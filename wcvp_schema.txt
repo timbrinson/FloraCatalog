@@ -1,0 +1,156 @@
+-- -----------------------------------------------------------------------------
+-- WCVP Import Schema (Staging Table)
+-- Matches the column structure of the World Checklist of Vascular Plants CSV.
+--
+-- DATA SOURCE CITATION:
+-- Govaerts R (ed.). 2025. WCVP: World Checklist of Vascular Plants.
+-- Facilitated by the Royal Botanic Gardens, Kew.
+-- [WWW document] URL https://doi.org/10.34885/b8fr-km05 [accessed 28 May 2025].
+-- Extracted: 28/05/2025
+-- -----------------------------------------------------------------------------
+
+CREATE TABLE wcvp_import (
+    -- =========================================================================
+    -- IDENTIFIERS
+    -- =========================================================================
+    
+    -- The unique World Checklist of Vascular Plants identifier (e.g., '12345-1').
+    -- This is the Primary Key for the source data.
+    plant_name_id text PRIMARY KEY,
+    
+    -- International Plant Names Index identifier (e.g., '320035-2').
+    ipni_id text,
+    
+    -- Plants of the World Online identifier. Often identical to plant_name_id.
+    powo_id text,
+    
+    -- =========================================================================
+    -- HIERARCHY & LINKS
+    -- =========================================================================
+    
+    -- If taxonomic_status is 'Synonym', this ID points to the 'Accepted' plant_name_id.
+    accepted_plant_name_id text,
+    
+    -- ID of the immediate parent taxon (e.g., Species ID for a Variety, Genus ID for a Species).
+    parent_plant_name_id text,
+    
+    -- ID of the basionym (the original name under which the taxon was described).
+    basionym_plant_name_id text,
+    
+    -- ID linking homotypic synonyms (names based on the same type specimen).
+    homotypic_synonym text,
+    
+    -- =========================================================================
+    -- TAXONOMY & NAMES
+    -- =========================================================================
+    
+    -- The full scientific name including genus, species, and infraspecific epithets.
+    -- Does NOT include authorship.
+    taxon_name text,
+    
+    -- The full authorship string for the name (e.g., "L." or "(Schott) Engelm.").
+    taxon_authors text,
+    
+    -- The family to which the taxon belongs (e.g., "Asparagaceae").
+    family text,
+    
+    -- The Genus name (e.g., "Agave").
+    genus text,
+    
+    -- Hybrid marker for the Genus (e.g., '×' or '+').
+    genus_hybrid text,
+    
+    -- The Species epithet (e.g., "parryi").
+    species text,
+    
+    -- Hybrid marker for the Species (e.g., '×'). Indicates an interspecific hybrid.
+    species_hybrid text,
+    
+    -- The Infraspecific epithet (e.g., "truncata").
+    infraspecies text,
+    
+    -- The rank of the infraspecies (e.g., "var.", "subsp.", "f.").
+    infraspecific_rank text,
+    
+    -- The taxonomic rank of this record (e.g., "Species", "Genus", "Variety").
+    taxon_rank text,
+    
+    -- The status of the name: 'Accepted', 'Synonym', 'Unplaced', 'Artificial'.
+    taxon_status text,
+    
+    -- The formula for hybrids (e.g., "Agave scabra × Agave victoriae-reginae").
+    hybrid_formula text,
+    
+    -- =========================================================================
+    -- DETAILED AUTHORSHIP
+    -- =========================================================================
+    
+    -- The author of the original basionym (in parentheses).
+    parenthetical_author text,
+    
+    -- The primary author of the current name combination.
+    primary_author text,
+    
+    -- The author who published the name (specific to the publication citation).
+    publication_author text,
+    
+    -- The author of the synonym being replaced (if applicable).
+    replaced_synonym_author text,
+    
+    -- =========================================================================
+    -- PUBLICATION DETAILS
+    -- =========================================================================
+    
+    -- The title of the publication where the name was validly published.
+    place_of_publication text,
+    
+    -- The volume and page number of the publication.
+    volume_and_page text,
+    
+    -- The year or date the name was first published.
+    first_published text,
+    
+    -- Notes on the name's legitimacy (e.g., "nom. illeg.", "nom. inval.").
+    nomenclatural_remarks text,
+    
+    -- =========================================================================
+    -- DATA MANAGEMENT & ECOLOGY
+    -- =========================================================================
+    
+    -- Indicates if the record has been reviewed by Kew botanists ('Y' or 'N').
+    reviewed text,
+    
+    -- The description of the native distribution range (e.g., "Mexico Northeast").
+    geographic_area text,
+    
+    -- The growth form or habit (e.g., "Succulent", "Tree", "Geophyte").
+    lifeform_description text,
+    
+    -- The climate description (e.g., "Wet Tropical", "Subtropical").
+    climate_description text
+);
+
+-- -----------------------------------------------------------------------------
+-- INDEXES
+-- -----------------------------------------------------------------------------
+
+-- Optimizes searching by full scientific name (critical for autocomplete).
+CREATE INDEX idx_wcvp_name ON wcvp_import (taxon_name text_pattern_ops);
+
+-- Optimizes filtering by rank (e.g., "Show only Species").
+CREATE INDEX idx_wcvp_rank ON wcvp_import (taxon_rank);
+
+-- Optimizes filtering by status (e.g., "Show only Accepted names").
+CREATE INDEX idx_wcvp_status ON wcvp_import (taxon_status);
+
+-- Optimizes hierarchical tree traversal (Finding children of a parent).
+CREATE INDEX idx_wcvp_parent ON wcvp_import (parent_plant_name_id);
+
+-- Optimizes linking synonyms to their accepted names.
+CREATE INDEX idx_wcvp_accepted ON wcvp_import (accepted_plant_name_id);
+
+-- Optimizes grouping by Family.
+CREATE INDEX idx_wcvp_family ON wcvp_import (family);
+
+-- Optimizes grouping by Genus.
+CREATE INDEX idx_wcvp_genus ON wcvp_import (genus);
