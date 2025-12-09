@@ -1,6 +1,12 @@
 # Version History
 
-## v2.1 - Cost Optimization & UI Polish (Current)
+## v2.1.1 - Documentation & Specs (Current)
+**Date:** May 30, 2025
+
+### Changes
+- **Documentation:** Added `DESIGN_SPECS.md` to the project root. This file contains the "Prompt Context" and technical specifications needed to replicate or understand the codebase. It serves as a "living document" for the AI assistant.
+
+## v2.1 - Cost Optimization & UI Polish
 **Date:** May 30, 2025
 
 ### Key Changes
