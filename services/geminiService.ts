@@ -95,59 +95,10 @@ const getResponseText = (response: any): string => {
 };
 
 // ---------------------------------------------------------
-//  SEARCH & MATCHING
-// ---------------------------------------------------------
-
-export const searchTaxonCandidates = async (query: string): Promise<SearchCandidate[]> => {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-  
-  const prompt = `
-    User Search: "${query}"
-    
-    Task: Identify the botanical plant name(s) this refers to.
-    
-    Handle:
-    - Synonyms (e.g. "Dicentra spectabilis" -> "Lamprocapnos spectabilis")
-    - Common Names (e.g. "Bleeding Heart")
-    - Typos (e.g. "Agave paryi")
-    - Trademarks (e.g. "Encore Azalea")
-    
-    Return a JSON Array of up to 3 candidates, sorted by likelihood.
-    
-    Format:
-    [
-      { 
-        "scientificName": "Full botanical name with authors omitted", 
-        "commonName": "Common Name", 
-        "rank": "species|cultivar|etc",
-        "matchType": "exact|synonym|fuzzy|common_name",
-        "confidence": 0.95 
-      }
-    ]
-    
-    Strictly JSON. No Markdown.
-  `;
-
-  try {
-      const response = await ai.models.generateContent({
-        model: "gemini-2.5-flash",
-        contents: prompt
-      });
-      const text = getResponseText(response);
-      const json = extractJSON(text);
-      if (!json) return [];
-      return JSON.parse(json);
-  } catch (e) {
-      console.error("Search failed", e);
-      return [];
-  }
-};
-
-// ---------------------------------------------------------
 //  Identify Hierarchy Chain
 // ---------------------------------------------------------
 
-interface RawTaxonNode {
+export interface RawTaxonNode {
   rank: string; 
   name: string; 
   fullName: string;
@@ -155,6 +106,7 @@ interface RawTaxonNode {
   commonName?: string;
   genusHybrid?: string;
   speciesHybrid?: string;
+  referenceLinks?: Link[];
 }
 
 export const identifyTaxonomy = async (query: string): Promise<RawTaxonNode[]> => {
@@ -212,7 +164,11 @@ export const identifyTaxonomy = async (query: string): Promise<RawTaxonNode[]> =
       const jsonString = extractJSON(text);
       if (!jsonString) throw new Error("Empty response or invalid JSON extraction");
       
-      return JSON.parse(jsonString) as RawTaxonNode[];
+      const parsed = JSON.parse(jsonString);
+      // Ensure we always return an array, even if model outputs a single object
+      const chain = Array.isArray(parsed) ? parsed : [parsed];
+      
+      return chain as RawTaxonNode[];
     } catch (error: any) {
       console.error(`Taxonomy ID Error (Attempt ${attempt + 1}):`, error);
       if (attempt < maxRetries - 1) await wait(1000);
@@ -254,7 +210,6 @@ export const enrichTaxon = async (taxon: Taxon): Promise<Partial<Taxon>> => {
       const response = await ai.models.generateContent({
         model: "gemini-2.5-flash",
         contents: prompt,
-        config: { tools: [{ googleSearch: {} }] },
       });
 
       const text = getResponseText(response);
@@ -265,18 +220,8 @@ export const enrichTaxon = async (taxon: Taxon): Promise<Partial<Taxon>> => {
          try { details = JSON.parse(jsonString); } catch(e) { console.warn("Enrichment JSON parse failed", e); }
       }
 
-      const foundLinks: Link[] = [];
-      const chunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks;
-      if (chunks) {
-        chunks.forEach((chunk: any) => {
-           if (chunk.web?.uri) {
-               foundLinks.push({ title: chunk.web.title || "Reference", url: chunk.web.uri });
-           }
-        });
-      }
-
-      const finalLinks = [...(details.referenceLinks || []), ...foundLinks]
-         .filter((v,i,a) => a.findIndex(t => t.url === v.url) === i);
+      // Without Google Search grounding, we only rely on the links the model "hallucinates" or recalls from training.
+      const finalLinks = details.referenceLinks || [];
 
       return {
           description: details.description || taxon.description,
@@ -308,7 +253,7 @@ export const getBotanicalSuggestions = async (
      JSON Array of strings ONLY. No Markdown.
   `;
   try {
-      const response = await ai.models.generateContent({ model: "gemini-2.5-flash", contents: prompt, config: { tools: [{ googleSearch: {} }] } });
+      const response = await ai.models.generateContent({ model: "gemini-2.5-flash", contents: prompt });
       const text = getResponseText(response);
       const json = extractJSON(text);
       return json ? JSON.parse(json) : [];
@@ -319,15 +264,10 @@ export const findAdditionalLinks = async (name: string, existing: Link[]): Promi
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     try {
         const prompt = `Find 5 distinct reference links for "${name}". Exclude: ${existing.map(l=>l.url).join(', ')}. Return JSON array of {title, url}.`;
-        const res = await ai.models.generateContent({ model: "gemini-2.5-flash", contents: prompt, config: { tools: [{ googleSearch: {} }] } });
+        const res = await ai.models.generateContent({ model: "gemini-2.5-flash", contents: prompt });
         const text = getResponseText(res);
         const json = extractJSON(text);
-        let links = json ? JSON.parse(json) : [];
-        const chunks = res.candidates?.[0]?.groundingMetadata?.groundingChunks;
-        if (chunks) {
-            chunks.forEach((c:any) => { if(c.web?.uri) links.push({title: c.web.title||'Ref', url: c.web.uri}); });
-        }
-        return links;
+        return json ? JSON.parse(json) : [];
     } catch(e) { return []; }
 };
 
@@ -370,7 +310,7 @@ export const deepScanTaxon = async (
              const res = await ai.models.generateContent({
                  model: "gemini-2.5-flash",
                  contents: prompt,
-                 config: { tools: [{ googleSearch: {} }] }
+                 // Tools removed to save costs
              });
              const text = getResponseText(res);
              const json = extractJSON(text);
@@ -406,6 +346,59 @@ export const parseBulkText = async (rawText: string): Promise<RawTaxonNode[][]> 
         const res = await ai.models.generateContent({ model: "gemini-2.5-flash", contents: prompt });
         const text = getResponseText(res);
         const json = extractJSON(text);
-        return json ? JSON.parse(json) : [];
+        const parsed = json ? JSON.parse(json) : [];
+        return Array.isArray(parsed) ? parsed : [];
     } catch(e) { return []; }
 }
+
+// ---------------------------------------------------------
+//  SEARCH & MATCHING
+// ---------------------------------------------------------
+
+export const searchTaxonCandidates = async (query: string): Promise<SearchCandidate[]> => {
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  
+  const prompt = `
+    User Search: "${query}"
+    
+    Task: Identify the botanical plant name(s) this refers to.
+    
+    Handle:
+    - Synonyms (e.g. "Dicentra spectabilis" -> "Lamprocapnos spectabilis")
+    - Common Names (e.g. "Bleeding Heart")
+    - Typos (e.g. "Agave paryi")
+    - Trademarks (e.g. "Encore Azalea")
+    
+    Return a JSON Array of up to 3 candidates, sorted by likelihood.
+    
+    Format:
+    [
+      { 
+        "scientificName": "Full botanical name with authors omitted", 
+        "commonName": "Common Name", 
+        "rank": "species|cultivar|etc",
+        "matchType": "exact|synonym|fuzzy|common_name",
+        "confidence": 0.95
+      }
+    ]
+  `;
+
+  try {
+      const response = await ai.models.generateContent({
+        model: "gemini-2.5-flash",
+        contents: prompt,
+      });
+
+      const text = getResponseText(response);
+      const jsonString = extractJSON(text);
+      if (!jsonString) return [];
+      
+      const parsed = JSON.parse(jsonString);
+      const candidates = Array.isArray(parsed) ? parsed : [parsed];
+      
+      return candidates as SearchCandidate[];
+  } catch (error) {
+      console.error("Search candidates failed:", error);
+      return [];
+  }
+};

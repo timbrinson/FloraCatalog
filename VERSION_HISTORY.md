@@ -1,7 +1,24 @@
 # Version History
 
-## v2.0 - Advanced Tree Grid & Search (Current)
-**Date:** May 29, 2025 (Checkpoint 2)
+## v2.1 - Cost Optimization & UI Polish (Current)
+**Date:** May 30, 2025
+
+### Key Changes
+- **Cost Reduction:**
+  - **Removed Google Search Grounding:** Switched identifying and mining operations to rely solely on the model's internal knowledge base to eliminate high tool-use costs.
+  - **Optimized Mining:** Disabled grounding explicitly during bulk scanning operations.
+- **DataGridV2 Improvements:**
+  - **Column Locking:** Added `lockWidth` support to prevent narrow utility columns (Tree, #, GH, SH) from expanding during auto-fit or window resizing.
+  - **Tree Toggle:** Moved the Tree/Flat view switcher directly into the Tree column header and replaced it with a cleaner icon-only button.
+  - **Visuals:** Center-aligned utility headers and hid unnecessary sort icons for cleaner density.
+  - **Sizing Logic:** Updated `Fit to Screen` algorithm to respect locked columns and prioritize Scientific Name width.
+- **Bug Fixes:**
+  - **Scientific Name Reconstruction:** Fixed logic where the AI model returned partial names. The app now manually reconstructs the full `scientificName` (e.g., "Agave parryi var. truncata") using the hierarchy chain.
+  - **Hybrid Markers:** Ensured `×` markers are correctly inserted for Genus and Species hybrids during name generation.
+  - **Infraspecies Data:** Prevented rank prefixes (e.g., "var.") from being duplicated inside the `infraspecies` name field.
+
+## v2.0 - Advanced Tree Grid & Search
+**Date:** May 29, 2025
 
 ### Major Enhancements
 - **Tree Grid (DataGridV2):**
@@ -28,7 +45,7 @@
 - `types.ts`: Extended Taxon interface.
 - `utils/formatters.ts`: Scientific name formatting rules.
 
-## v1.0 - Stable Prototype (Current)
+## v1.0 - Stable Prototype
 **Date:** May 29, 2025
 
 ### Core Features
@@ -61,5 +78,3 @@
 ### Known Issues
 - File system updates in the code assistant sometimes timeout on large files.
 - Mining prompts occasionally hallucinate cross-genus results (Mitigated with client-side filtering).
-
----

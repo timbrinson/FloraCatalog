@@ -109,7 +109,7 @@ const MultiSelectFilter = ({
 
 const DataGrid: React.FC<DataGridProps> = ({ taxa, onAction, preferences }) => {
   // --- Column Definition ---
-  type ColumnId = keyof Taxon | string; 
+  type ColumnId = string; 
   
   interface ColumnConfig {
       id: ColumnId;
@@ -468,7 +468,7 @@ const DataGrid: React.FC<DataGridProps> = ({ taxa, onAction, preferences }) => {
                          <div className="space-y-0.5">
                             {allColumns.map(col => (
                                 <div 
-                                    key={col.id} 
+                                    key={String(col.id)} 
                                     onClick={() => toggleColumn(col.id)}
                                     className="flex items-center gap-2 px-2 py-1.5 hover:bg-slate-50 cursor-pointer rounded"
                                 >
@@ -493,7 +493,7 @@ const DataGrid: React.FC<DataGridProps> = ({ taxa, onAction, preferences }) => {
               <tr>
                   {activeColumns.map(col => (
                       <th 
-                        key={col.id} 
+                        key={String(col.id)} 
                         className={`border-b border-slate-200 border-r border-slate-100 last:border-r-0 bg-slate-50 select-none relative group
                            ${draggedColumn === col.id ? 'opacity-50 bg-slate-200' : ''}`}
                         style={{ width: colWidths[col.id], minWidth: 50 }}
@@ -525,7 +525,7 @@ const DataGrid: React.FC<DataGridProps> = ({ taxa, onAction, preferences }) => {
               {/* Row 2: Filters */}
               <tr>
                   {activeColumns.map(col => (
-                      <th key={`${col.id}-filter`} className="p-1 border-b border-slate-200 border-r border-slate-100 bg-slate-50/80">
+                      <th key={`${String(col.id)}-filter`} className="p-1 border-b border-slate-200 border-r border-slate-100 bg-slate-50/80">
                           {col.id === 'actions' ? null : 
                            col.filterType === 'multi-select' ? (
                               <MultiSelectFilter 
@@ -548,7 +548,7 @@ const DataGrid: React.FC<DataGridProps> = ({ taxa, onAction, preferences }) => {
            </thead>
            <tbody className="divide-y divide-slate-100">
               {sortedData.map(row => (
-                 <tr key={row.id} className="hover:bg-blue-50/50 transition-colors">
+                 <tr key={String(row.id)} className="hover:bg-blue-50/50 transition-colors">
                     {activeColumns.map(col => {
                         // @ts-ignore
                         const val = row[col.id];
@@ -591,7 +591,7 @@ const DataGrid: React.FC<DataGridProps> = ({ taxa, onAction, preferences }) => {
                         }
 
                         return (
-                            <td key={col.id} className="p-2 border-r border-slate-50 last:border-r-0 text-slate-600 truncate overflow-hidden max-w-0" title={String(val || '')}>
+                            <td key={String(col.id)} className="p-2 border-r border-slate-50 last:border-r-0 text-slate-600 truncate overflow-hidden max-w-0" title={String(val || '')}>
                                 {displayVal}
                             </td>
                         );

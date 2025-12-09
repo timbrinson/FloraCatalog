@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { Taxon, UserPreferences } from '../types';
 import { ArrowUpDown, Settings, Check, ChevronDown, GripVertical, Maximize, Monitor, Pickaxe, Info, Wand2, LayoutList, ChevronRight, Network, AlignJustify } from 'lucide-react';
@@ -61,14 +62,15 @@ const MultiSelectFilter = ({ options, selected, onChange, label }: { options: st
     );
 };
 
-interface TreeRow extends Taxon {
+// Changed from interface extends to type intersection to ensure properties are picked up correctly
+type TreeRow = Taxon & {
     isTreeHeader?: boolean;
     treeExpanded?: boolean;
     childCount?: number;
     depth?: number;
     treePath?: string;
     isVirtual?: boolean; 
-}
+};
 
 const getDescendantCount = (taxonId: string, allTaxa: Taxon[]): number => {
     let count = 0;
@@ -81,7 +83,7 @@ const getDescendantCount = (taxonId: string, allTaxa: Taxon[]): number => {
 };
 
 const DataGridV2: React.FC<DataGridProps> = ({ taxa, onAction, preferences }) => {
-  type ColumnId = keyof Taxon | string; 
+  type ColumnId = string; 
   interface ColumnConfig { 
       id: ColumnId; 
       label: string; 
@@ -89,26 +91,29 @@ const DataGridV2: React.FC<DataGridProps> = ({ taxa, onAction, preferences }) =>
       filterType?: 'text' | 'multi-select'; 
       filterOptions?: string[]; 
       disableSorting?: boolean; 
-      disableDrag?: boolean;    
+      disableDrag?: boolean;
+      hideHeaderIcons?: boolean; 
+      headerAlign?: 'left' | 'center' | 'right';
+      lockWidth?: boolean; // If true, auto-fit and fit-to-screen won't resize this column
   }
 
   const allColumns: ColumnConfig[] = [
-      { id: 'treeControl', label: 'Tree', defaultWidth: 80, filterType: undefined, disableSorting: true }, 
-      { id: 'actions', label: 'Actions', defaultWidth: 70, filterType: undefined, disableSorting: true }, 
-      { id: 'childCount', label: '#', defaultWidth: 50, filterType: 'text' }, 
+      { id: 'treeControl', label: 'Tree', defaultWidth: 55, filterType: undefined, disableSorting: true, lockWidth: true, hideHeaderIcons: true, headerAlign: 'center' }, 
+      { id: 'actions', label: 'Actions', defaultWidth: 70, filterType: undefined, disableSorting: true, lockWidth: true, hideHeaderIcons: true, headerAlign: 'center' }, 
+      { id: 'childCount', label: '#', defaultWidth: 50, filterType: 'text', hideHeaderIcons: true, headerAlign: 'center', lockWidth: true }, 
       
       { id: 'family', label: 'Family', defaultWidth: 120, filterType: 'text' },
       { id: 'genus', label: 'Genus', defaultWidth: 120, filterType: 'text' }, 
-      { id: 'genusHybrid', label: 'GH', defaultWidth: 40, filterType: 'text', disableSorting: true }, 
+      { id: 'genusHybrid', label: 'GH', defaultWidth: 40, filterType: 'text', disableSorting: true, hideHeaderIcons: true, headerAlign: 'center', lockWidth: true }, 
       { id: 'species', label: 'Species', defaultWidth: 120, filterType: 'text' }, 
-      { id: 'speciesHybrid', label: 'SH', defaultWidth: 40, filterType: 'text', disableSorting: true }, 
-      { id: 'infraspecificRank', label: 'I Rank', defaultWidth: 60, filterType: 'text' },
+      { id: 'speciesHybrid', label: 'SH', defaultWidth: 40, filterType: 'text', disableSorting: true, hideHeaderIcons: true, headerAlign: 'center', lockWidth: true }, 
+      { id: 'infraspecificRank', label: 'I Rank', defaultWidth: 60, filterType: 'text', hideHeaderIcons: true, headerAlign: 'center', lockWidth: true },
       { id: 'infraspecies', label: 'Infraspecies', defaultWidth: 120, filterType: 'text' }, 
       { id: 'cultivar', label: 'Cultivar', defaultWidth: 150, filterType: 'text' }, 
       
       { id: 'scientificName', label: 'Scientific Name', defaultWidth: 220, filterType: 'text' },
       
-      { id: 'rank', label: 'Rank', defaultWidth: 110, filterType: 'multi-select', filterOptions: ['family', 'genus', 'species', 'subspecies', 'variety', 'form', 'hybrid', 'cultivar', 'grex'] },
+      { id: 'rank', label: 'Rank', defaultWidth: 110, filterType: 'multi-select', filterOptions: ['family', 'genus', 'species', 'subspecies', 'variety', 'form', 'hybrid', 'cultivar', 'grex'], lockWidth: true },
       { id: 'taxonomicStatus', label: 'Status', defaultWidth: 110, filterType: 'multi-select', filterOptions: ['Accepted', 'Synonym', 'Unresolved', 'Artificial'] },
       { id: 'commonName', label: 'Common Name', defaultWidth: 150, filterType: 'text' },
       
@@ -191,6 +196,10 @@ const DataGridV2: React.FC<DataGridProps> = ({ taxa, onAction, preferences }) =>
 
   const activeColumns = useMemo(() => columnOrder.filter(id => visibleColumns.has(id)).map(id => allColumns.find(c => c.id === id)).filter((c): c is ColumnConfig => !!c), [columnOrder, visibleColumns]);
 
+  const totalTableWidth = useMemo(() => {
+      return activeColumns.reduce((sum, col) => sum + (colWidths[col.id] || col.defaultWidth), 0);
+  }, [activeColumns, colWidths]);
+
   const getRowValue = (row: Taxon, colId: string) => {
        if (colId === 'childCount') {
            const tr = row as TreeRow;
@@ -233,8 +242,8 @@ const DataGridV2: React.FC<DataGridProps> = ({ taxa, onAction, preferences }) =>
              const countB = getRowValue(b, 'childCount') as number;
              return sortConfig.direction === 'asc' ? countA - countB : countB - countA;
           }
-          const aValue = String(getRowValue(a, sortConfig.key as string) || '').toLowerCase();
-          const bValue = String(getRowValue(b, sortConfig.key as string) || '').toLowerCase();
+          const aValue = String(getRowValue(a, String(sortConfig.key)) || '').toLowerCase();
+          const bValue = String(getRowValue(b, String(sortConfig.key)) || '').toLowerCase();
           if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1;
           if (aValue > bValue) return sortConfig.direction === 'asc' ? 1 : -1;
           return 0;
@@ -362,9 +371,83 @@ const DataGridV2: React.FC<DataGridProps> = ({ taxa, onAction, preferences }) =>
   const handleResizeStart = (e: React.MouseEvent, colId: ColumnId) => { e.preventDefault(); e.stopPropagation(); resizingRef.current = { colId, startX: e.clientX, startWidth: colWidths[colId] || 100 }; document.addEventListener('mousemove', handleResizeMove); document.addEventListener('mouseup', handleResizeEnd); document.body.style.cursor = 'col-resize'; };
   const handleResizeMove = useCallback((e: MouseEvent) => { if (!resizingRef.current) return; const { colId, startX, startWidth } = resizingRef.current; const diff = e.clientX - startX; setColWidths(prev => ({ ...prev, [colId]: Math.max(30, startWidth + diff) })); }, []);
   const handleResizeEnd = useCallback(() => { resizingRef.current = null; document.removeEventListener('mousemove', handleResizeMove); document.removeEventListener('mouseup', handleResizeEnd); document.body.style.cursor = ''; }, [handleResizeMove]);
-  const getIdealWidths = () => { const canvas = document.createElement('canvas'); const context = canvas.getContext('2d'); if (!context) return {}; context.font = '14px Inter, sans-serif'; const idealWidths: Record<ColumnId, number> = {}; const sampleSize = 100; activeColumns.forEach(col => { let maxWidth = context.measureText(col.label).width + 24; const rowsToCheck = taxa.slice(0, sampleSize); rowsToCheck.forEach(row => { const val = String(getRowValue(row, col.id as string) || ''); const width = context.measureText(val).width + 16; maxWidth = Math.max(maxWidth, width); }); maxWidth = Math.max(maxWidth, 50); idealWidths[col.id] = Math.ceil(maxWidth); }); return idealWidths; };
-  const autoFitContent = () => { const ideals = getIdealWidths(); const limit = preferences.autoFitMaxWidth || 400; Object.keys(ideals).forEach(k => { if (k === 'scientificName') ideals[k] = Math.max(ideals[k], 180); else ideals[k] = Math.min(ideals[k], limit); }); setColWidths(prev => ({...prev, ...ideals})); };
-  const fitToScreen = () => { if (!containerRef.current) return; const ideals = getIdealWidths(); const availableWidth = containerRef.current.clientWidth - 2; let minIdeal = 9999; Object.values(ideals).forEach(w => { if(w < minIdeal) minIdeal = w; }); const ratio = preferences.fitScreenMaxRatio || 4.0; const maxAllowed = minIdeal * ratio; const cappedIdeals: Record<ColumnId, number> = {}; let totalCappedWidth = 0; activeColumns.forEach(col => { let w = ideals[col.id]; if (['rank', 'taxonomicStatus', 'reviewed'].includes(col.id as string)) w = Math.max(w, 110); if (col.id === 'scientificName') w = Math.max(w, 180); else w = Math.min(w, maxAllowed); cappedIdeals[col.id] = w; totalCappedWidth += w; }); const newWidths: Record<ColumnId, number> = {}; if (totalCappedWidth < availableWidth) { const extraSpace = availableWidth - totalCappedWidth; activeColumns.forEach(col => { const share = cappedIdeals[col.id] / totalCappedWidth; newWidths[col.id] = Math.floor(cappedIdeals[col.id] + (extraSpace * share)); }); } else { const scale = availableWidth / totalCappedWidth; activeColumns.forEach(col => { let w = cappedIdeals[col.id] * scale; if (col.id === 'scientificName') w = Math.max(w, 150); if (['rank', 'taxonomicStatus', 'reviewed'].includes(col.id as string)) w = Math.max(w, 80); newWidths[col.id] = Math.max(40, Math.floor(w)); }); } setColWidths(prev => ({...prev, ...newWidths})); };
+  
+  const getIdealWidths = () => { const canvas = document.createElement('canvas'); const context = canvas.getContext('2d'); if (!context) return {}; context.font = '14px Inter, sans-serif'; const idealWidths: Record<ColumnId, number> = {}; const sampleSize = 100; activeColumns.forEach(col => { let maxWidth = context.measureText(col.label).width + 24; const rowsToCheck = taxa.slice(0, sampleSize); rowsToCheck.forEach(row => { const val = String(getRowValue(row, String(col.id)) || ''); const width = context.measureText(val).width + 16; maxWidth = Math.max(maxWidth, width); }); maxWidth = Math.max(maxWidth, 50); idealWidths[col.id] = Math.ceil(maxWidth); }); return idealWidths; };
+  
+  const autoFitContent = () => { 
+      const ideals = getIdealWidths(); 
+      const limit = preferences.autoFitMaxWidth || 400; 
+      const updates: Record<ColumnId, number> = {};
+      
+      Object.keys(ideals).forEach(k => { 
+          const colDef = allColumns.find(c => c.id === k);
+          if (colDef?.lockWidth) return; // Skip locked columns
+
+          if (k === 'scientificName') updates[k] = Math.max(ideals[k], 180); 
+          else updates[k] = Math.min(ideals[k], limit); 
+      }); 
+      setColWidths(prev => ({...prev, ...updates})); 
+  };
+  
+  const fitToScreen = () => { 
+      if (!containerRef.current) return; 
+      const ideals = getIdealWidths(); 
+      const availableWidth = containerRef.current.clientWidth - 2; 
+
+      // Separation of columns
+      const lockedCols = activeColumns.filter(c => c.lockWidth);
+      const flexCols = activeColumns.filter(c => !c.lockWidth);
+
+      // 1. Calculate Fixed Space (using CURRENT widths for locked columns)
+      let lockedWidth = 0;
+      lockedCols.forEach(col => {
+          lockedWidth += (colWidths[col.id] || col.defaultWidth);
+      });
+
+      const flexAvailable = Math.max(0, availableWidth - lockedWidth);
+
+      if (flexCols.length === 0) return;
+
+      // 2. Distribute remaining space among flex columns
+      let minIdeal = 9999; 
+      flexCols.forEach(col => { 
+          const w = ideals[col.id] || 50;
+          if(w < minIdeal) minIdeal = w; 
+      }); 
+      
+      const ratio = preferences.fitScreenMaxRatio || 4.0; 
+      const maxAllowed = minIdeal * ratio; 
+      const cappedIdeals: Record<ColumnId, number> = {}; 
+      let totalCappedWidth = 0; 
+      
+      flexCols.forEach(col => { 
+          let w = ideals[col.id]; 
+          if (['rank', 'taxonomicStatus', 'reviewed'].includes(String(col.id))) w = Math.max(w, 110); 
+          if (col.id === 'scientificName') w = Math.max(w, 180); 
+          else w = Math.min(w, maxAllowed); 
+          cappedIdeals[col.id] = w; 
+          totalCappedWidth += w; 
+      }); 
+      
+      const newWidths: Record<ColumnId, number> = {}; 
+      if (totalCappedWidth < flexAvailable) { 
+          const extraSpace = flexAvailable - totalCappedWidth; 
+          flexCols.forEach(col => { 
+              const share = cappedIdeals[col.id] / totalCappedWidth; 
+              newWidths[col.id] = Math.floor(cappedIdeals[col.id] + (extraSpace * share)); 
+          }); 
+      } else { 
+          const scale = flexAvailable / totalCappedWidth; 
+          flexCols.forEach(col => { 
+              let w = cappedIdeals[col.id] * scale; 
+              if (col.id === 'scientificName') w = Math.max(w, 150); 
+              if (['rank', 'taxonomicStatus', 'reviewed'].includes(String(col.id))) w = Math.max(w, 80); 
+              newWidths[col.id] = Math.max(40, Math.floor(w)); 
+          }); 
+      } 
+      setColWidths(prev => ({...prev, ...newWidths})); 
+  };
+  
   const handleSort = (key: ColumnId) => { let direction: 'asc' | 'desc' = 'asc'; if (sortConfig && sortConfig.key === key && sortConfig.direction === 'asc') direction = 'desc'; setSortConfig({ key, direction }); };
   const handleTextFilterChange = (key: string, val: string) => setTextFilters(p => ({ ...p, [key]: val }));
   const handleMultiFilterChange = (key: string, vals: string[]) => setMultiFilters(p => ({ ...p, [key]: vals }));
@@ -388,14 +471,6 @@ const DataGridV2: React.FC<DataGridProps> = ({ taxa, onAction, preferences }) =>
                  </div>
              )}
 
-             <button 
-                onClick={() => setIsHierarchyMode(!isHierarchyMode)}
-                className={`flex items-center gap-1.5 px-3 py-1.5 border border-slate-300 rounded text-xs hover:bg-slate-50 shadow-sm transition-colors ${isHierarchyMode ? 'bg-indigo-50 text-indigo-700 border-indigo-200' : 'bg-white text-slate-600'}`}
-             >
-                {isHierarchyMode ? <Network size={14}/> : <AlignJustify size={14}/>}
-                {isHierarchyMode ? 'Tree' : 'Flat'}
-             </button>
-
              <div className="relative" ref={legendRef}>
                  <button onClick={() => setShowLegend(!showLegend)} className={`flex items-center gap-1.5 px-3 py-1.5 border border-slate-300 rounded text-xs hover:bg-slate-50 shadow-sm ${showLegend ? 'bg-slate-100 text-leaf-600' : 'bg-white text-slate-600'}`}><Info size={14} /> Legend</button>
                  {showLegend && (<div className="absolute right-0 top-full mt-2 w-72 bg-white border border-slate-200 rounded-lg shadow-xl z-50 p-4"><h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3">Taxonomic Ranks</h4><div className="grid grid-cols-2 gap-2">{Object.entries(RANK_COLORS).map(([rank, color]) => (<div key={rank} className="flex items-center gap-2"><span className={`w-3 h-3 rounded-full border ${color.split(' ')[0]} ${color.split(' ')[2]}`}></span><span className="text-xs text-slate-600 capitalize">{rank}</span></div>))}</div></div>)}
@@ -409,12 +484,15 @@ const DataGridV2: React.FC<DataGridProps> = ({ taxa, onAction, preferences }) =>
          </div>
       </div>
       <div className="flex-1 overflow-auto" ref={containerRef}>
-        <table className="w-full text-left text-sm whitespace-nowrap border-separate border-spacing-0 table-fixed">
+        <table 
+            className="text-left text-sm whitespace-nowrap border-separate border-spacing-0 table-fixed"
+            style={{ width: totalTableWidth }}
+        >
            <thead className="bg-slate-50 sticky top-0 z-10 text-xs font-bold text-slate-500 uppercase tracking-wide shadow-sm">
               <tr>
                   {activeColumns.map(col => (
                       <th 
-                          key={col.id} 
+                          key={String(col.id)} 
                           className={`border-b border-slate-200 border-r border-slate-100 last:border-r-0 bg-slate-50 select-none relative group ${draggedColumn === col.id ? 'opacity-50 bg-slate-200' : ''}`} 
                           style={{ width: colWidths[col.id], minWidth: 30 }} 
                           draggable={!col.disableDrag}
@@ -422,12 +500,27 @@ const DataGridV2: React.FC<DataGridProps> = ({ taxa, onAction, preferences }) =>
                           onDragOver={handleDragOver} 
                           onDrop={(e) => handleDrop(e, col.id)}
                       >
-                         <div className="flex items-center justify-between gap-1 p-2 h-full w-full">
-                             <div className="flex items-center gap-1 cursor-grab active:cursor-grabbing overflow-hidden" onClick={() => !col.disableSorting && handleSort(col.id)}>
-                                {col.id !== 'actions' && col.id !== 'treeControl' && !col.disableDrag && <GripVertical size={12} className="text-slate-300 opacity-0 group-hover:opacity-100 cursor-move flex-shrink-0" />}
-                                <span className="truncate">{col.label}</span>
-                             </div>
-                             {col.id !== 'actions' && col.id !== 'treeControl' && !col.disableSorting && (<button onClick={() => handleSort(col.id)} className="flex-shrink-0"><ArrowUpDown size={12} className={sortConfig?.key === col.id ? 'text-leaf-600' : 'text-slate-300 hover:text-slate-500'}/></button>)}
+                         <div className={`flex items-center gap-1 p-2 h-full w-full ${col.headerAlign === 'center' ? 'justify-center' : 'justify-between'}`}>
+                             {col.id === 'treeControl' ? (
+                                <button
+                                    onClick={(e) => {
+                                        e.stopPropagation(); // prevent sort/drag if any
+                                        setIsHierarchyMode(!isHierarchyMode);
+                                    }}
+                                    className={`p-1 rounded hover:bg-slate-200 transition-colors ${isHierarchyMode ? 'text-indigo-600 bg-indigo-50 ring-1 ring-indigo-200 shadow-inner' : 'text-slate-400'}`}
+                                    title={isHierarchyMode ? "Switch to Flat View" : "Switch to Tree View"}
+                                >
+                                    <Network size={16} />
+                                </button>
+                             ) : (
+                                 <>
+                                     <div className="flex items-center gap-1 cursor-grab active:cursor-grabbing overflow-hidden" onClick={() => !col.disableSorting && handleSort(col.id)}>
+                                        {col.id !== 'actions' && !col.disableDrag && !col.hideHeaderIcons && <GripVertical size={12} className="text-slate-300 opacity-0 group-hover:opacity-100 cursor-move flex-shrink-0" />}
+                                        <span className="truncate">{col.label}</span>
+                                     </div>
+                                     {col.id !== 'actions' && !col.disableSorting && !col.hideHeaderIcons && (<button onClick={() => handleSort(col.id)} className="flex-shrink-0"><ArrowUpDown size={12} className={sortConfig?.key === col.id ? 'text-leaf-600' : 'text-slate-300 hover:text-slate-500'}/></button>)}
+                                 </>
+                             )}
                          </div>
                          {col.id !== 'actions' && (<div className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-leaf-400 z-20" onMouseDown={(e) => handleResizeStart(e, col.id)}/>)}
                       </th>
@@ -435,8 +528,8 @@ const DataGridV2: React.FC<DataGridProps> = ({ taxa, onAction, preferences }) =>
               </tr>
               <tr>
                   {activeColumns.map(col => (
-                      <th key={`${col.id}-filter`} className="p-1 border-b border-slate-200 border-r border-slate-100 bg-slate-50/80">
-                          {col.id === 'actions' || col.id === 'treeControl' ? null : col.filterType === 'multi-select' ? (<MultiSelectFilter label={col.label} options={col.filterOptions || []} selected={multiFilters[col.id as string] || []} onChange={(vals) => handleMultiFilterChange(col.id as string, vals)}/>) : (<input className="w-full text-xs px-2 py-1.5 bg-white border border-slate-200 rounded outline-none focus:border-leaf-300 focus:ring-1 focus:ring-leaf-200 placeholder:text-slate-300 font-normal" placeholder={`Filter...`} value={textFilters[col.id as string] || ''} onChange={e => handleTextFilterChange(col.id as string, e.target.value)}/>)}
+                      <th key={`${String(col.id)}-filter`} className="p-1 border-b border-slate-200 border-r border-slate-100 bg-slate-50/80">
+                          {col.id === 'actions' || col.id === 'treeControl' ? null : col.filterType === 'multi-select' ? (<MultiSelectFilter label={col.label} options={col.filterOptions || []} selected={multiFilters[String(col.id)] || []} onChange={(vals) => handleMultiFilterChange(String(col.id), vals)}/>) : (<input className="w-full text-xs px-2 py-1.5 bg-white border border-slate-200 rounded outline-none focus:border-leaf-300 focus:ring-1 focus:ring-leaf-200 placeholder:text-slate-300 font-normal" placeholder={`Filter...`} value={textFilters[String(col.id)] || ''} onChange={e => handleTextFilterChange(String(col.id), e.target.value)}/>)}
                       </th>
                   ))}
               </tr>
@@ -455,24 +548,24 @@ const DataGridV2: React.FC<DataGridProps> = ({ taxa, onAction, preferences }) =>
                           if (tr.isTreeHeader) {
                               const isCollapsed = !tr.treeExpanded;
                               return (
-                                 <td key={col.id} className="p-2 border-r border-slate-200" style={{ paddingLeft: `${(tr.depth || 0) * 12}px` }}>
+                                 <td key={String(col.id)} className="p-2 border-r border-slate-200" style={{ paddingLeft: `${(tr.depth || 0) * 20}px` }}>
                                      <div className="flex items-center gap-1 font-bold text-slate-600">
                                          <span className={`transform transition-transform ${!isCollapsed ? 'rotate-90' : ''}`}><ChevronRight size={14} /></span>
                                      </div>
                                  </td>
                               );
                           }
-                          return <td key={col.id} className="p-2 border-r border-slate-50"></td>;
+                          return <td key={String(col.id)} className="p-2 border-r border-slate-50"></td>;
                       }
 
                       // Child Count - Using recursive helper on FULL dataset
                       if (col.id === 'childCount') {
                           // For header, show count of group. For row, show recursive descendants.
                           const count = tr.isTreeHeader ? tr.childCount : getDescendantCount(tr.id, taxa);
-                          return <td key={col.id} className="p-2 border-r border-slate-200 text-xs text-center text-slate-400 font-mono">{count || ''}</td>;
+                          return <td key={String(col.id)} className="p-2 border-r border-slate-200 text-xs text-center text-slate-400 font-mono">{count || ''}</td>;
                       }
 
-                      const val = getRowValue(tr, col.id as string);
+                      const val = getRowValue(tr, String(col.id));
                       let displayVal: React.ReactNode = val || '';
                       
                       // Bold Logic: Applies to both Header and Data Rows
@@ -481,17 +574,17 @@ const DataGridV2: React.FC<DataGridProps> = ({ taxa, onAction, preferences }) =>
                       const coreCols = ['genus', 'species', 'cultivar', 'infraspecies', 'infraspecificRank', 'scientificName'];
                       
                       // CORE LOGIC: Bold the column that matches the rank
-                      if (coreCols.includes(col.id as string)) {
+                      if (coreCols.includes(String(col.id))) {
                            // If rank matches column name directly
-                           if (r === col.id) isBold = true;
+                           if (r === String(col.id)) isBold = true;
                            // Special mapping for infraspecies
-                           if (col.id === 'infraspecies' && ['variety','subspecies','form'].includes(r)) isBold = true;
+                           if (String(col.id) === 'infraspecies' && ['variety','subspecies','form'].includes(r)) isBold = true;
                       }
 
                       // Dim Logic: Applies to both
                       let isDimmed = false;
                       const rowRankLevel = RANK_HIERARCHY[r] || 99;
-                      const colRankLevel = COLUMN_RANK_MAP[col.id as string];
+                      const colRankLevel = COLUMN_RANK_MAP[String(col.id)];
                       if (colRankLevel && colRankLevel < rowRankLevel) {
                           isDimmed = true;
                       }
@@ -507,7 +600,7 @@ const DataGridV2: React.FC<DataGridProps> = ({ taxa, onAction, preferences }) =>
                       } else if (col.id === 'actions') {
                           const isMineable = ['genus', 'species', 'subspecies', 'variety', 'form', 'hybrid', 'grex'].includes(r);
                           displayVal = (
-                              <div className="flex items-center gap-1">
+                              <div className="flex items-center justify-center gap-1">
                                   {isMineable ? (
                                       <button type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); onAction && onAction('mine', tr); }} className="p-1.5 bg-indigo-50 border border-indigo-200 rounded text-indigo-600 hover:text-indigo-800 hover:bg-indigo-100 transition-colors cursor-pointer relative z-50 active:scale-95 shadow-sm" title={`Deep Mine Cultivars`}><Pickaxe size={14} className="pointer-events-none" /></button>
                                   ) : (
@@ -524,12 +617,15 @@ const DataGridV2: React.FC<DataGridProps> = ({ taxa, onAction, preferences }) =>
                           </span>
                       );
 
-                      return <td key={col.id} className="p-2 border-r border-slate-50 truncate overflow-hidden max-w-0" title={String(val || '')}>{content}</td>;
+                      // Center text for narrow columns if requested
+                      const textAlignClass = col.headerAlign === 'center' ? 'text-center' : '';
+
+                      return <td key={String(col.id)} className={`p-2 border-r border-slate-50 truncate overflow-hidden max-w-0 ${textAlignClass}`} title={String(val || '')}>{content}</td>;
                   });
 
                   // Render Row (Unified)
                   return (
-                     <tr key={tr.id} className={`hover:bg-blue-50/50 transition-colors ${rowBgClass} ${tr.isTreeHeader ? 'cursor-pointer group/header border-b-2 border-slate-200' : ''}`} onClick={tr.isTreeHeader ? () => toggleGroup(tr.treePath || '') : undefined}>
+                     <tr key={String(tr.id)} className={`hover:bg-blue-50/50 transition-colors ${rowBgClass} ${tr.isTreeHeader ? 'cursor-pointer group/header border-b-2 border-slate-200' : ''}`} onClick={tr.isTreeHeader ? () => toggleGroup(tr.treePath || '') : undefined}>
                         {renderCells()}
                      </tr>
                   );

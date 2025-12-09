@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Loader2, Leaf, Plus, RotateCcw, Table, Network, Upload, X, Settings as SettingsIcon, Wrench } from 'lucide-react';
 import { Taxon, LoadingState, TaxonomicStatus, UserPreferences, BackgroundProcess, ActivityItem, SearchCandidate } from './types';
@@ -73,9 +74,6 @@ function App() {
   // CORE LOGIC: Taxon Manipulation
   // ------------------------------------------------------------------
   const normalizeNode = (node: any) => {
-      // Safety check for empty/invalid node from AI
-      if (!node) return { name: 'Unknown', rank: 'unranked' };
-
       let cleanName = (node.name || '').trim();
       let genusHybrid = node.genusHybrid;
       let speciesHybrid = node.speciesHybrid;
@@ -93,6 +91,11 @@ function App() {
   };
 
   const mergeChainIntoTaxa = (chain: any[]) => {
+      if (!Array.isArray(chain)) {
+          console.warn("mergeChainIntoTaxa expected array, got:", chain);
+          return;
+      }
+      
       let newTaxaToAdd: Taxon[] = [];
       
       // Track accumulating hierarchy for denormalization
@@ -144,32 +147,58 @@ function App() {
                   let infraspeciesField = undefined;
                   let cultivarField = undefined;
                   
+                  // Fix: Populate infraspecies field with NAME only (no rank prefix)
                   if (['subspecies', 'variety', 'form'].includes(node.rank)) {
-                      infraspeciesField = `${currentInfraspecificRank || ''} ${node.name}`.trim();
+                      infraspeciesField = node.name;
                   }
+                  
                   if (node.rank === 'cultivar') {
                       cultivarField = node.name;
                       if (currentInfraspeciesName) {
-                          infraspeciesField = `${currentInfraspecificRank || ''} ${currentInfraspeciesName}`.trim();
+                          infraspeciesField = currentInfraspeciesName;
                       }
                   }
 
-                  // CONSTRUCT FULL NAME if missing or just simple name
-                  let finalScientificName = node.fullName || node.scientificName;
-                  if (!finalScientificName || finalScientificName === node.name) {
-                      const parts = [];
-                      if (currentGenus) parts.push(currentGenusHybrid ? `× ${currentGenus}` : currentGenus);
-                      if (currentSpecies) parts.push(currentSpeciesHybrid ? `× ${currentSpecies}` : currentSpecies);
-                      if (infraspeciesField) parts.push(infraspeciesField);
+                  // CLIENT-SIDE NAME RECONSTRUCTION
+                  // We rebuild the scientificName to ensure it is full and correct, 
+                  // checking for hybrid markers and rank abbreviations.
+                  let builtScientificName = node.fullName || node.name;
+                  
+                  if (currentGenus) {
+                      const parts: string[] = [];
                       
+                      // 1. Genus (with Hybrid marker if present)
+                      const gH = currentGenusHybrid === '×' || currentGenusHybrid === 'x' ? '× ' : '';
+                      parts.push(gH + currentGenus);
+                      
+                      // 2. Species
+                      if (currentSpecies && node.rank !== 'genus') {
+                           const sH = currentSpeciesHybrid === '×' || currentSpeciesHybrid === 'x' ? '× ' : '';
+                           parts.push(sH + currentSpecies);
+                      } else if (node.rank === 'species') {
+                           const sH = node.speciesHybrid === '×' || node.speciesHybrid === 'x' ? '× ' : '';
+                           parts.push(sH + node.name);
+                      }
+
+                      // 3. Infraspecies
+                      if (['subspecies', 'variety', 'form'].includes(node.rank)) {
+                           const r = node.rank === 'subspecies' ? 'subsp.' : node.rank === 'variety' ? 'var.' : 'f.';
+                           parts.push(r);
+                           parts.push(node.name);
+                      } else if (currentInfraspeciesName && node.rank === 'cultivar') {
+                           parts.push(currentInfraspecificRank || 'var.');
+                           parts.push(currentInfraspeciesName);
+                      }
+
+                      // 4. Cultivar
                       if (node.rank === 'cultivar') {
                           parts.push(`'${node.name}'`);
-                      } else if (node.rank !== 'genus' && node.rank !== 'species' && node.rank !== 'variety' && node.rank !== 'subspecies') {
-                          parts.push(node.name);
                       }
                       
-                      if (parts.length === 0) finalScientificName = node.name;
-                      else finalScientificName = parts.join(' ');
+                      // Only update if we actually built something substantial
+                      if (parts.length > 0) {
+                          builtScientificName = parts.join(' ');
+                      }
                   }
 
                   const newTaxon: Taxon = {
@@ -177,7 +206,7 @@ function App() {
                       parentId: parentId, 
                       rank: node.rank, 
                       name: node.name, 
-                      scientificName: finalScientificName, 
+                      scientificName: builtScientificName, 
                       genus: currentGenus,
                       genusHybrid: currentGenusHybrid,
                       species: currentSpecies,
@@ -214,7 +243,7 @@ function App() {
               return prev.map(a => a.id === id ? { ...a, status: 'running', message: 'Starting...', timestamp: Date.now() } : a);
           }
           const newItem: ActivityItem = {
-              id, name, type, status: 'running', message: 'Starting...', timestamp: Date.now(), payload, details: payload // Store payload as details initially
+              id, name, type, status: 'running', message: 'Starting...', timestamp: Date.now(), payload
           };
           return [newItem, ...prev].slice(0, 50); 
       });
@@ -282,7 +311,7 @@ function App() {
   };
 
   // ------------------------------------------------------------------
-  // EXECUTORS (Search & Mining)
+  // EXECUTORS
   // ------------------------------------------------------------------
 
   const executeMining = async (taxon: Taxon, existingId?: string) => {
@@ -327,33 +356,24 @@ function App() {
 
           if (candidates.length > 1 && candidates[0].confidence < 0.95) {
               requireInputActivity(actId, "Multiple matches found.", {
-                  type: 'ambiguous',
-                  candidates: candidates,
-                  originalQuery: queryTerm
+                  type: 'ambiguous', candidates: candidates, originalQuery: queryTerm
               });
               return;
           }
 
           const topMatch = candidates[0];
-          const existing = taxa.find(t => 
-              t.scientificName.toLowerCase() === topMatch.scientificName.toLowerCase()
-          );
+          const existing = taxa.find(t => t.scientificName.toLowerCase() === topMatch.scientificName.toLowerCase());
 
           if (existing) {
               requireInputActivity(actId, "Plant already exists.", {
-                  type: 'duplicate',
-                  candidates: [topMatch],
-                  originalQuery: queryTerm,
-                  existingId: existing.id
+                  type: 'duplicate', candidates: [topMatch], originalQuery: queryTerm, existingId: existing.id
               });
               return;
           }
 
           if (topMatch.matchType !== 'exact' || topMatch.scientificName.toLowerCase() !== queryTerm.toLowerCase()) {
                requireInputActivity(actId, `Verify Name: ${topMatch.scientificName}`, {
-                  type: 'correction',
-                  candidates: [topMatch],
-                  originalQuery: queryTerm
+                  type: 'correction', candidates: [topMatch], originalQuery: queryTerm
               });
               return;
           }
@@ -370,7 +390,7 @@ function App() {
 
   const handleAddPlant = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!query || !query.trim()) return;
+    if (!query.trim()) return;
     executeSearch(query);
     setQuery('');
   };
@@ -433,8 +453,8 @@ function App() {
   };
 
   const handleBulkImport = async () => {
-      if(!importText || !importText.trim()) return;
-      const actId = addActivity("Bulk Import", 'import', { rawLength: importText.length }); 
+      if(!importText.trim()) return;
+      const actId = addActivity("Bulk Import", 'import'); 
       setShowImportModal(false);
       try {
           const chains = await parseBulkText(importText);
@@ -443,7 +463,7 @@ function App() {
               if (cancelledActivityIds.current.has(actId)) break;
               mergeChainIntoTaxa(chain); 
               count++; 
-              updateActivity(actId, `Importing ${count}/${chains.length}...`, { details: { parsedCount: chains.length, current: count, lastChain: chain }}); 
+              updateActivity(actId, `Importing ${count}/${chains.length}...`); 
           }
           if (cancelledActivityIds.current.has(actId)) failActivity(actId, "Cancelled");
           else completeActivity(actId, `Imported ${count} plants`);
@@ -496,7 +516,7 @@ function App() {
               if (cancelledActivityIds.current.has(actId)) {
                   // If cancelled, clear the rest of the queue logic
                   activeEnrichmentCount.current = 0;
-                  failActivity(actId, "Enrichment cancelled");
+                  failActivity(actId, "Enrichment stopped by user");
                   return;
               }
 
