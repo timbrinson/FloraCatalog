@@ -1,5 +1,7 @@
 Use  "strictly adhere to the XML format required by the system." To successful stream file updates. Otherwise they show up in the Code assistant.
 
+When the AI halucinates a previous state say "If I hallucinate, simply saying "Look at the file content provided". This get it to weight the actual file contents over the generalized memory from the AI system from recent conversations.
+
 Current code fixes:
 
 needing to restore to older versions then reapply.

@@ -1,7 +1,15 @@
 
 # Version History
 
-## v2.4 - UI Polish & Stability (Current)
+## v2.5 - Data Schema Alignment (Current)
+**Date:** May 30, 2025
+
+### Changes
+- **Data Model:** Updated the `Taxon` interface in `types.ts` to strictly align with the World Checklist of Vascular Plants (WCVP) schema.
+- **New Fields:** Added missing WCVP columns: `primaryAuthor`, `replacedSynonymAuthor`, `parentPlantNameId`, and `homotypicSynonym`.
+- **Documentation:** Regenerated `docs/DATA_MAPPING.md` with comprehensive field descriptions, value classes, and remarks from the source CSV.
+
+## v2.4 - UI Polish & Stability
 **Date:** May 30, 2025
 
 ### Key Refinements

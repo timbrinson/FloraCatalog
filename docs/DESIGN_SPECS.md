@@ -20,7 +20,11 @@ The app is a "Smart Spreadsheet" for plants. It allows users to input natural la
 ## 2. Data Model (Crucial)
 The central data unit is a `Taxon`. It is recursive (has a `parentId`).
 *   **Rank Hierarchy:** Family, Genus, Species, Subspecies, Variety, Form, Cultivar, Hybrid, Grex.
-*   **WCVP Alignment:** The schema must match the *World Checklist of Vascular Plants*. Include fields: `plantNameId` (WCVP ID), `ipniId`, `powoId`, `authorship`, `publication`, `geographicArea`, `firstPublished`.
+*   **WCVP Alignment:** The schema is strictly aligned with the *World Checklist of Vascular Plants*. 
+    *   **IDs:** `plantNameId` (WCVP ID), `ipniId`, `powoId`, `acceptedNameId`, `basionymId`, `parentPlantNameId`, `homotypicSynonym`.
+    *   **Authorship:** `authorship` (Full), `primaryAuthor`, `parentheticalAuthor`, `publicationAuthor`, `replacedSynonymAuthor`.
+    *   **Publication:** `publication` (Place), `volumeAndPage`, `firstPublished`, `nomenclaturalRemarks`.
+    *   **Geography/Bio:** `geographicArea`, `lifeformDescription`, `climateDescription`.
 *   **Hybrid Handling:**
     *   Store "Hybrid Status" separately from "Rank".
     *   Fields: `genusHybrid` (stores '×'), `speciesHybrid` (stores '×'), `hybridFormula`.
@@ -53,10 +57,10 @@ This is the most complex component. It is a "Tree Grid" that renders a flat list
         *   Active/Bold cells inherit the row's base color (e.g., `text-green-900` on a green row).
         *   Dimmed cells use `text-slate-400`.
     *   **Color Coding (Option 2a Default - Sky Variant):**
-        *   **Genus:** Green.
-        *   **Species:** Amber.
-        *   **Infraspecies:** Orange.
-        *   **Cultivar:** Sky (Light Blue).
+        *   **Genus:** Orange (Warm start).
+        *   **Species:** Sky (Blue anchor).
+        *   **Infraspecies:** Cyan (Cool refinement).
+        *   **Cultivar:** Violet (End of spectrum).
         *   **Hybrids:** Use CSS filter `saturate-50` to make the row "grayer"/muted while keeping the same lightness (`-50` bg).
 *   **Advanced Features:**
     *   **Locked Columns:** The Utility columns (Tree, Actions, #, GH, SH, I-Rank) must have `lockWidth: true`. They must **NOT** resize when using "Auto Fit" or "Fit to Screen".

@@ -55,7 +55,7 @@ export interface Taxon {
   
   /** WCVP ID of the basionym (original name) (mapped from 'basionym_plant_name_id') */
   basionymId?: string; 
-  
+
   /** 
    * WCVP ID for the parent genus or species (mapped from 'parent_plant_name_id').
    */
