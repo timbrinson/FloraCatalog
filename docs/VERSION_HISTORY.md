@@ -1,6 +1,22 @@
 
 # Version History
 
+## v2.4 - UI Polish & Stability (Current)
+**Date:** May 30, 2025
+
+### Key Refinements
+- **Data Grid V2:**
+  - **Tree Column:** Fixed resizing issues and adjusted default width to 60px.
+  - **Header Layout:** Compacted "GH" (Genus Hybrid) and "SH" (Species Hybrid) columns by hiding sort/drag icons. Renamed "Infra Rank" to "I Rank".
+  - **Visuals:** Updated "Tree" column header to use an icon instead of text.
+  - **Formatting:** Fixed "Scientific Name" to correctly display the full hierarchical name (e.g., "Agave parryi var. truncata") instead of just the epithet.
+- **Data Logic:**
+  - **Infraspecies:** Fixed propagation logic to ensuring cultivars correctly inherit parent data (Genus/Species/Infraspecies) without prepending rank terms like "var." twice.
+  - **Hybrid Markers:** Enforced consistent use of `×` over `x`.
+- **Activity Panel:**
+  - **Layout:** Increased width and optimized flex spacing for better visibility of user input items.
+  - **Safety:** Added null checks to prevent crashes during status updates.
+
 ## v2.3 - Cleanup & Docs
 **Date:** May 30, 2025
 
