@@ -1,3 +1,4 @@
+
 <!--
 HOW TO UPDATE THIS DOCUMENT:
 To regenerate this file based on the latest codebase changes, simply ask the AI:
@@ -24,6 +25,7 @@ The central data unit is a `Taxon`. It is recursive (has a `parentId`).
     *   Store "Hybrid Status" separately from "Rank".
     *   Fields: `genusHybrid` (stores '×'), `speciesHybrid` (stores '×'), `hybridFormula`.
     *   **Rule:** A plant can be Rank: 'Genus' and GenusHybrid: '×' (e.g., × Mangave).
+    *   **Normalization:** Input containing 'x' or 'X' in hybrid fields must be converted to '×' before storage.
 
 ## 3. AI Service Layer (`geminiService.ts`)
 Use `gemini-2.5-flash`.
@@ -41,8 +43,21 @@ This is the most complex component. It is a "Tree Grid" that renders a flat list
 *   **Columns:** Tree Control, # (Count), Actions, Family, Genus, GH (Genus Hybrid), Species, SH (Species Hybrid), Infraspecific Rank, Infraspecies, Cultivar, Scientific Name, Common Name, + all WCVP fields.
 *   **Visual Logic:**
     *   **Dimming:** If the row is a "Genus", dim columns to the right (Species, Cultivar).
-    *   **Bolding:** Bold the column text that matches the row's rank.
-    *   **Color Coding:** Use specific pastel badges for ranks (Genus=Orange, Species=Amber, Cultivar=Violet, Hybrid=Cyan).
+        *   *Special Logic:* Ranks `subspecies`, `variety`, and `form` are all treated as Visual Level 5. This prevents the Infraspecies column (Level 5) from being incorrectly dimmed for a 'form' rank row.
+    *   **Bolding:** 
+        *   Bold the column text that matches the row's rank (e.g., Species term is bold on a Species row).
+        *   **Scientific Name:** Always Bold.
+        *   **Hybrid Markers (GH/SH):** Bold when the row matches their level (e.g., GH is bold on a Genus row).
+        *   **Infraspecific Rank (I-Rank):** Bold on Infraspecific rows (matches the Name column).
+    *   **Text Color:** 
+        *   Active/Bold cells inherit the row's base color (e.g., `text-green-900` on a green row).
+        *   Dimmed cells use `text-slate-400`.
+    *   **Color Coding (Option 2a Default - Sky Variant):**
+        *   **Genus:** Green.
+        *   **Species:** Amber.
+        *   **Infraspecies:** Orange.
+        *   **Cultivar:** Sky (Light Blue).
+        *   **Hybrids:** Use CSS filter `saturate-50` to make the row "grayer"/muted while keeping the same lightness (`-50` bg).
 *   **Advanced Features:**
     *   **Locked Columns:** The Utility columns (Tree, Actions, #, GH, SH, I-Rank) must have `lockWidth: true`. They must **NOT** resize when using "Auto Fit" or "Fit to Screen".
     *   **Header Icons:** Hide sort/drag icons for narrow utility columns to save space. Center-align their headers.
@@ -52,6 +67,8 @@ This is the most complex component. It is a "Tree Grid" that renders a flat list
 *   **Tree/Flat Toggle:**
     *   In the "Tree" column header, include a button (Icon Only) to toggle between Flat View (normal table) and Tree View (groups rows by Genus -> Species -> Infraspecies).
     *   Tree View uses "Virtual" header rows for the groups.
+*   **Legend:**
+    *   Displays a 2-column comparison: Standard colors vs. Hybrid (Saturated/Grayer) colors.
 
 ## 5. UI: Activity & Process Panel
 *   A fixed bottom-right panel to track background tasks (Mining, Imports, Enrichment).

@@ -146,11 +146,14 @@ export enum LoadingState {
   ERROR = 'ERROR'
 }
 
+export type ColorTheme = 'option1a' | 'option1b' | 'option2a' | 'option2b';
+
 export interface UserPreferences {
   hybridSpacing: 'space' | 'nospace'; // '× Mangave' vs '×Mangave'
   autoEnrichment: boolean; // Auto-run enrichment after adding
   autoFitMaxWidth?: number; // default 400
   fitScreenMaxRatio?: number; // default 4.0
+  colorTheme: ColorTheme;
 }
 
 export type ActivityStatus = 'running' | 'paused' | 'completed' | 'error' | 'needs_input';

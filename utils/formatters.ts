@@ -1,6 +1,7 @@
+
 import { Taxon, UserPreferences } from '../types';
 
-export const formatScientificName = (taxon: Taxon, prefs: UserPreferences = { hybridSpacing: 'space', autoEnrichment: false }): string => {
+export const formatScientificName = (taxon: Taxon, prefs: UserPreferences = { hybridSpacing: 'space', autoEnrichment: false, colorTheme: 'option2a' }): string => {
   let name = taxon.name || ''; // Safe default
   
   // Clean potential dirty data double-prefixes if normalizing didn't catch them all

@@ -5,7 +5,6 @@ import { Taxon, LoadingState, TaxonomicStatus, UserPreferences, BackgroundProces
 import { identifyTaxonomy, enrichTaxon, deepScanTaxon, parseBulkText, searchTaxonCandidates } from './services/geminiService';
 import TaxonRow from './components/PlantCard';
 import EmptyState from './components/EmptyState';
-import DataGrid from './components/DataGrid';
 import DataGridV2 from './components/DataGridV2';
 import ConfirmDialog from './components/ConfirmDialog';
 import SettingsModal from './components/SettingsModal';
@@ -17,7 +16,6 @@ function App() {
   const [query, setQuery] = useState('');
   const [loadingState, setLoadingState] = useState<LoadingState>(LoadingState.IDLE);
   const [viewMode, setViewMode] = useState<'tree' | 'grid'>('grid');
-  const [gridVersion, setGridVersion] = useState<'v1' | 'v2'>('v2');
   
   // UI States
   const [showImportModal, setShowImportModal] = useState(false);
@@ -38,7 +36,8 @@ function App() {
       hybridSpacing: 'space',
       autoEnrichment: false,
       autoFitMaxWidth: 400,
-      fitScreenMaxRatio: 4.0
+      fitScreenMaxRatio: 4.0,
+      colorTheme: 'option2a'
   });
   
   // ACTIVITY MANAGEMENT
@@ -78,6 +77,10 @@ function App() {
       let genusHybrid = node.genusHybrid;
       let speciesHybrid = node.speciesHybrid;
       let rank = (node.rank || '').toLowerCase();
+
+      // Normalize hybrid markers from 'x' or 'X' to '×' immediately
+      if (genusHybrid === 'x' || genusHybrid === 'X') genusHybrid = '×';
+      if (speciesHybrid === 'x' || speciesHybrid === 'X') speciesHybrid = '×';
 
       if (rank === 'hybrid genus' || rank === 'nothogenus') { rank = 'genus'; genusHybrid = '×'; }
       if (rank === 'hybrid species' || rank === 'nothospecies') { rank = 'species'; speciesHybrid = '×'; }
@@ -187,7 +190,7 @@ function App() {
                            parts.push(node.name);
                       } else if (currentInfraspeciesName && node.rank === 'cultivar') {
                            parts.push(currentInfraspecificRank || 'var.');
-                           parts.push(currentInfraspeciesName);
+                           parts.push(currentInfraspecificRank ? currentInfraspeciesName : (currentSpecies || ''));
                       }
 
                       // 4. Cultivar
@@ -602,12 +605,6 @@ function App() {
                     >
                         <Table size={18} />
                     </button>
-                    {viewMode === 'grid' && (
-                        <div className="ml-2 flex bg-slate-200 rounded p-0.5">
-                             <button onClick={() => setGridVersion('v1')} className={`px-2 text-[10px] font-bold rounded ${gridVersion === 'v1' ? 'bg-white shadow text-slate-800' : 'text-slate-500'}`}>V1</button>
-                             <button onClick={() => setGridVersion('v2')} className={`px-2 text-[10px] font-bold rounded ${gridVersion === 'v2' ? 'bg-white shadow text-indigo-600' : 'text-slate-500'}`}>V2</button>
-                        </div>
-                    )}
                  </div>
                  
                  <button 
@@ -720,19 +717,11 @@ function App() {
                 
                 <div className={viewMode === 'grid' ? 'block' : 'hidden'}>
                     <div className="h-[calc(100vh-140px)]">
-                         {gridVersion === 'v1' ? (
-                             <DataGrid 
-                                taxa={taxa} 
-                                preferences={preferences} 
-                                onAction={handleGridAction} 
-                             /> 
-                        ) : (
-                             <DataGridV2 
-                                taxa={taxa} 
-                                preferences={preferences} 
-                                onAction={handleGridAction} 
-                             />
-                        )}
+                         <DataGridV2 
+                            taxa={taxa} 
+                            preferences={preferences} 
+                            onAction={handleGridAction} 
+                         />
                     </div>
                 </div>
              </>

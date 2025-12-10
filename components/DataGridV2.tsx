@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
-import { Taxon, UserPreferences } from '../types';
-import { ArrowUpDown, Settings, Check, ChevronDown, GripVertical, Maximize, Monitor, Pickaxe, Info, Wand2, LayoutList, ChevronRight, Network, AlignJustify } from 'lucide-react';
+import { Taxon, UserPreferences, ColorTheme } from '../types';
+import { ArrowUpDown, Settings, Check, ChevronDown, GripVertical, Maximize, Monitor, Pickaxe, Info, Wand2, LayoutList, ChevronRight, Network, AlignJustify, X as XIcon } from 'lucide-react';
 import { formatFullScientificName } from '../utils/formatters';
 
 interface DataGridProps {
@@ -23,21 +23,37 @@ const COLUMN_RANK_MAP: Record<string, number> = {
     'cultivar': 9
 };
 
-const RANK_BASE_COLORS: Record<string, string> = {
-    'family': 'rose', 
-    'genus': 'orange', 
-    'species': 'amber', 
-    'subspecies': 'lime', 
-    'variety': 'emerald', 
-    'form': 'teal', 
-    'hybrid': 'cyan', 
-    'grex': 'sky', 
-    'cultivar': 'violet', 
+// THEME DEFINITIONS
+type ThemeMap = Record<string, string>;
+
+const THEMES: Record<ColorTheme, ThemeMap> = {
+    'option1a': { // Orange -> Amber -> Green -> Sky
+        'family': 'red', 'genus': 'orange', 'species': 'amber', 
+        'subspecies': 'green', 'variety': 'green', 'form': 'green', 'hybrid': 'amber',
+        'cultivar': 'sky', 'grex': 'sky'
+    },
+    'option1b': { // Sky -> Green -> Amber -> Orange
+        'family': 'red', 'genus': 'sky', 'species': 'green', 
+        'subspecies': 'amber', 'variety': 'amber', 'form': 'amber', 'hybrid': 'green',
+        'cultivar': 'orange', 'grex': 'orange'
+    },
+    'option2a': { // Green -> Amber -> Orange -> Sky
+        'family': 'red', 'genus': 'green', 'species': 'amber', 
+        'subspecies': 'orange', 'variety': 'orange', 'form': 'orange', 'hybrid': 'amber',
+        'cultivar': 'sky', 'grex': 'sky'
+    },
+    'option2b': { // Sky -> Orange -> Amber -> Green
+        'family': 'red', 'genus': 'sky', 'species': 'orange', 
+        'subspecies': 'amber', 'variety': 'amber', 'form': 'amber', 'hybrid': 'orange',
+        'cultivar': 'green', 'grex': 'green'
+    }
 };
 
-const RANK_COLORS: Record<string, string> = Object.fromEntries(
-    Object.entries(RANK_BASE_COLORS).map(([k, c]) => [k, `bg-${c}-50 text-${c}-700 border-${c}-100`])
-);
+// Helper to get text color class based on base color
+const getTextClass = (color: string) => {
+    if (color === 'slate') return 'text-slate-600';
+    return `text-${color}-700`;
+};
 
 const MultiSelectFilter = ({ options, selected, onChange, label }: { options: string[], selected: string[], onChange: (val: string[]) => void, label: string }) => {
     const [isOpen, setIsOpen] = useState(false);
@@ -103,10 +119,13 @@ const DataGridV2: React.FC<DataGridProps> = ({ taxa, onAction, preferences }) =>
       { id: 'childCount', label: '#', defaultWidth: 50, filterType: 'text', hideHeaderIcons: true, headerAlign: 'center', lockWidth: true }, 
       
       { id: 'family', label: 'Family', defaultWidth: 120, filterType: 'text' },
-      { id: 'genus', label: 'Genus', defaultWidth: 120, filterType: 'text' }, 
+      // Moved GH before Genus
       { id: 'genusHybrid', label: 'GH', defaultWidth: 40, filterType: 'text', disableSorting: true, hideHeaderIcons: true, headerAlign: 'center', lockWidth: true }, 
-      { id: 'species', label: 'Species', defaultWidth: 120, filterType: 'text' }, 
+      { id: 'genus', label: 'Genus', defaultWidth: 120, filterType: 'text' }, 
+      // Moved SH before Species
       { id: 'speciesHybrid', label: 'SH', defaultWidth: 40, filterType: 'text', disableSorting: true, hideHeaderIcons: true, headerAlign: 'center', lockWidth: true }, 
+      { id: 'species', label: 'Species', defaultWidth: 120, filterType: 'text' }, 
+      
       { id: 'infraspecificRank', label: 'I Rank', defaultWidth: 60, filterType: 'text', hideHeaderIcons: true, headerAlign: 'center', lockWidth: true },
       { id: 'infraspecies', label: 'Infraspecies', defaultWidth: 120, filterType: 'text' }, 
       { id: 'cultivar', label: 'Cultivar', defaultWidth: 150, filterType: 'text' }, 
@@ -149,11 +168,12 @@ const DataGridV2: React.FC<DataGridProps> = ({ taxa, onAction, preferences }) =>
   const [visibleColumns, setVisibleColumns] = useState<Set<ColumnId>>(() => {
       const saved = loadState<string[]>('grid_v2_visible_cols', []);
       return saved.length > 0 ? new Set(saved) : new Set([
-          'treeControl', 'childCount', 'genus', 'genusHybrid', 'species', 'speciesHybrid', 'infraspecificRank', 'infraspecies', 'cultivar', 'scientificName'
+          'treeControl', 'childCount', 'genusHybrid', 'genus', 'speciesHybrid', 'species', 'infraspecificRank', 'infraspecies', 'cultivar', 'scientificName'
       ]);
   });
   
-  const [columnOrder, setColumnOrder] = useState<ColumnId[]>(() => loadState('grid_v2_col_order', allColumns.map(c => c.id)));
+  // Updated key to rev1 to ensure column order update is picked up
+  const [columnOrder, setColumnOrder] = useState<ColumnId[]>(() => loadState('grid_v2_col_order_rev1', allColumns.map(c => c.id)));
   const [colWidths, setColWidths] = useState<Record<ColumnId, number>>(() => loadState('grid_v2_col_widths', Object.fromEntries(allColumns.map(c => [c.id, c.defaultWidth]))));
   const [sortConfig, setSortConfig] = useState<{ key: ColumnId; direction: 'asc' | 'desc' } | null>(() => loadState('grid_v2_sort', { key: 'scientificName', direction: 'asc' }));
   const [textFilters, setTextFilters] = useState<Record<string, string>>(() => loadState('grid_v2_text_filters', {}));
@@ -169,7 +189,7 @@ const DataGridV2: React.FC<DataGridProps> = ({ taxa, onAction, preferences }) =>
   }, [isHierarchyMode]);
 
   useEffect(() => localStorage.setItem('grid_v2_visible_cols', JSON.stringify(Array.from(visibleColumns))), [visibleColumns]);
-  useEffect(() => localStorage.setItem('grid_v2_col_order', JSON.stringify(columnOrder)), [columnOrder]);
+  useEffect(() => localStorage.setItem('grid_v2_col_order_rev1', JSON.stringify(columnOrder)), [columnOrder]); // Persist to new key
   useEffect(() => localStorage.setItem('grid_v2_col_widths', JSON.stringify(colWidths)), [colWidths]);
   useEffect(() => localStorage.setItem('grid_v2_sort', JSON.stringify(sortConfig)), [sortConfig]);
   useEffect(() => localStorage.setItem('grid_v2_text_filters', JSON.stringify(textFilters)), [textFilters]);
@@ -199,6 +219,9 @@ const DataGridV2: React.FC<DataGridProps> = ({ taxa, onAction, preferences }) =>
   const totalTableWidth = useMemo(() => {
       return activeColumns.reduce((sum, col) => sum + (colWidths[col.id] || col.defaultWidth), 0);
   }, [activeColumns, colWidths]);
+
+  // Determine current color map
+  const activeColorMap = useMemo(() => THEMES[preferences.colorTheme] || THEMES['option1a'], [preferences.colorTheme]);
 
   const getRowValue = (row: Taxon, colId: string) => {
        if (colId === 'childCount') {
@@ -473,7 +496,54 @@ const DataGridV2: React.FC<DataGridProps> = ({ taxa, onAction, preferences }) =>
 
              <div className="relative" ref={legendRef}>
                  <button onClick={() => setShowLegend(!showLegend)} className={`flex items-center gap-1.5 px-3 py-1.5 border border-slate-300 rounded text-xs hover:bg-slate-50 shadow-sm ${showLegend ? 'bg-slate-100 text-leaf-600' : 'bg-white text-slate-600'}`}><Info size={14} /> Legend</button>
-                 {showLegend && (<div className="absolute right-0 top-full mt-2 w-72 bg-white border border-slate-200 rounded-lg shadow-xl z-50 p-4"><h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3">Taxonomic Ranks</h4><div className="grid grid-cols-2 gap-2">{Object.entries(RANK_COLORS).map(([rank, color]) => (<div key={rank} className="flex items-center gap-2"><span className={`w-3 h-3 rounded-full border ${color.split(' ')[0]} ${color.split(' ')[2]}`}></span><span className="text-xs text-slate-600 capitalize">{rank}</span></div>))}</div></div>)}
+                 {showLegend && (
+                    <div className="absolute right-0 top-full mt-2 w-[400px] bg-white border border-slate-200 rounded-lg shadow-xl z-50 p-4">
+                        <div className="grid grid-cols-2 gap-6">
+                            <div>
+                                <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3 border-b border-slate-100 pb-1">Standard</h4>
+                                <div className="space-y-3">
+                                    <div className="flex items-center gap-2">
+                                        <span className={`w-3 h-3 rounded-full border bg-${activeColorMap['genus']}-50 border-${activeColorMap['genus']}-200`}></span>
+                                        <span className="text-xs text-slate-600">Genus</span>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <span className={`w-3 h-3 rounded-full border bg-${activeColorMap['species']}-50 border-${activeColorMap['species']}-200`}></span>
+                                        <span className="text-xs text-slate-600">Species</span>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <span className={`w-3 h-3 rounded-full border bg-${activeColorMap['variety']}-50 border-${activeColorMap['variety']}-200`}></span>
+                                        <span className="text-xs text-slate-600">Infraspecies</span>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <span className={`w-3 h-3 rounded-full border bg-${activeColorMap['cultivar']}-50 border-${activeColorMap['cultivar']}-200`}></span>
+                                        <span className="text-xs text-slate-600">Cultivar</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div>
+                                <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3 border-b border-slate-100 pb-1">Hybrid (Grayer)</h4>
+                                <div className="space-y-3">
+                                    <div className="flex items-center gap-2">
+                                        <span className={`w-3 h-3 rounded-full border bg-${activeColorMap['genus']}-50 border-${activeColorMap['genus']}-200 saturate-50`}></span>
+                                        <span className="text-xs text-slate-600">Hybrid Genus</span>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <span className={`w-3 h-3 rounded-full border bg-${activeColorMap['species']}-50 border-${activeColorMap['species']}-200 saturate-50`}></span>
+                                        <span className="text-xs text-slate-600">Hybrid Species</span>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <span className={`w-3 h-3 rounded-full border bg-${activeColorMap['variety']}-50 border-${activeColorMap['variety']}-200 saturate-50`}></span>
+                                        <span className="text-xs text-slate-600">Hybrid Infraspecies</span>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <span className={`w-3 h-3 rounded-full border bg-${activeColorMap['cultivar']}-50 border-${activeColorMap['cultivar']}-200 saturate-50`}></span>
+                                        <span className="text-xs text-slate-600">Hybrid Cultivar</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                 )}
              </div>
              <button onClick={fitToScreen} className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-300 rounded text-xs text-slate-600 hover:bg-slate-50 shadow-sm" title="Fit columns to current screen width"><Monitor size={14} /> Fit Screen</button>
              <button onClick={autoFitContent} className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-300 rounded text-xs text-slate-600 hover:bg-slate-50 shadow-sm" title="Resize columns to fit content"><Maximize size={14} /> Auto Fit</button>
@@ -538,9 +608,18 @@ const DataGridV2: React.FC<DataGridProps> = ({ taxa, onAction, preferences }) =>
               {gridRows.map(row => {
                   const tr = row as TreeRow;
                   
-                  // Compute background for all rows
-                  const rankBaseColor = RANK_BASE_COLORS[String(tr.rank).toLowerCase()];
-                  const rowBgClass = rankBaseColor ? `bg-${rankBaseColor}-50` : ''; 
+                  // Color Logic
+                  const rankKey = String(tr.rank).toLowerCase();
+                  const baseColor = activeColorMap[rankKey] || 'slate';
+                  const isHybrid = tr.genusHybrid === '×' || tr.genusHybrid === 'x' || 
+                                   tr.speciesHybrid === '×' || tr.speciesHybrid === 'x' || 
+                                   rankKey === 'hybrid';
+                                   
+                  // HYBRID STYLING:
+                  // Use same lightness (-50) but desaturate to look "grayer"/muted
+                  const rowBgClass = baseColor === 'slate' 
+                    ? (isHybrid ? 'bg-slate-50 saturate-50' : '') 
+                    : `bg-${baseColor}-50 ${isHybrid ? 'saturate-50' : ''}`;
 
                   const renderCells = () => activeColumns.map((col, idx) => {
                       // Tree Control Column
@@ -567,23 +646,43 @@ const DataGridV2: React.FC<DataGridProps> = ({ taxa, onAction, preferences }) =>
 
                       const val = getRowValue(tr, String(col.id));
                       let displayVal: React.ReactNode = val || '';
+
+                      // Fix x display to × for hybrid columns
+                      if ((col.id === 'genusHybrid' || col.id === 'speciesHybrid') && (val === 'x' || val === 'X')) {
+                          displayVal = '×';
+                      }
                       
                       // Bold Logic: Applies to both Header and Data Rows
                       let isBold = false;
                       const r = String(tr.rank).toLowerCase();
-                      const coreCols = ['genus', 'species', 'cultivar', 'infraspecies', 'infraspecificRank', 'scientificName'];
+                      const coreCols = ['genus', 'species', 'cultivar', 'infraspecies', 'infraspecificRank', 'scientificName', 'genusHybrid', 'speciesHybrid'];
                       
                       // CORE LOGIC: Bold the column that matches the rank
                       if (coreCols.includes(String(col.id))) {
                            // If rank matches column name directly
                            if (r === String(col.id)) isBold = true;
-                           // Special mapping for infraspecies
-                           if (String(col.id) === 'infraspecies' && ['variety','subspecies','form'].includes(r)) isBold = true;
+                           
+                           // Infraspecies logic for both Name and Rank
+                           if ((String(col.id) === 'infraspecies' || String(col.id) === 'infraspecificRank') && ['variety','subspecies','form'].includes(r)) isBold = true;
+
+                           // Scientific Name always bold
+                           if (String(col.id) === 'scientificName') isBold = true;
+                           
+                           // Hybrids Bolding Logic
+                           if (String(col.id) === 'genusHybrid' && r === 'genus') isBold = true;
+                           if (String(col.id) === 'speciesHybrid' && r === 'species') isBold = true;
                       }
 
                       // Dim Logic: Applies to both
                       let isDimmed = false;
-                      const rowRankLevel = RANK_HIERARCHY[r] || 99;
+                      let rowRankLevel = RANK_HIERARCHY[r] || 99;
+                      
+                      // Fix for Form (rank 6) vs Infraspecies Column (rank 5)
+                      // Treat all infraspecific ranks as level 5 for visual dimming purposes
+                      if (['subspecies', 'variety', 'form'].includes(r)) {
+                          rowRankLevel = 5;
+                      }
+
                       const colRankLevel = COLUMN_RANK_MAP[String(col.id)];
                       if (colRankLevel && colRankLevel < rowRankLevel) {
                           isDimmed = true;
@@ -591,7 +690,8 @@ const DataGridV2: React.FC<DataGridProps> = ({ taxa, onAction, preferences }) =>
                       
                       // Formatting
                       if (col.id === 'rank') {
-                          const rankStyle = RANK_COLORS[r] || 'bg-slate-100 text-slate-500';
+                          // Dynamic badge color
+                          const rankStyle = `bg-${baseColor}-100 ${getTextClass(baseColor)} border-${baseColor}-200`;
                           displayVal = <span className={`px-2 py-0.5 text-[10px] rounded border uppercase font-bold ${rankStyle}`}>{val as string}</span>;
                       } else if (col.id === 'scientificName') {
                           displayVal = formatFullScientificName(tr, preferences);
@@ -611,8 +711,17 @@ const DataGridV2: React.FC<DataGridProps> = ({ taxa, onAction, preferences }) =>
                           );
                       }
                       
+                      // Text Color Logic: Apply colored text only to active term
+                      let textColorClass = "";
+                      if (isBold) {
+                          textColorClass = baseColor === 'slate' ? "text-slate-900" : `text-${baseColor}-900`;
+                      }
+                      if (isDimmed) {
+                          textColorClass = "text-slate-400";
+                      }
+                      
                       const content = (
-                          <span className={`${isBold ? "font-bold text-slate-900" : ""} ${isDimmed ? "text-slate-400 font-normal" : ""}`}>
+                          <span className={`${isBold ? "font-bold" : ""} ${isDimmed ? "font-normal" : ""} ${textColorClass}`}>
                               {displayVal}
                           </span>
                       );

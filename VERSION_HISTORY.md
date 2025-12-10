@@ -1,6 +1,34 @@
+
 # Version History
 
-## v2.1.1 - Documentation & Specs (Current)
+## v2.3 - Visual Polish & Logic Fixes
+**Date:** May 30, 2025
+
+### Visual Improvements
+- **Theme Update:** Switched "Blue" to "Sky" in the default theme to improve contrast and reduce visual weight.
+- **Cell Styling:** Active rank terms (e.g., "Agave" in a Genus row) now inherit the row's rich theme color (e.g., `text-green-900`) instead of generic slate.
+- **Bolding:** Scientific Name is now always bold. Hybrid markers (GH/SH) and Infraspecific Rank (I-Rank) are bolded when relevant.
+- **Legend:** Redesigned into a 2-column layout comparing Standard vs. Hybrid (Grayer) styles.
+
+### Logic Fixes
+- **Hybrid Markers:** Enforced strict normalization of `x` to `×` in both data entry and grid display.
+- **Form Rank:** Fixed a bug where plants with rank 'form' (f.) caused the Infraspecies column to dim incorrectly. 'Form' is now visually treated at the same level as Subspecies/Variety.
+
+## v2.2 - Cleanup of Legacy DataGrid
+**Date:** May 30, 2025
+
+### Changes
+- **Cleanup:** Removed the deprecated `DataGrid` (V1) component and its associated selector logic from `App.tsx`.
+- **Simplification:** The application now exclusively uses `DataGridV2` (the advanced Tree Grid).
+
+## v2.1.2 - Codebase Cleanup
+**Date:** May 30, 2025
+
+### Changes
+- **Cleanup:** Removed deprecated `stable` and `stable2` snapshot directories to reduce project noise.
+- **Maintenance:** The project now relies on `DESIGN_SPECS.md` and Git history for version tracking instead of duplicated folders.
+
+## v2.1.1 - Documentation & Specs
 **Date:** May 30, 2025
 
 ### Changes
@@ -38,18 +66,13 @@
   - **Search Resolution Flow:** UI to handle Duplicates, Ambiguities, and Name Corrections before adding.
 - **Process Management:**
   - **Activity Panel:** Tracking multiple concurrent background tasks (Mining, Import, Enrichment).
-  - **Cancellation:** Ability to stop long-running mining operations.
+  - **Cancellation:** Ability to stop long-running mining tasks.
 - **Data Integrity:**
   - **Infraspecies Propagation:** Correctly inherits variety/subspecies names down to cultivars during import.
   - **WCVP Schema:** Full support for WCVP columns including IDs, Authorship, and Geography.
 
-### File Checkpoints (in `/stable2`)
-- `App.tsx`: Main logic with view persistence and search integration.
-- `components/DataGridV2.tsx`: The new tree-grid component.
-- `components/ActivityPanel.tsx`: The process monitor and resolution UI.
-- `services/geminiService.ts`: AI logic with robust JSON parsing.
-- `types.ts`: Extended Taxon interface.
-- `utils/formatters.ts`: Scientific name formatting rules.
+### File Checkpoints (Deprecated)
+- *Note: Snapshot folders `stable` and `stable2` were removed in v2.1.2.*
 
 ## v1.0 - Stable Prototype
 **Date:** May 29, 2025
@@ -73,13 +96,6 @@
   - `ProcessMonitor` UI to track background jobs.
   - Cancellation support for long-running mining tasks.
   - Consolidated status for batch enrichment.
-
-### File Checkpoints (in `/stable`)
-- `App.tsx`: Main logic, state management, view routing.
-- `types.ts`: TypeScript interfaces for Taxon, UserPreferences.
-- `services/geminiService.ts`: AI prompt engineering and JSON extraction.
-- `components/DataGrid.tsx`: Complex spreadsheet component.
-- `utils/formatters.ts`: Scientific name formatting logic.
 
 ### Known Issues
 - File system updates in the code assistant sometimes timeout on large files.

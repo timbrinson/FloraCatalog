@@ -1,7 +1,7 @@
 
 import React from 'react';
-import { X, Settings, Layout, Zap } from 'lucide-react';
-import { UserPreferences } from '../types';
+import { X, Settings, Layout, Zap, Palette } from 'lucide-react';
+import { UserPreferences, ColorTheme } from '../types';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -12,6 +12,27 @@ interface SettingsModalProps {
 
 const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, preferences, onUpdate }) => {
   if (!isOpen) return null;
+
+  // Pattern for preview: Genus -> Species -> Infraspecies -> Cultivar -> Repeat
+  const PREVIEW_SEQUENCE = [
+      { label: 'Genus (Agave)', role: 'genus' },
+      { label: 'Species (parryi)', role: 'species' },
+      { label: 'Infraspecies (var. truncata)', role: 'variety' },
+      { label: 'Cultivar (Huntington)', role: 'cultivar' },
+      { label: 'Genus (Agave)', role: 'genus' },
+      { label: 'Species (parryi)', role: 'species' },
+  ];
+
+  const getColor = (theme: ColorTheme, role: string) => {
+      const colors: Record<ColorTheme, Record<string, string>> = {
+          'option1a': { genus: 'orange', species: 'amber', variety: 'green', cultivar: 'blue' },
+          'option1b': { genus: 'blue', species: 'green', variety: 'amber', cultivar: 'orange' },
+          'option2a': { genus: 'green', species: 'amber', variety: 'orange', cultivar: 'blue' },
+          'option2b': { genus: 'blue', species: 'orange', variety: 'amber', cultivar: 'green' }
+      };
+      const c = colors[theme][role] || 'slate';
+      return `bg-${c}-50 border-${c}-200 text-${c}-900`;
+  };
 
   return (
     <div className="fixed inset-0 bg-black/50 z-[60] flex items-center justify-center p-4 animate-in fade-in duration-200">
@@ -26,6 +47,56 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, preferen
         </div>
 
         <div className="space-y-8">
+            
+            {/* Color Theme Section */}
+            <div>
+                <h4 className="text-sm font-bold text-slate-700 uppercase tracking-wide mb-3 flex items-center gap-2">
+                    <Palette size={14}/> Color Rhythm Tester
+                </h4>
+                <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
+                    <p className="text-xs text-slate-500 mb-4">Select a pattern to visualize the taxonomic hierarchy flow.</p>
+                    
+                    <div className="grid grid-cols-2 gap-2 mb-4">
+                        <button 
+                            onClick={() => onUpdate({ ...preferences, colorTheme: 'option1a' })}
+                            className={`p-2 text-xs border rounded text-center ${preferences.colorTheme === 'option1a' ? 'border-leaf-500 bg-white ring-1 ring-leaf-500 font-bold text-leaf-700' : 'border-slate-200 text-slate-600 hover:bg-white'}`}
+                        >
+                            1a: Warm → Cool
+                        </button>
+                         <button 
+                            onClick={() => onUpdate({ ...preferences, colorTheme: 'option1b' })}
+                            className={`p-2 text-xs border rounded text-center ${preferences.colorTheme === 'option1b' ? 'border-leaf-500 bg-white ring-1 ring-leaf-500 font-bold text-leaf-700' : 'border-slate-200 text-slate-600 hover:bg-white'}`}
+                        >
+                            1b: Cool → Warm
+                        </button>
+                         <button 
+                            onClick={() => onUpdate({ ...preferences, colorTheme: 'option2a' })}
+                            className={`p-2 text-xs border rounded text-center ${preferences.colorTheme === 'option2a' ? 'border-leaf-500 bg-white ring-1 ring-leaf-500 font-bold text-leaf-700' : 'border-slate-200 text-slate-600 hover:bg-white'}`}
+                        >
+                            2a: Green Start
+                        </button>
+                         <button 
+                            onClick={() => onUpdate({ ...preferences, colorTheme: 'option2b' })}
+                            className={`p-2 text-xs border rounded text-center ${preferences.colorTheme === 'option2b' ? 'border-leaf-500 bg-white ring-1 ring-leaf-500 font-bold text-leaf-700' : 'border-slate-200 text-slate-600 hover:bg-white'}`}
+                        >
+                            2b: Blue Start
+                        </button>
+                    </div>
+
+                    {/* Live Pattern Preview */}
+                    <div className="border border-slate-200 rounded-md overflow-hidden">
+                        <div className="bg-slate-100 px-3 py-1 text-[10px] uppercase font-bold text-slate-400 border-b border-slate-200">Pattern Preview</div>
+                        <div className="flex flex-col">
+                            {PREVIEW_SEQUENCE.map((item, idx) => (
+                                <div key={idx} className={`px-4 py-2 text-xs border-b border-slate-100 last:border-0 ${getColor(preferences.colorTheme, item.role)}`}>
+                                    {item.label}
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             {/* Automation Section */}
             <div>
                 <h4 className="text-sm font-bold text-slate-700 uppercase tracking-wide mb-3 flex items-center gap-2">
