@@ -56,6 +56,17 @@ export interface Taxon {
   /** WCVP ID of the basionym (original name) (mapped from 'basionym_plant_name_id') */
   basionymId?: string; 
   
+  /** 
+   * WCVP ID for the parent genus or species (mapped from 'parent_plant_name_id').
+   */
+  parentPlantNameId?: string;
+
+  /** 
+   * ID linking homotypic synonyms (names based on the same type specimen) 
+   * (mapped from 'homotypic_synonym').
+   */
+  homotypicSynonym?: string;
+
   // Names
   /** Full scientific name including authors (mapped from 'taxon_name') */
   scientificName: string; 
@@ -78,17 +89,23 @@ export interface Taxon {
 
   // Authorship
   /** 
-   * Full author string (mapped from 'taxon_authors' or 'primary_author'). 
+   * Full author string (mapped from 'taxon_authors'). 
    * e.g. "L." or "(Schott) Engelm."
    */
   authorship?: string; 
   
+  /** The primary author of the current name combination (mapped from 'primary_author') */
+  primaryAuthor?: string;
+
   /** The original author in parentheses (mapped from 'parenthetical_author') */
   parentheticalAuthor?: string; 
   
   /** The author who published this specific combination (mapped from 'publication_author') */
   publicationAuthor?: string; 
   
+  /** The author of the synonym being replaced (mapped from 'replaced_synonym_author') */
+  replacedSynonymAuthor?: string;
+
   // Publication
   /** Title of publication (mapped from 'place_of_publication') */
   publication?: string; 
