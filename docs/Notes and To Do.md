@@ -113,41 +113,50 @@ Add a fake group under Genus to hold generic cultivars. Use something like "---"
 
 
 
-Make the default order of the beginning columns be: 
-Tree, 
-Actions (hidden),
-Rank (hidden), 
-Family (hidden), 
-GH, 
-Genus, 
-SH, 
-Species, 
-Infraspecies Rank,
-Infraspecies, 
-Cultivar, 
-Scientific Name, 
-Authorship (hidden), 
-Parenthetical Author (hidden),
-Pub Author (hidden), 
-Publication (hidden), 
-Vol/Page (hidden), 
-First Published (hidden),
-Common Name (hidden), 
-Description (hidden), 
-Geography (hidden), 
-Climate (hidden), 
-Lifeform (hidden),
-Status, (hidden),
-Reviewed (hidden),
-Nom Remarks (hidden),
-Hybrid Formula (hidden),
-Internal ID (hidden),
-Parent ID (hidden),
-WCVP ID (hidden),
-IPNI ID (hidden),
-POWO ID (hidden),
-Accepted ID (hidden),
-Basionym ID (hidden),
+Create groups for the columns in the Column selector and make the group selectable, which selects/deselects all columns in the group. 
+Use the following to set the groups and column order and their default selection state:
+  Control (not selected)
+    Tree (selected)
+    Actions (not selected)
+    # (selected)
+  Taxon Breakdown (not selected)
+    GH (not selected)
+    Genus (not selected)
+    SH (not selected)
+    Species (not selected)
+    I Rank (not selected)
+    Infraspecies (not selected)
+    Cultivar (not selected)
+  Basic Info (selected)
+    Scientific Name (selected) 
+    Common Name (selected)
+    Description (selected)
+    Geography (selected)
+    Climate (selected)
+  Aditional Info (not selected)
+    Lifeform (not selected)
+    Rank (not selected)
+    Family (not selected)
+    Hybrid Formula (not selected)
+  Name Origin (not selected)
+    Authorship (not selected)
+    Pub. Author (not selected)
+    Paren. Author (not selected)
+    Publication (not selected)
+    Vol/Page (not selected)
+    First Published (not selected)
+  Review (not selected)
+    Status, (not selected),
+    Reviewed (not selected),
+    Nom. Remarks (not selected),
+  Identifiers (not selected)
+    Internal ID (not selected)
+    Parent ID (not selected)
+    WCVP ID (not selected)
+    IPNI ID (not selected)
+    POWO ID (not selected)
+    Accepted ID (not selected)
+    Basionym ID (not selected)
 
 
 
