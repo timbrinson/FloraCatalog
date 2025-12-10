@@ -15,6 +15,8 @@ import { DEFAULT_TAXA } from './defaultData';
 function App() {
   const [query, setQuery] = useState('');
   const [loadingState, setLoadingState] = useState<LoadingState>(LoadingState.IDLE);
+  
+  // DEFAULT: Grid View (Tree Grid V2)
   const [viewMode, setViewMode] = useState<'tree' | 'grid'>('grid');
   
   // UI States
@@ -78,15 +80,13 @@ function App() {
       let speciesHybrid = node.speciesHybrid;
       let rank = (node.rank || '').toLowerCase();
 
-      // Normalize hybrid markers from 'x' or 'X' to '×' immediately
-      if (genusHybrid === 'x' || genusHybrid === 'X') genusHybrid = '×';
-      if (speciesHybrid === 'x' || speciesHybrid === 'X') speciesHybrid = '×';
-
       if (rank === 'hybrid genus' || rank === 'nothogenus') { rank = 'genus'; genusHybrid = '×'; }
       if (rank === 'hybrid species' || rank === 'nothospecies') { rank = 'species'; speciesHybrid = '×'; }
 
-      if (/^[×x]\s?/i.test(cleanName)) {
-          cleanName = cleanName.replace(/^[×x]\s?/i, '');
+      const hybridStartRegex = /^(?:×|[xX]\s)/;
+      
+      if (hybridStartRegex.test(cleanName)) {
+          cleanName = cleanName.replace(hybridStartRegex, '');
           if (rank === 'genus' && !genusHybrid) genusHybrid = '×';
           if (rank === 'species' && !speciesHybrid) speciesHybrid = '×';
       }
@@ -94,11 +94,6 @@ function App() {
   };
 
   const mergeChainIntoTaxa = (chain: any[]) => {
-      if (!Array.isArray(chain)) {
-          console.warn("mergeChainIntoTaxa expected array, got:", chain);
-          return;
-      }
-      
       let newTaxaToAdd: Taxon[] = [];
       
       // Track accumulating hierarchy for denormalization
@@ -150,58 +145,37 @@ function App() {
                   let infraspeciesField = undefined;
                   let cultivarField = undefined;
                   
-                  // Fix: Populate infraspecies field with NAME only (no rank prefix)
                   if (['subspecies', 'variety', 'form'].includes(node.rank)) {
-                      infraspeciesField = node.name;
+                      infraspeciesField = `${node.name}`.trim();
                   }
-                  
                   if (node.rank === 'cultivar') {
                       cultivarField = node.name;
                       if (currentInfraspeciesName) {
-                          infraspeciesField = currentInfraspeciesName;
+                          infraspeciesField = `${currentInfraspeciesName}`.trim();
                       }
                   }
 
-                  // CLIENT-SIDE NAME RECONSTRUCTION
-                  // We rebuild the scientificName to ensure it is full and correct, 
-                  // checking for hybrid markers and rank abbreviations.
-                  let builtScientificName = node.fullName || node.name;
-                  
-                  if (currentGenus) {
-                      const parts: string[] = [];
+                  // CONSTRUCT FULL NAME if missing or just simple name
+                  let finalScientificName = node.fullName || node.scientificName;
+                  if (!finalScientificName || finalScientificName === node.name) {
+                      const parts = [];
+                      if (currentGenus) parts.push(currentGenusHybrid ? `× ${currentGenus}` : currentGenus);
+                      if (currentSpecies) parts.push(currentSpeciesHybrid ? `× ${currentSpecies}` : currentSpecies);
                       
-                      // 1. Genus (with Hybrid marker if present)
-                      const gH = currentGenusHybrid === '×' || currentGenusHybrid === 'x' ? '× ' : '';
-                      parts.push(gH + currentGenus);
+                      // For infraspecies, we need the rank prefix for the Full Name
+                      if (infraspeciesField) {
+                         const rankPrefix = currentInfraspecificRank ? `${currentInfraspecificRank} ` : '';
+                         parts.push(`${rankPrefix}${infraspeciesField}`);
+                      }
                       
-                      // 2. Species
-                      if (currentSpecies && node.rank !== 'genus') {
-                           const sH = currentSpeciesHybrid === '×' || currentSpeciesHybrid === 'x' ? '× ' : '';
-                           parts.push(sH + currentSpecies);
-                      } else if (node.rank === 'species') {
-                           const sH = node.speciesHybrid === '×' || node.speciesHybrid === 'x' ? '× ' : '';
-                           parts.push(sH + node.name);
-                      }
-
-                      // 3. Infraspecies
-                      if (['subspecies', 'variety', 'form'].includes(node.rank)) {
-                           const r = node.rank === 'subspecies' ? 'subsp.' : node.rank === 'variety' ? 'var.' : 'f.';
-                           parts.push(r);
-                           parts.push(node.name);
-                      } else if (currentInfraspeciesName && node.rank === 'cultivar') {
-                           parts.push(currentInfraspecificRank || 'var.');
-                           parts.push(currentInfraspecificRank ? currentInfraspeciesName : (currentSpecies || ''));
-                      }
-
-                      // 4. Cultivar
                       if (node.rank === 'cultivar') {
                           parts.push(`'${node.name}'`);
+                      } else if (node.rank !== 'genus' && node.rank !== 'species' && node.rank !== 'variety' && node.rank !== 'subspecies') {
+                          parts.push(node.name);
                       }
                       
-                      // Only update if we actually built something substantial
-                      if (parts.length > 0) {
-                          builtScientificName = parts.join(' ');
-                      }
+                      if (parts.length === 0) finalScientificName = node.name;
+                      else finalScientificName = parts.join(' ');
                   }
 
                   const newTaxon: Taxon = {
@@ -209,7 +183,7 @@ function App() {
                       parentId: parentId, 
                       rank: node.rank, 
                       name: node.name, 
-                      scientificName: builtScientificName, 
+                      scientificName: finalScientificName, 
                       genus: currentGenus,
                       genusHybrid: currentGenusHybrid,
                       species: currentSpecies,
@@ -246,7 +220,7 @@ function App() {
               return prev.map(a => a.id === id ? { ...a, status: 'running', message: 'Starting...', timestamp: Date.now() } : a);
           }
           const newItem: ActivityItem = {
-              id, name, type, status: 'running', message: 'Starting...', timestamp: Date.now(), payload
+              id, name, type, status: 'running', message: 'Starting...', timestamp: Date.now(), payload, details: payload
           };
           return [newItem, ...prev].slice(0, 50); 
       });
@@ -359,24 +333,33 @@ function App() {
 
           if (candidates.length > 1 && candidates[0].confidence < 0.95) {
               requireInputActivity(actId, "Multiple matches found.", {
-                  type: 'ambiguous', candidates: candidates, originalQuery: queryTerm
+                  type: 'ambiguous',
+                  candidates: candidates,
+                  originalQuery: queryTerm
               });
               return;
           }
 
           const topMatch = candidates[0];
-          const existing = taxa.find(t => t.scientificName.toLowerCase() === topMatch.scientificName.toLowerCase());
+          const existing = taxa.find(t => 
+              t.scientificName.toLowerCase() === topMatch.scientificName.toLowerCase()
+          );
 
           if (existing) {
               requireInputActivity(actId, "Plant already exists.", {
-                  type: 'duplicate', candidates: [topMatch], originalQuery: queryTerm, existingId: existing.id
+                  type: 'duplicate',
+                  candidates: [topMatch],
+                  originalQuery: queryTerm,
+                  existingId: existing.id
               });
               return;
           }
 
           if (topMatch.matchType !== 'exact' || topMatch.scientificName.toLowerCase() !== queryTerm.toLowerCase()) {
                requireInputActivity(actId, `Verify Name: ${topMatch.scientificName}`, {
-                  type: 'correction', candidates: [topMatch], originalQuery: queryTerm
+                  type: 'correction',
+                  candidates: [topMatch],
+                  originalQuery: queryTerm
               });
               return;
           }
@@ -393,7 +376,7 @@ function App() {
 
   const handleAddPlant = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!query.trim()) return;
+    if (!query || !query.trim()) return;
     executeSearch(query);
     setQuery('');
   };
@@ -456,8 +439,8 @@ function App() {
   };
 
   const handleBulkImport = async () => {
-      if(!importText.trim()) return;
-      const actId = addActivity("Bulk Import", 'import'); 
+      if(!importText || !importText.trim()) return;
+      const actId = addActivity("Bulk Import", 'import', { rawLength: importText.length }); 
       setShowImportModal(false);
       try {
           const chains = await parseBulkText(importText);
@@ -466,7 +449,7 @@ function App() {
               if (cancelledActivityIds.current.has(actId)) break;
               mergeChainIntoTaxa(chain); 
               count++; 
-              updateActivity(actId, `Importing ${count}/${chains.length}...`); 
+              updateActivity(actId, `Importing ${count}/${chains.length}...`, { details: { parsedCount: chains.length, current: count, lastChain: chain }}); 
           }
           if (cancelledActivityIds.current.has(actId)) failActivity(actId, "Cancelled");
           else completeActivity(actId, `Imported ${count} plants`);
@@ -519,7 +502,9 @@ function App() {
               if (cancelledActivityIds.current.has(actId)) {
                   // If cancelled, clear the rest of the queue logic
                   activeEnrichmentCount.current = 0;
-                  failActivity(actId, "Enrichment stopped by user");
+                  // Use removeProcess (which deletes from state)
+                  failActivity(actId, "Cancelled by user");
+                  cancelledActivityIds.current.delete(actId);
                   return;
               }
 
@@ -717,11 +702,11 @@ function App() {
                 
                 <div className={viewMode === 'grid' ? 'block' : 'hidden'}>
                     <div className="h-[calc(100vh-140px)]">
-                         <DataGridV2 
-                            taxa={taxa} 
-                            preferences={preferences} 
-                            onAction={handleGridAction} 
-                         />
+                        <DataGridV2 
+                           taxa={taxa} 
+                           preferences={preferences} 
+                           onAction={handleGridAction} 
+                        />
                     </div>
                 </div>
              </>

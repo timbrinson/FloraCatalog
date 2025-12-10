@@ -2,61 +2,108 @@
 import { Taxon } from './types';
 
 export const DEFAULT_TAXA: Taxon[] = [
-    // 1. Agave ovatifolia 'Frosty Blue'
+    // 1. x Amarine tubergenii 'Anastasia'
     { 
-        id: '1', rank: 'genus', name: 'Agave', scientificName: 'Agave', taxonomicStatus: 'Accepted', family: 'Asparagaceae', commonName: 'Century Plant', synonyms: [], referenceLinks: [], createdAt: 1,
-        authorship: 'L.', plantNameId: 'urn:lsid:ipni.org:names:320035-2',
-        geographicArea: 'Americas', firstPublished: 'Sp. Pl.: 323 (1753)',
-        reviewed: 'Y', lifeformDescription: 'Succulent subshrub', climateDescription: 'Subtropical'
+        id: '1', rank: 'genus', name: 'Amarine', scientificName: '× Amarine', genusHybrid: '×', genus: 'Amarine', taxonomicStatus: 'Accepted', family: 'Amaryllidaceae', synonyms: [], referenceLinks: [], createdAt: 1 
     },
     { 
-        id: '2', parentId: '1', rank: 'species', name: 'ovatifolia', scientificName: 'Agave ovatifolia', taxonomicStatus: 'Accepted', commonName: "Whale's Tongue Agave", synonyms: [], referenceLinks: [], createdAt: 2,
-        authorship: 'G.D.Starr & Villarreal', geographicArea: 'Mexico Northeast', plantNameId: 'urn:lsid:ipni.org:names:60435868-2',
-        firstPublished: 'Sida 20: 395 (2002)', publication: 'Sida 20: 395', volumeAndPage: '20: 395',
-        reviewed: 'Y', lifeformDescription: 'Succulent', climateDescription: 'Subtropical'
+        id: '2', parentId: '1', rank: 'species', name: 'tubergenii', scientificName: '× Amarine tubergenii', genus: 'Amarine', genusHybrid: '×', species: 'tubergenii', taxonomicStatus: 'Accepted', synonyms: [], referenceLinks: [], createdAt: 2 
     },
-    { id: '3', parentId: '2', rank: 'cultivar', name: 'Frosty Blue', scientificName: "Agave ovatifolia 'Frosty Blue'", taxonomicStatus: 'Accepted', commonName: "Frosty Blue Agave", synonyms: [], referenceLinks: [], createdAt: 3, description: "Intense powder-blue foliage selection." },
+    { 
+        id: '3', parentId: '2', rank: 'cultivar', name: 'Anastasia', scientificName: "× Amarine tubergenii 'Anastasia'", genus: 'Amarine', genusHybrid: '×', species: 'tubergenii', cultivar: 'Anastasia', taxonomicStatus: 'Accepted', synonyms: [], referenceLinks: [], createdAt: 3 
+    },
 
-    // 2. Agave parryi var. truncata 'Huntington'
+    // 2. x Hippeastrelia 'Volcano'
     { 
-        id: '4', parentId: '1', rank: 'species', name: 'parryi', scientificName: 'Agave parryi', taxonomicStatus: 'Accepted', synonyms: [], referenceLinks: [], createdAt: 4,
-        authorship: 'Engelm.', geographicArea: 'Arizona to Mexico', plantNameId: 'urn:lsid:ipni.org:names:6193-2',
-        firstPublished: 'Trans. Acad. Sci. St. Louis 3: 311 (1875)',
-        reviewed: 'Y'
+        id: '4', rank: 'genus', name: 'Hippeastrelia', scientificName: '× Hippeastrelia', genusHybrid: '×', genus: 'Hippeastrelia', taxonomicStatus: 'Accepted', family: 'Amaryllidaceae', synonyms: [], referenceLinks: [], createdAt: 4 
     },
     { 
-        id: '5', parentId: '4', rank: 'variety', name: 'truncata', scientificName: 'Agave parryi var. truncata', taxonomicStatus: 'Accepted', synonyms: [], referenceLinks: [], createdAt: 5,
-        authorship: 'Gentry', geographicArea: 'Mexico (Durango, Zacatecas)', plantNameId: 'urn:lsid:ipni.org:names:22502-2',
-        firstPublished: 'Publ. Carnegie Inst. Wash. 527: 523 (1940)',
-        nomenclaturalRemarks: 'nom. illeg. if treated as sp.', reviewed: 'Y'
+        id: '5', parentId: '4', rank: 'cultivar', name: 'Volcano', scientificName: "× Hippeastrelia 'Volcano'", genus: 'Hippeastrelia', genusHybrid: '×', cultivar: 'Volcano', taxonomicStatus: 'Accepted', synonyms: [], referenceLinks: [], createdAt: 5 
     },
-    { 
-        id: '13', parentId: '4', rank: 'subspecies', name: 'truncata', scientificName: 'Agave parryi subsp. truncata', taxonomicStatus: 'Synonym', synonyms: [], referenceLinks: [], createdAt: 5,
-        authorship: 'Gentry', geographicArea: 'Mexico (Durango, Zacatecas)', plantNameId: 'urn:lsid:ipni.org:names:99999-1',
-        acceptedNameId: 'urn:lsid:ipni.org:names:22502-2',
-        firstPublished: 'Agaves Cont. N. Amer.: 523 (1982)'
-    },
-    { id: '6', parentId: '5', rank: 'cultivar', name: 'Huntington', scientificName: "Agave parryi var. truncata 'Huntington'", taxonomicStatus: 'Accepted', synonyms: [], referenceLinks: [], createdAt: 6, description: "A clone distributed by the Huntington Botanical Gardens." },
-    
-    // 3. Colocasia 'Mojito'
-    { 
-        id: '10', rank: 'genus', name: 'Colocasia', scientificName: 'Colocasia', taxonomicStatus: 'Accepted', family: 'Araceae', commonName: 'Elephant Ear', synonyms: [], referenceLinks: [], createdAt: 10,
-        authorship: 'Schott', plantNameId: 'urn:lsid:ipni.org:names:2745-1', firstPublished: 'Melet. Bot.: 18 (1832)',
-        geographicArea: 'Trop. & Subtrop. Asia'
-    },
-    { 
-        id: '11', parentId: '10', rank: 'species', name: 'esculenta', scientificName: 'Colocasia esculenta', taxonomicStatus: 'Accepted', synonyms: [], referenceLinks: [], createdAt: 11,
-        authorship: '(L.) Schott', geographicArea: 'Trop. & Subtrop. Asia to N. Australia', plantNameId: 'urn:lsid:ipni.org:names:86629-1',
-        firstPublished: 'Melet. Bot.: 18 (1832)', parentheticalAuthor: 'L.', publicationAuthor: 'Schott',
-        reviewed: 'Y'
-    },
-    { id: '12', parentId: '11', rank: 'cultivar', name: 'Mojito', scientificName: "Colocasia esculenta 'Mojito'", taxonomicStatus: 'Accepted', description: "Speckled with midnight purple.", synonyms: [], referenceLinks: [], createdAt: 12 },
 
-    // 4. Hybrid Example: x Mangave
-    {
-        id: '20', rank: 'genus', name: 'Mangave', scientificName: '× Mangave', taxonomicStatus: 'Accepted', family: 'Asparagaceae', synonyms: [], referenceLinks: [], createdAt: 20,
-        authorship: 'J.M.Webber', genusHybrid: '×', hybridFormula: 'Agave × Manfreda',
-        firstPublished: 'Madroño 12: 120 (1953)', plantNameId: 'urn:lsid:ipni.org:names:295627-2',
-        reviewed: 'Y'
+    // 3. Hippeastrum x johnsonii
+    { 
+        id: '6', rank: 'genus', name: 'Hippeastrum', scientificName: 'Hippeastrum', genus: 'Hippeastrum', taxonomicStatus: 'Accepted', family: 'Amaryllidaceae', synonyms: [], referenceLinks: [], createdAt: 6 
+    },
+    { 
+        id: '7', parentId: '6', rank: 'species', name: 'johnsonii', scientificName: 'Hippeastrum × johnsonii', genus: 'Hippeastrum', species: 'johnsonii', speciesHybrid: '×', taxonomicStatus: 'Accepted', synonyms: [], referenceLinks: [], createdAt: 7 
+    },
+
+    // 4. Habranthus x floryi 'Cherry Pink'
+    { 
+        id: '8', rank: 'genus', name: 'Habranthus', scientificName: 'Habranthus', genus: 'Habranthus', taxonomicStatus: 'Accepted', family: 'Amaryllidaceae', synonyms: [], referenceLinks: [], createdAt: 8 
+    },
+    { 
+        id: '9', parentId: '8', rank: 'species', name: 'floryi', scientificName: 'Habranthus × floryi', genus: 'Habranthus', species: 'floryi', speciesHybrid: '×', taxonomicStatus: 'Accepted', synonyms: [], referenceLinks: [], createdAt: 9 
+    },
+    { 
+        id: '10', parentId: '9', rank: 'cultivar', name: 'Cherry Pink', scientificName: "Habranthus × floryi 'Cherry Pink'", genus: 'Habranthus', species: 'floryi', speciesHybrid: '×', cultivar: 'Cherry Pink', taxonomicStatus: 'Accepted', synonyms: [], referenceLinks: [], createdAt: 10 
+    },
+
+    // 5. Agave parryi hierarchy
+    { 
+        id: '11', rank: 'genus', name: 'Agave', scientificName: 'Agave', genus: 'Agave', taxonomicStatus: 'Accepted', family: 'Asparagaceae', synonyms: [], referenceLinks: [], createdAt: 11 
+    },
+    { 
+        id: '12', parentId: '11', rank: 'species', name: 'parryi', scientificName: 'Agave parryi', genus: 'Agave', species: 'parryi', taxonomicStatus: 'Accepted', synonyms: [], referenceLinks: [], createdAt: 12 
+    },
+    { 
+        id: '13', parentId: '12', rank: 'subspecies', name: 'huachucensis', scientificName: 'Agave parryi subsp. huachucensis', genus: 'Agave', species: 'parryi', infraspecificRank: 'subsp.', infraspecies: 'huachucensis', taxonomicStatus: 'Accepted', synonyms: [], referenceLinks: [], createdAt: 13 
+    },
+    { 
+        id: '14', parentId: '12', rank: 'subspecies', name: 'truncata', scientificName: 'Agave parryi subsp. truncata', genus: 'Agave', species: 'parryi', infraspecificRank: 'subsp.', infraspecies: 'truncata', taxonomicStatus: 'Accepted', synonyms: [], referenceLinks: [], createdAt: 14 
+    },
+    { 
+        id: '15', parentId: '14', rank: 'cultivar', name: 'Orizaba', scientificName: "Agave parryi subsp. truncata 'Orizaba'", genus: 'Agave', species: 'parryi', infraspecificRank: 'subsp.', infraspecies: 'truncata', cultivar: 'Orizaba', taxonomicStatus: 'Accepted', synonyms: [], referenceLinks: [], createdAt: 15 
+    },
+
+    // 6. Tulipa clusiana hierarchy
+    { 
+        id: '16', rank: 'genus', name: 'Tulipa', scientificName: 'Tulipa', genus: 'Tulipa', taxonomicStatus: 'Accepted', family: 'Liliaceae', synonyms: [], referenceLinks: [], createdAt: 16 
+    },
+    { 
+        id: '17', parentId: '16', rank: 'species', name: 'clusiana', scientificName: 'Tulipa clusiana', genus: 'Tulipa', species: 'clusiana', taxonomicStatus: 'Accepted', synonyms: [], referenceLinks: [], createdAt: 17 
+    },
+    { 
+        id: '18', parentId: '17', rank: 'variety', name: 'stellata', scientificName: 'Tulipa clusiana var. stellata', genus: 'Tulipa', species: 'clusiana', infraspecificRank: 'var.', infraspecies: 'stellata', taxonomicStatus: 'Accepted', synonyms: [], referenceLinks: [], createdAt: 18 
+    },
+    { 
+        id: '19', parentId: '17', rank: 'variety', name: 'chrysanth', scientificName: 'Tulipa clusiana var. chrysanth', genus: 'Tulipa', species: 'clusiana', infraspecificRank: 'var.', infraspecies: 'chrysanth', taxonomicStatus: 'Accepted', synonyms: [], referenceLinks: [], createdAt: 19 
+    },
+    { 
+        id: '20', parentId: '19', rank: 'cultivar', name: 'Tubergens Gem', scientificName: "Tulipa clusiana var. chrysanth 'Tubergens Gem'", genus: 'Tulipa', species: 'clusiana', infraspecificRank: 'var.', infraspecies: 'chrysanth', cultivar: 'Tubergens Gem', taxonomicStatus: 'Accepted', synonyms: [], referenceLinks: [], createdAt: 20 
+    },
+
+    // 7. Echeveria colorata
+    { 
+        id: '21', rank: 'genus', name: 'Echeveria', scientificName: 'Echeveria', genus: 'Echeveria', taxonomicStatus: 'Accepted', family: 'Crassulaceae', synonyms: [], referenceLinks: [], createdAt: 21 
+    },
+    { 
+        id: '22', parentId: '21', rank: 'species', name: 'colorata', scientificName: 'Echeveria colorata', genus: 'Echeveria', species: 'colorata', taxonomicStatus: 'Accepted', synonyms: [], referenceLinks: [], createdAt: 22 
+    },
+    { 
+        id: '23', parentId: '22', rank: 'form', name: 'lindsayana', scientificName: 'Echeveria colorata f. lindsayana', genus: 'Echeveria', species: 'colorata', infraspecificRank: 'f.', infraspecies: 'lindsayana', taxonomicStatus: 'Accepted', synonyms: [], referenceLinks: [], createdAt: 23 
+    },
+
+    // 8. Agapanthus
+    { 
+        id: '24', rank: 'genus', name: 'Agapanthus', scientificName: 'Agapanthus', genus: 'Agapanthus', taxonomicStatus: 'Accepted', family: 'Amaryllidaceae', synonyms: [], referenceLinks: [], createdAt: 24 
+    },
+    { 
+        id: '25', parentId: '24', rank: 'cultivar', name: 'Storm Cloud', scientificName: "Agapanthus 'Storm Cloud'", genus: 'Agapanthus', cultivar: 'Storm Cloud', taxonomicStatus: 'Accepted', synonyms: [], referenceLinks: [], createdAt: 25 
+    },
+    { 
+        id: '26', parentId: '24', rank: 'species', name: 'africanus', scientificName: 'Agapanthus africanus', genus: 'Agapanthus', species: 'africanus', taxonomicStatus: 'Accepted', synonyms: [], referenceLinks: [], createdAt: 26 
+    },
+    { 
+        id: '27', parentId: '26', rank: 'cultivar', name: 'Summer Sky', scientificName: "Agapanthus africanus 'Summer Sky'", genus: 'Agapanthus', species: 'africanus', cultivar: 'Summer Sky', taxonomicStatus: 'Accepted', synonyms: [], referenceLinks: [], createdAt: 27 
+    },
+
+    // 9. Boophone
+    { 
+        id: '28', rank: 'genus', name: 'Boophone', scientificName: 'Boophone', genus: 'Boophone', taxonomicStatus: 'Accepted', family: 'Amaryllidaceae', synonyms: [], referenceLinks: [], createdAt: 28 
+    },
+    { 
+        id: '29', parentId: '28', rank: 'species', name: 'disticha', scientificName: 'Boophone disticha', genus: 'Boophone', species: 'disticha', taxonomicStatus: 'Accepted', synonyms: [], referenceLinks: [], createdAt: 29 
     }
 ];

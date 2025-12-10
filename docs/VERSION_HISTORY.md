@@ -1,18 +1,13 @@
 
 # Version History
 
-## v2.3 - Visual Polish & Logic Fixes
+## v2.3 - Cleanup & Docs
 **Date:** May 30, 2025
 
-### Visual Improvements
-- **Theme Update:** Switched "Blue" to "Sky" in the default theme to improve contrast and reduce visual weight.
-- **Cell Styling:** Active rank terms (e.g., "Agave" in a Genus row) now inherit the row's rich theme color (e.g., `text-green-900`) instead of generic slate.
-- **Bolding:** Scientific Name is now always bold. Hybrid markers (GH/SH) and Infraspecific Rank (I-Rank) are bolded when relevant.
-- **Legend:** Redesigned into a 2-column layout comparing Standard vs. Hybrid (Grayer) styles.
-
-### Logic Fixes
-- **Hybrid Markers:** Enforced strict normalization of `x` to `×` in both data entry and grid display.
-- **Form Rank:** Fixed a bug where plants with rank 'form' (f.) caused the Infraspecies column to dim incorrectly. 'Form' is now visually treated at the same level as Subspecies/Variety.
+### Changes
+- **Cleanup:** Removed deprecated `components/DataGrid.tsx` logic from the main application. The app now exclusively uses the `DataGridV2` implementation (Tree Grid).
+- **Documentation:** Moved `DESIGN_SPECS.md` and `VERSION_HISTORY.md` to the `docs/` folder to separate metadata from source code.
+- **Maintenance:** Removed the deprecated `stable` and `stable2` snapshot folders.
 
 ## v2.2 - Cleanup of Legacy DataGrid
 **Date:** May 30, 2025
@@ -66,7 +61,7 @@
   - **Search Resolution Flow:** UI to handle Duplicates, Ambiguities, and Name Corrections before adding.
 - **Process Management:**
   - **Activity Panel:** Tracking multiple concurrent background tasks (Mining, Import, Enrichment).
-  - **Cancellation:** Ability to stop long-running mining tasks.
+  - **Cancellation:** Ability to stop long-running mining operations.
 - **Data Integrity:**
   - **Infraspecies Propagation:** Correctly inherits variety/subspecies names down to cultivars during import.
   - **WCVP Schema:** Full support for WCVP columns including IDs, Authorship, and Geography.
