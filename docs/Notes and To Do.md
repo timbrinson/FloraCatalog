@@ -4,12 +4,25 @@ Current code fixes:
 
 needing to restore to older versions then reapply.
 
-The SH column is using x instead of ×. It appears the GH and Scientific Name is using × correctly.
-When the taxon level is Infraspecies make the I Rank term font the same bold and color as the Infraspecies term.
-When the taxon level is Species make the SH term font the same color as the Species term. It is already Bold and keep that.
-When the taxon level is Genus make the GH term font the same color as the Genus term. It is already Bold and keep that.
-Make the Scientific Name font bold and make it the same color as the lowest level taxon term font.
+I want to work toward the database integration and have a number of things to work on to get there. That is why I wanted to see the data mapping. Here are some enhancements based on reviewing the data mapping.
 
+In the data mapping you shortened some of the information in the columns of metadata from WCVP. Regenerate with all the information so I can see if it is too much.
+
+Make sure the Taxon interface incudes attributes for all columns from WCVP. Also the attribute name in the Taxon interface must match that from the WCVP column name. Here are some I see that are missing or don't match:
+taxon_name->scientificName;
+taxon_rank->rank;
+taxon_authors->authorship;
+primary_author->(missing);
+replaced_synonym_author->(missing);
+place_of_publication->publication;
+accepted_plant_name_id-> acceptedNameId;
+basionym_plant_name_id-> basionymId;
+parent_plant_name_id->(missing);
+homotypic_synonym->(missing);
+
+Continue to make sure grid columns exist for all attributes in the Taxon interface and that the names match exactly. I realize there are extra grid columns as well for things like the tree, count and actions.
+
+When you first generated the data mapping to the console you added additional columns than what I explicitly asked for (Grid Label and Notes). I liked those and se you did include the Grid Label in the DATA_MAPPING.md. Please include the Notes in the DATA_MAPPING.md file as well.
 
 Issue 2025--12-07
 -----------------
