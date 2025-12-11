@@ -135,9 +135,9 @@ const DataGridV2: React.FC<DataGridProps> = ({ taxa, onAction, preferences }) =>
       { id: 'infraspecies', label: 'Infraspecies', defaultWidth: 120, filterType: 'text' }, 
       { id: 'cultivar', label: 'Cultivar', defaultWidth: 150, filterType: 'text' }, 
       
-      { id: 'scientificName', label: 'Scientific Name', defaultWidth: 220, filterType: 'text' },
+      { id: 'taxonName', label: 'Taxon Name', defaultWidth: 220, filterType: 'text' }, // Was scientificName
       
-      { id: 'rank', label: 'Rank', defaultWidth: 110, filterType: 'multi-select', filterOptions: ['family', 'genus', 'species', 'subspecies', 'variety', 'form', 'hybrid', 'cultivar', 'grex'], lockWidth: true },
+      { id: 'taxonRank', label: 'Rank', defaultWidth: 110, filterType: 'multi-select', filterOptions: ['family', 'genus', 'species', 'subspecies', 'variety', 'form', 'hybrid', 'cultivar', 'grex'], lockWidth: true }, 
       { id: 'taxonStatus', label: 'Status', defaultWidth: 110, filterType: 'multi-select', filterOptions: ['Accepted', 'Synonym', 'Unresolved', 'Artificial'] },
       { id: 'commonName', label: 'Common Name', defaultWidth: 150, filterType: 'text' },
       
@@ -147,7 +147,7 @@ const DataGridV2: React.FC<DataGridProps> = ({ taxa, onAction, preferences }) =>
       { id: 'acceptedPlantNameId', label: 'Accepted ID', defaultWidth: 100, filterType: 'text' }, 
       { id: 'parentId', label: 'Parent ID', defaultWidth: 100, filterType: 'text' },
       { id: 'parentPlantNameId', label: 'Parent Plant ID', defaultWidth: 100, filterType: 'text' }, 
-      { id: 'basionymPlantNameId', label: 'Basionym ID', defaultWidth: 100, filterType: 'text' }, // Was basionymId
+      { id: 'basionymPlantNameId', label: 'Basionym ID', defaultWidth: 100, filterType: 'text' }, 
       { id: 'homotypicSynonym', label: 'Homotypic Syn.', defaultWidth: 100, filterType: 'text' }, 
       { id: 'id', label: 'Internal ID', defaultWidth: 100, filterType: 'text' },
 
@@ -177,14 +177,14 @@ const DataGridV2: React.FC<DataGridProps> = ({ taxa, onAction, preferences }) =>
   const [visibleColumns, setVisibleColumns] = useState<Set<ColumnId>>(() => {
       const saved = loadState<string[]>('grid_v2_visible_cols', []);
       return saved.length > 0 ? new Set(saved) : new Set([
-          'treeControl', 'childCount', 'genusHybrid', 'genus', 'speciesHybrid', 'species', 'infraspecificRank', 'infraspecies', 'cultivar', 'scientificName'
+          'treeControl', 'childCount', 'genusHybrid', 'genus', 'speciesHybrid', 'species', 'infraspecificRank', 'infraspecies', 'cultivar', 'taxonName'
       ]);
   });
   
-  // Updated key to rev5 to ensure column order update is picked up
-  const [columnOrder, setColumnOrder] = useState<ColumnId[]>(() => loadState('grid_v2_col_order_rev5', allColumns.map(c => c.id)));
+  // Updated key to rev7 to ensure column order update is picked up
+  const [columnOrder, setColumnOrder] = useState<ColumnId[]>(() => loadState('grid_v2_col_order_rev7', allColumns.map(c => c.id)));
   const [colWidths, setColWidths] = useState<Record<ColumnId, number>>(() => loadState('grid_v2_col_widths', Object.fromEntries(allColumns.map(c => [c.id, c.defaultWidth]))));
-  const [sortConfig, setSortConfig] = useState<{ key: ColumnId; direction: 'asc' | 'desc' } | null>(() => loadState('grid_v2_sort', { key: 'scientificName', direction: 'asc' }));
+  const [sortConfig, setSortConfig] = useState<{ key: ColumnId; direction: 'asc' | 'desc' } | null>(() => loadState('grid_v2_sort', { key: 'taxonName', direction: 'asc' }));
   const [textFilters, setTextFilters] = useState<Record<string, string>>(() => loadState('grid_v2_text_filters', {}));
   const [multiFilters, setMultiFilters] = useState<Record<string, string[]>>(() => loadState('grid_v2_multi_filters', {}));
 
@@ -198,7 +198,7 @@ const DataGridV2: React.FC<DataGridProps> = ({ taxa, onAction, preferences }) =>
   }, [isHierarchyMode]);
 
   useEffect(() => localStorage.setItem('grid_v2_visible_cols', JSON.stringify(Array.from(visibleColumns))), [visibleColumns]);
-  useEffect(() => localStorage.setItem('grid_v2_col_order_rev5', JSON.stringify(columnOrder)), [columnOrder]); // Persist to new key
+  useEffect(() => localStorage.setItem('grid_v2_col_order_rev7', JSON.stringify(columnOrder)), [columnOrder]); // Persist to new key
   useEffect(() => localStorage.setItem('grid_v2_col_widths', JSON.stringify(colWidths)), [colWidths]);
   useEffect(() => localStorage.setItem('grid_v2_sort', JSON.stringify(sortConfig)), [sortConfig]);
   useEffect(() => localStorage.setItem('grid_v2_text_filters', JSON.stringify(textFilters)), [textFilters]);
@@ -237,7 +237,7 @@ const DataGridV2: React.FC<DataGridProps> = ({ taxa, onAction, preferences }) =>
            const tr = row as TreeRow;
            return tr.isTreeHeader ? tr.childCount : getDescendantCount(tr.id, taxa);
        }
-       if (colId === 'cultivar' && row.rank === 'cultivar') return row.name;
+       if (colId === 'cultivar' && row.taxonRank === 'cultivar') return row.name;
        // @ts-ignore
        return row[colId];
   };
@@ -263,11 +263,11 @@ const DataGridV2: React.FC<DataGridProps> = ({ taxa, onAction, preferences }) =>
   const sortedData = useMemo(() => {
     if (!sortConfig) return filteredData;
     return [...filteredData].sort((a, b) => {
-      if (sortConfig.key === 'rank') {
+      if (sortConfig.key === 'taxonRank') { 
           // @ts-ignore
-          const rankA = RANK_HIERARCHY[(a.rank || '').toLowerCase()] || 99;
+          const rankA = RANK_HIERARCHY[(a.taxonRank || '').toLowerCase()] || 99;
           // @ts-ignore
-          const rankB = RANK_HIERARCHY[(b.rank || '').toLowerCase()] || 99;
+          const rankB = RANK_HIERARCHY[(b.taxonRank || '').toLowerCase()] || 99;
           return sortConfig.direction === 'asc' ? rankA - rankB : rankB - rankA;
       } else {
           // Sort by numeric value if sorting by count
@@ -301,11 +301,11 @@ const DataGridV2: React.FC<DataGridProps> = ({ taxa, onAction, preferences }) =>
              if (!valMatches) return false;
              
              // Smart mapping for group headers
-             if (field === 'genus') return t.rank === 'genus';
-             if (field === 'species') return t.rank === 'species';
-             if (field === 'infraspecies') return ['variety', 'subspecies', 'form'].includes(t.rank);
+             if (field === 'genus') return t.taxonRank === 'genus';
+             if (field === 'species') return t.taxonRank === 'species';
+             if (field === 'infraspecies') return ['variety', 'subspecies', 'form'].includes(t.taxonRank);
              
-             return t.rank.toLowerCase() === field.toLowerCase();
+             return t.taxonRank.toLowerCase() === field.toLowerCase();
           });
       };
 
@@ -340,9 +340,10 @@ const DataGridV2: React.FC<DataGridProps> = ({ taxa, onAction, preferences }) =>
               const headerRow: TreeRow = headerTaxon ? { ...headerTaxon } : {
                   id: `virtual-${path}`,
                   isVirtual: true,
-                  rank: field as any, 
+                  taxonRank: field as any, 
                   name: key,
-                  scientificName: key,
+                  taxonName: key, // Was scientificName
+                  scientificName: key, // Removed legacy, using taxonName below, but keeping key prop for internal logic if needed
                   taxonStatus: 'Accepted',
                   family: firstChild?.family,
                   genus: firstChild?.genus,
@@ -417,7 +418,7 @@ const DataGridV2: React.FC<DataGridProps> = ({ taxa, onAction, preferences }) =>
           const colDef = allColumns.find(c => c.id === k);
           if (colDef?.lockWidth) return; // Skip locked columns
 
-          if (k === 'scientificName') updates[k] = Math.max(ideals[k], 180); 
+          if (k === 'taxonName') updates[k] = Math.max(ideals[k], 180); 
           else updates[k] = Math.min(ideals[k], limit); 
       }); 
       setColWidths(prev => ({...prev, ...updates})); 
@@ -456,8 +457,8 @@ const DataGridV2: React.FC<DataGridProps> = ({ taxa, onAction, preferences }) =>
       
       flexCols.forEach(col => { 
           let w = ideals[col.id]; 
-          if (['rank', 'taxonStatus', 'reviewed'].includes(String(col.id))) w = Math.max(w, 110); 
-          if (col.id === 'scientificName') w = Math.max(w, 180); 
+          if (['taxonRank', 'taxonStatus', 'reviewed'].includes(String(col.id))) w = Math.max(w, 110); 
+          if (col.id === 'taxonName') w = Math.max(w, 180); 
           else w = Math.min(w, maxAllowed); 
           cappedIdeals[col.id] = w; 
           totalCappedWidth += w; 
@@ -474,8 +475,8 @@ const DataGridV2: React.FC<DataGridProps> = ({ taxa, onAction, preferences }) =>
           const scale = flexAvailable / totalCappedWidth; 
           flexCols.forEach(col => { 
               let w = cappedIdeals[col.id] * scale; 
-              if (col.id === 'scientificName') w = Math.max(w, 150); 
-              if (['rank', 'taxonStatus', 'reviewed'].includes(String(col.id))) w = Math.max(w, 80); 
+              if (col.id === 'taxonName') w = Math.max(w, 150); 
+              if (['taxonRank', 'taxonStatus', 'reviewed'].includes(String(col.id))) w = Math.max(w, 80); 
               newWidths[col.id] = Math.max(40, Math.floor(w)); 
           }); 
       } 
@@ -620,7 +621,7 @@ const DataGridV2: React.FC<DataGridProps> = ({ taxa, onAction, preferences }) =>
                   const tr = row as TreeRow;
                   
                   // Color Logic
-                  const rankKey = String(tr.rank).toLowerCase();
+                  const rankKey = String(tr.taxonRank).toLowerCase(); 
                   const baseColor = activeColorMap[rankKey] || 'slate';
                   const isHybrid = tr.genusHybrid === '×' || tr.genusHybrid === 'x' || 
                                    tr.speciesHybrid === '×' || tr.speciesHybrid === 'x' || 
@@ -665,8 +666,8 @@ const DataGridV2: React.FC<DataGridProps> = ({ taxa, onAction, preferences }) =>
                       
                       // Bold Logic: Applies to both Header and Data Rows
                       let isBold = false;
-                      const r = String(tr.rank).toLowerCase();
-                      const coreCols = ['genus', 'species', 'cultivar', 'infraspecies', 'infraspecificRank', 'scientificName', 'genusHybrid', 'speciesHybrid'];
+                      const r = String(tr.taxonRank).toLowerCase(); 
+                      const coreCols = ['genus', 'species', 'cultivar', 'infraspecies', 'infraspecificRank', 'taxonName', 'genusHybrid', 'speciesHybrid']; // Updated coreCols
                       
                       // CORE LOGIC: Bold the column that matches the rank
                       if (coreCols.includes(String(col.id))) {
@@ -677,7 +678,7 @@ const DataGridV2: React.FC<DataGridProps> = ({ taxa, onAction, preferences }) =>
                            if ((String(col.id) === 'infraspecies' || String(col.id) === 'infraspecificRank') && ['variety','subspecies','form'].includes(r)) isBold = true;
 
                            // Scientific Name always bold
-                           if (String(col.id) === 'scientificName') isBold = true;
+                           if (String(col.id) === 'taxonName') isBold = true; // Updated
                            
                            // Hybrids Bolding Logic
                            if (String(col.id) === 'genusHybrid' && r === 'genus') isBold = true;
@@ -700,11 +701,11 @@ const DataGridV2: React.FC<DataGridProps> = ({ taxa, onAction, preferences }) =>
                       }
                       
                       // Formatting
-                      if (col.id === 'rank') {
+                      if (col.id === 'taxonRank') { 
                           // Dynamic badge color
                           const rankStyle = `bg-${baseColor}-100 ${getTextClass(baseColor)} border-${baseColor}-200`;
                           displayVal = <span className={`px-2 py-0.5 text-[10px] rounded border uppercase font-bold ${rankStyle}`}>{val as string}</span>;
-                      } else if (col.id === 'scientificName') {
+                      } else if (col.id === 'taxonName') { // Updated
                           displayVal = formatFullScientificName(tr, preferences);
                       } else if (col.id === 'taxonStatus') {
                            displayVal = <span className={`px-2 py-0.5 text-[10px] rounded uppercase font-bold ${val === 'Accepted' ? 'bg-green-50 text-green-600' : ''} ${val === 'Synonym' ? 'bg-slate-100 text-slate-500' : ''} ${val === 'Artificial' ? 'bg-yellow-50 text-yellow-600' : ''}`}>{val as string || '-'}</span>;

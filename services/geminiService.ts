@@ -186,7 +186,7 @@ export const enrichTaxon = async (taxon: Taxon): Promise<Partial<Taxon>> => {
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
       const prompt = `
-        Botanical API. Target: "${taxon.scientificName}" (${taxon.rank}).
+        Botanical API. Target: "${taxon.taxonName}" (${taxon.taxonRank}).
         
         Task: Find description, synonyms, links, and WCVP/POWO specific details.
         
@@ -274,7 +274,7 @@ export const findAdditionalLinks = async (name: string, existing: Link[]): Promi
 
 export const deepScanTaxon = async (
     taxonFullName: string,
-    rank: string,
+    rank: string, // Kept as rank since AI prompts use "rank" terminology
     onBatch: (names: string[], status: string) => Promise<boolean> 
 ) => {
     console.log("deepScanTaxon invoked for:", taxonFullName);
@@ -395,9 +395,17 @@ export const searchTaxonCandidates = async (query: string): Promise<SearchCandid
       if (!jsonString) return [];
       
       const parsed = JSON.parse(jsonString);
-      const candidates = Array.isArray(parsed) ? parsed : [parsed];
+      const rawCandidates = Array.isArray(parsed) ? parsed : [parsed];
       
-      return candidates as SearchCandidate[];
+      return rawCandidates.map((c: any) => ({
+          taxonName: c.scientificName, // Map AI 'scientificName' to 'taxonName'
+          commonName: c.commonName,
+          taxonRank: c.rank, 
+          matchType: c.matchType,
+          confidence: c.confidence,
+          isHybrid: c.isHybrid
+      })) as SearchCandidate[];
+
   } catch (error) {
       console.error("Search candidates failed:", error);
       return [];

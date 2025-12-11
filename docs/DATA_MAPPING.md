@@ -19,7 +19,7 @@ This document maps the columns from the World Checklist of Vascular Plants (WCVP
 | `ipni_id` | | chr | International Plant Name Index (IPNI) identifier. Missing values indicate that the name has not been matched with a name in IPNI or is missing from IPNI. | | `ipniId` | `ipniId` | IPNI ID |
 | `powo_id` | | chr | identifier required to look up the name directly in Plants of the World Online (Powo) | | `powoId` | `powoId` | POWO ID |
 | **TAXONOMY** | | | | | | | |
-| `taxon_name` | | chr | Concatenation of genus with species and, where applicable, infraspecific epithets to make a binomial or trinomial name. | | `taxonName` | `scientificName` | Scientific Name |
+| `taxon_name` | | chr | Concatenation of genus with species and, where applicable, infraspecific epithets to make a binomial or trinomial name. | | `taxonName` | `taxonName` | Taxon Name |
 | `family` | | chr | The name of the family to which the taxon belongs. (The highest rank at which names are presented in WCVP). | | `family` | `family` | Family |
 | `genus` | | chr | The name of the genus to which the record refers. | | `genus` | `genus` | Genus |
 | `genus_hybrid` | +, × | chr | Indication of hybrid status at genus level: + indicates a graft-chimaera and × indicates a hybrid. | | `genusHybrid` | `genusHybrid` | GH |
@@ -28,7 +28,7 @@ This document maps the columns from the World Checklist of Vascular Plants (WCVP
 | `infraspecific_rank` | agamosp., convar., ecas., f., grex, group, lusus, microf., microgene, micromorphe, modif., monstr., mut., nid, nothof., nothosubsp., nothovar., positio, proles, provar., psp., stirps, subf., sublusus, subproles, subsp., subspecioid, subvar., unterrasse, var. | chr | The taxonomic rank of the infraspecific epithet. Empty where the taxon name is species rank or higher. For more information, see the International Code of Nomenclature for algae, fungi and plants: https://www.iapt-taxon.org/nomen/main.php | | `infraspecificRank` | `infraspecificRank` | I Rank |
 | `infraspecies` | | chr | The infraspecific epithet which is combined with a binomial to make a trinomial name at infraspecific rank. Empty when taxon name is at species rank or higher. | | `infraspecies` | `infraspecies` | Infraspecies |
 | — | — | — | — | — | `cultivar` | `cultivar` | Cultivar |
-| `taxon_rank` | Convariety, Form, Genus, proles, Species, Subform, Subspecies, Subvariety, Variety | chr | The level in the taxonomic hierarchy where the taxon name fits. Some infraspecific names are unranked and will have no value in this column. | | `taxonRank` | `rank` | Rank |
+| `taxon_rank` | Convariety, Form, Genus, proles, Species, Subform, Subspecies, Subvariety, Variety | chr | The level in the taxonomic hierarchy where the taxon name fits. Some infraspecific names are unranked and will have no value in this column. | | `taxonRank` | `taxonRank` | Rank |
 | `taxon_status` | Accepted, Artificial Hybrid, Illegitimate, Invalid, Local Biotype, Misapplied, Orthographic, Synonym, Unplaced, Provisionally Accepted | chr | Indication of nomenclatural status and taxonomic opinion re the name: see details in main text. Names with status ‘Provisionally Accepted’ are unplaced names that have synonyms, following the GBIF classification and only used within the Darwin Core Archive downlaod. | | `taxonomicStatus` | `taxonomicStatus` | Status |
 | `hybrid_formula` | | chr | parents of hybrid | | `hybridFormula` | `hybridFormula` | Hybrid Formula |
 | **AUTHORSHIP** | | | | | | | |

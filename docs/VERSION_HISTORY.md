@@ -2,7 +2,15 @@
 
 # Version History
 
-## v2.7 - Strict WCVP Field Alignment (Current)
+## v2.8 - Taxon Name Alignment
+**Date:** May 30, 2025
+
+### Changes
+- **Field Rename:** Renamed `scientificName` to `taxonName` across the entire application (`Taxon` interface, Grid, Search, etc.) to strictly align with the WCVP column `taxon_name`.
+- **Docs:** Updated `DATA_MAPPING.md` and `DESIGN_SPECS.md` to reflect that `taxonName` is the canonical field for the full name.
+- **Migration:** Bumped `DataGridV2` column revision key to `grid_v2_col_order_rev7`.
+
+## v2.7 - Strict WCVP Field Alignment
 **Date:** May 30, 2025
 
 ### Changes

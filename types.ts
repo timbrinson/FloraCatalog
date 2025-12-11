@@ -31,7 +31,12 @@ export interface Taxon {
   // Hierarchy
   /** UUID of the parent Taxon in the App database */
   parentId?: string; 
-  rank: TaxonRank;
+  
+  /** 
+   * The taxonomic rank (mapped from 'taxon_rank').
+   * e.g. "Genus", "Species", "Variety"
+   */
+  taxonRank: TaxonRank;
   
   // --- WCVP / POWO Specific Fields ---
   
@@ -70,7 +75,7 @@ export interface Taxon {
 
   // Names
   /** Full scientific name including authors (mapped from 'taxon_name') */
-  scientificName: string; 
+  taxonName: string; 
   
   /** Hybrid marker for Genus, e.g. '×' or '+' (mapped from 'genus_hybrid') */
   genusHybrid?: string; 
@@ -178,12 +183,12 @@ export type ActivityStatus = 'running' | 'paused' | 'completed' | 'error' | 'nee
 
 // Search specific types
 export interface SearchCandidate {
-  scientificName: string;
+  taxonName: string; // Was scientificName
   commonName?: string;
-  rank?: string;
+  taxonRank?: string; 
   matchType: 'exact' | 'synonym' | 'fuzzy' | 'common_name';
   confidence: number; // 0-1
-  isHybrid?: boolean; // New flag
+  isHybrid?: boolean; 
 }
 
 export interface ResolutionData {

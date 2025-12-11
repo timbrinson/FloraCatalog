@@ -1,4 +1,5 @@
 
+
 import { Taxon, UserPreferences } from '../types';
 
 export const formatScientificName = (taxon: Taxon, prefs: UserPreferences = { hybridSpacing: 'space', autoEnrichment: false, colorTheme: 'option2a' }): string => {
@@ -10,7 +11,7 @@ export const formatScientificName = (taxon: Taxon, prefs: UserPreferences = { hy
   // Logic for adding hybrid symbol prefix
   const isGenusHybrid = taxon.genusHybrid === '×' || taxon.genusHybrid === 'x';
   const isSpeciesHybrid = taxon.speciesHybrid === '×' || taxon.speciesHybrid === 'x';
-  const isHybridRank = taxon.rank === 'hybrid';
+  const isHybridRank = taxon.taxonRank === 'hybrid'; 
 
   const showHybridSymbol = isGenusHybrid || isSpeciesHybrid || isHybridRank;
 
@@ -24,7 +25,7 @@ export const formatScientificName = (taxon: Taxon, prefs: UserPreferences = { hy
 
 // Helper for full scientific name reconstruction
 export const formatFullScientificName = (taxon: Taxon, prefs: UserPreferences): string => {
-    let fullName = taxon.scientificName || taxon.name || 'Unknown'; // Safe default
+    let fullName = taxon.taxonName || taxon.name || 'Unknown'; // Was scientificName
     const space = prefs.hybridSpacing === 'space' ? ' ' : '';
 
     // Step 1: Normalize any existing x/× to a standard placeholder

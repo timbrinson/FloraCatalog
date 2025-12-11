@@ -1,4 +1,5 @@
 
+
 import React, { useState } from 'react';
 import { Taxon, TaxonRank, UserPreferences } from '../types';
 import { ChevronDown, ChevronUp, Trash2 } from 'lucide-react';
@@ -17,22 +18,22 @@ const TaxonRow: React.FC<TaxonRowProps> = ({ taxon, onDelete, onUpdate, depth, p
   const [expanded, setExpanded] = useState(false);
 
   // Indentation logic based on rank or depth
-  const isGenus = taxon.rank === 'genus';
-  const isSpecies = taxon.rank === 'species';
+  const isGenus = taxon.taxonRank === 'genus';
+  const isSpecies = taxon.taxonRank === 'species';
   
   // Style adjustments
   let nameStyle = "font-serif text-slate-700";
   if (isGenus) nameStyle = "font-serif font-bold text-slate-800 text-lg italic";
   else if (isSpecies) nameStyle = "font-serif font-semibold text-slate-600 italic";
-  else if (taxon.rank === 'cultivar') nameStyle = "font-sans font-medium text-slate-800";
+  else if (taxon.taxonRank === 'cultivar') nameStyle = "font-sans font-medium text-slate-800";
   else nameStyle = "font-serif text-slate-500 italic"; // var, subsp
 
   // Use Formatter for the specific epithet/name
   let displayName = formatScientificName(taxon, preferences);
-  if (taxon.rank === 'cultivar') displayName = `'${taxon.name}'`;
+  if (taxon.taxonRank === 'cultivar') displayName = `'${taxon.name}'`;
   
   // Rank badge
-  const showRankBadge = !isGenus && !isSpecies && taxon.rank !== 'cultivar';
+  const showRankBadge = !isGenus && !isSpecies && taxon.taxonRank !== 'cultivar';
 
   return (
     <>
@@ -44,7 +45,7 @@ const TaxonRow: React.FC<TaxonRowProps> = ({ taxon, onDelete, onUpdate, depth, p
               <span className={nameStyle}>{displayName}</span>
               {showRankBadge && (
                  <span className="text-[10px] uppercase font-bold text-slate-400 bg-slate-100 px-1.5 rounded">
-                    {taxon.rank.substring(0,4)}
+                    {taxon.taxonRank.substring(0,4)}
                  </span>
               )}
            </div>
@@ -90,7 +91,7 @@ const TaxonRow: React.FC<TaxonRowProps> = ({ taxon, onDelete, onUpdate, depth, p
           <td colSpan={4} className="p-0">
             <div className="p-6" style={{ paddingLeft: `${(depth * 20) + 40}px` }}>
                <DetailsPanel
-                 title={taxon.scientificName}
+                 title={taxon.taxonName}
                  description={taxon.description}
                  synonyms={taxon.synonyms}
                  referenceLinks={taxon.referenceLinks}

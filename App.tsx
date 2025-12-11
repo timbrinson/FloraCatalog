@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Loader2, Leaf, Plus, RotateCcw, Table, Network, Upload, X, Settings as SettingsIcon, Wrench } from 'lucide-react';
 import { Taxon, LoadingState, TaxonomicStatus, UserPreferences, BackgroundProcess, ActivityItem, SearchCandidate } from './types';
@@ -78,7 +79,7 @@ function App() {
       let cleanName = (node.name || '').trim();
       let genusHybrid = node.genusHybrid;
       let speciesHybrid = node.speciesHybrid;
-      let rank = (node.rank || '').toLowerCase();
+      let rank = (node.rank || '').toLowerCase(); // Reads raw 'rank' from AI
 
       if (rank === 'hybrid genus' || rank === 'nothogenus') { rank = 'genus'; genusHybrid = '×'; }
       if (rank === 'hybrid species' || rank === 'nothospecies') { rank = 'species'; speciesHybrid = '×'; }
@@ -135,7 +136,8 @@ function App() {
                   if (node.rank === 'form') currentInfraspecificRank = 'f.';
               }
 
-              let existing = next.find(t => t.rank === node.rank && t.name.toLowerCase() === node.name.toLowerCase() && t.parentId === parentId);
+              // Check existing using taxonRank field
+              let existing = next.find(t => t.taxonRank === node.rank && t.name.toLowerCase() === node.name.toLowerCase() && t.parentId === parentId);
               
               if (existing) { 
                   parentId = existing.id; 
@@ -156,8 +158,8 @@ function App() {
                   }
 
                   // CONSTRUCT FULL NAME if missing or just simple name
-                  let finalScientificName = node.fullName || node.scientificName;
-                  if (!finalScientificName || finalScientificName === node.name) {
+                  let finalTaxonName = node.fullName || node.scientificName;
+                  if (!finalTaxonName || finalTaxonName === node.name) {
                       const parts = [];
                       if (currentGenus) parts.push(currentGenusHybrid ? `× ${currentGenus}` : currentGenus);
                       if (currentSpecies) parts.push(currentSpeciesHybrid ? `× ${currentSpecies}` : currentSpecies);
@@ -174,16 +176,16 @@ function App() {
                           parts.push(node.name);
                       }
                       
-                      if (parts.length === 0) finalScientificName = node.name;
-                      else finalScientificName = parts.join(' ');
+                      if (parts.length === 0) finalTaxonName = node.name;
+                      else finalTaxonName = parts.join(' ');
                   }
 
                   const newTaxon: Taxon = {
                       id: newId, 
                       parentId: parentId, 
-                      rank: node.rank, 
+                      taxonRank: node.rank, // Mapping here!
                       name: node.name, 
-                      scientificName: finalScientificName, 
+                      taxonName: finalTaxonName, // Renamed from scientificName
                       genus: currentGenus,
                       genusHybrid: currentGenusHybrid,
                       species: currentSpecies,
@@ -276,11 +278,11 @@ function App() {
 
       if (payload && (choice === 'accept' || choice === 'select')) {
           const candidate = payload as SearchCandidate;
-          updateActivity(id, `Adding ${candidate.scientificName}...`, { status: 'running', resolution: undefined });
+          updateActivity(id, `Adding ${candidate.taxonName}...`, { status: 'running', resolution: undefined });
           try {
-              const chain = await identifyTaxonomy(candidate.scientificName);
+              const chain = await identifyTaxonomy(candidate.taxonName);
               mergeChainIntoTaxa(chain);
-              completeActivity(id, `Added ${candidate.scientificName}`);
+              completeActivity(id, `Added ${candidate.taxonName}`);
           } catch(e) {
               failActivity(id, "Failed to add plant", true);
           }
@@ -293,11 +295,11 @@ function App() {
 
   const executeMining = async (taxon: Taxon, existingId?: string) => {
       setConfirmState(prev => ({ ...prev, isOpen: false }));
-      const displayName = taxon.scientificName || taxon.name;
+      const displayName = taxon.taxonName || taxon.name;
       const actId = addActivity(`Mining ${displayName}`, 'mining', taxon, existingId);
       
       try {
-          await deepScanTaxon(displayName, taxon.rank, async (names, status) => {
+          await deepScanTaxon(displayName, taxon.taxonRank, async (names, status) => { 
               if (cancelledActivityIds.current.has(actId)) return false;
               updateActivity(actId, status);
               for (const name of names) {
@@ -342,7 +344,7 @@ function App() {
 
           const topMatch = candidates[0];
           const existing = taxa.find(t => 
-              t.scientificName.toLowerCase() === topMatch.scientificName.toLowerCase()
+              t.taxonName.toLowerCase() === topMatch.taxonName.toLowerCase()
           );
 
           if (existing) {
@@ -355,8 +357,8 @@ function App() {
               return;
           }
 
-          if (topMatch.matchType !== 'exact' || topMatch.scientificName.toLowerCase() !== queryTerm.toLowerCase()) {
-               requireInputActivity(actId, `Verify Name: ${topMatch.scientificName}`, {
+          if (topMatch.matchType !== 'exact' || topMatch.taxonName.toLowerCase() !== queryTerm.toLowerCase()) {
+               requireInputActivity(actId, `Verify Name: ${topMatch.taxonName}`, {
                   type: 'correction',
                   candidates: [topMatch],
                   originalQuery: queryTerm
@@ -364,10 +366,10 @@ function App() {
               return;
           }
 
-          updateActivity(actId, `Found ${topMatch.scientificName}. Adding...`);
-          const chain = await identifyTaxonomy(topMatch.scientificName);
+          updateActivity(actId, `Found ${topMatch.taxonName}. Adding...`);
+          const chain = await identifyTaxonomy(topMatch.taxonName);
           mergeChainIntoTaxa(chain);
-          completeActivity(actId, `Added ${topMatch.scientificName}`);
+          completeActivity(actId, `Added ${topMatch.taxonName}`);
 
       } catch (err: any) {
           failActivity(actId, "Search failed: " + err.message, true);
@@ -384,8 +386,8 @@ function App() {
   const handleMineTaxon = (taxon: Taxon) => {
       setConfirmState({
           isOpen: true,
-          title: `Start deep scan for ${taxon.scientificName}?`,
-          message: `This will search for all registered cultivars associated with the ${taxon.rank} "${taxon.scientificName}".`,
+          title: `Start deep scan for ${taxon.taxonName}?`,
+          message: `This will search for all registered cultivars associated with the ${taxon.taxonRank} "${taxon.taxonName}".`,
           confirmLabel: "Start Mining",
           onConfirm: () => executeMining(taxon)
       });
@@ -395,7 +397,7 @@ function App() {
       setConfirmState({
           isOpen: true,
           title: `Enrich Details?`,
-          message: `Fetch additional details (description, links, etc.) for ${taxon.scientificName}?`,
+          message: `Fetch additional details (description, links, etc.) for ${taxon.taxonName}?`,
           confirmLabel: "Enrich",
           onConfirm: () => {
               setConfirmState(prev => ({ ...prev, isOpen: false }));
@@ -680,7 +682,7 @@ function App() {
          {taxa.length === 0 ? <EmptyState /> : (
              <>
                 {/* PERSISTENT VIEWS: Use CSS hiding instead of conditional rendering */}
-                <div className={viewMode === 'tree' ? 'block' : 'hidden'}>
+                <div className="hidden">
                      <div className="bg-white rounded-xl shadow border border-slate-200 overflow-hidden">
                          <table className="w-full text-left">
                              <thead className="bg-slate-50 text-xs font-bold text-slate-400 uppercase tracking-wider border-b border-slate-200">
@@ -707,6 +709,24 @@ function App() {
                         />
                     </div>
                 </div>
+                 {/* Tree View temporarily hidden but logic maintained */}
+                 <div className={viewMode === 'tree' ? 'block' : 'hidden'}>
+                     <div className="bg-white rounded-xl shadow border border-slate-200 overflow-hidden">
+                         <table className="w-full text-left">
+                             <thead className="bg-slate-50 text-xs font-bold text-slate-400 uppercase tracking-wider border-b border-slate-200">
+                                 <tr>
+                                     <th className="p-3 pl-8 w-1/2">Taxon Name</th>
+                                     <th className="p-3 w-1/4">Common Name</th>
+                                     <th className="p-3">Family / Notes</th>
+                                     <th className="p-3 text-right">Actions</th>
+                                 </tr>
+                             </thead>
+                             <tbody>
+                                 {renderTree(undefined, 0)}
+                             </tbody>
+                         </table>
+                     </div>
+                 </div>
              </>
          )}
       </main>

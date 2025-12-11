@@ -22,6 +22,7 @@ The app is a "Smart Spreadsheet" for plants. It allows users to input natural la
 The central data unit is a `Taxon`. It is recursive (has a `parentId`).
 *   **Rank Hierarchy:** Family, Genus, Species, Subspecies, Variety, Form, Cultivar, Hybrid, Grex.
 *   **WCVP Alignment:** The schema is strictly aligned with the *World Checklist of Vascular Plants*. 
+    *   **Core:** `taxonRank` (mapped from `taxon_rank`), `taxonName` (mapped from `taxon_name`).
     *   **IDs:** `plantNameId` (WCVP ID), `ipniId`, `powoId`, `acceptedPlantNameId`, `basionymPlantNameId`, `parentPlantNameId`, `homotypicSynonym`.
     *   **Authorship:** `taxonAuthors` (Full), `primaryAuthor`, `parentheticalAuthor`, `publicationAuthor`, `replacedSynonymAuthor`.
     *   **Publication:** `placeOfPublication` (Title), `volumeAndPage`, `firstPublished`, `nomenclaturalRemarks`.
@@ -38,6 +39,7 @@ Use `gemini-2.5-flash`.
 *   **`identifyTaxonomy(query)`:**
     *   Prompt: Act as a botanical taxonomist. Parse input into a hierarchy chain.
     *   Input: "Lycoris rosea" -> Output JSON Array: `[{ rank: "genus", name: "Lycoris"... }, { rank: "species", name: "rosea", speciesHybrid: "×" }]`.
+    *   *Mapping Logic:* The AI returns "rank" (as it's standard JSON terminology) but the application maps this to `taxonRank` before storage.
     *   *Hybrid Logic:* Infer hidden hybrids. If input is "Lycoris rosea" (which is botanically Lycoris × rosea), the JSON must return `speciesHybrid: "×"`.
 *   **`deepScanTaxon(name, rank)`:**
     *   Iterate through alphabet ranges (A-C, D-F...) to find all registered cultivars for a specific genus/species.
@@ -45,13 +47,13 @@ Use `gemini-2.5-flash`.
 
 ## 4. UI: The Advanced Data Grid (`DataGridV2.tsx`)
 This is the most complex component. It is a "Tree Grid" that renders a flat list but groups visually.
-*   **Columns:** Tree Control, # (Count), Actions, Family, Genus, GH (Genus Hybrid), Species, SH (Species Hybrid), Infraspecific Rank, Infraspecies, Cultivar, Scientific Name, Common Name, + all WCVP fields.
+*   **Columns:** Tree Control, # (Count), Actions, Family, Genus, GH (Genus Hybrid), Species, SH (Species Hybrid), Infraspecific Rank, Infraspecies, Cultivar, Taxon Name, Common Name, + all WCVP fields.
 *   **Visual Logic:**
     *   **Dimming:** If the row is a "Genus", dim columns to the right (Species, Cultivar).
         *   *Special Logic:* Ranks `subspecies`, `variety`, and `form` are all treated as Visual Level 5. This prevents the Infraspecies column (Level 5) from being incorrectly dimmed for a 'form' rank row.
     *   **Bolding:** 
         *   Bold the column text that matches the row's rank (e.g., Species term is bold on a Species row).
-        *   **Scientific Name:** Always Bold.
+        *   **Taxon Name:** Always Bold.
         *   **Hybrid Markers (GH/SH):** Bold when the row matches their level (e.g., GH is bold on a Genus row).
         *   **Infraspecific Rank (I-Rank):** Bold on Infraspecific rows (matches the Name column).
     *   **Text Color:** 
@@ -68,7 +70,7 @@ This is the most complex component. It is a "Tree Grid" that renders a flat list
     *   **Header Icons:** Hide sort/drag icons for narrow utility columns to save space. Center-align their headers.
     *   **Fit Algorithms:**
         *   *Auto Fit:* Measure content width.
-        *   *Fit to Screen:* Distribute available screen width among flexible columns. Give priority (more width) to `scientificName`. Respect "Locked" columns (do not stretch them).
+        *   *Fit to Screen:* Distribute available screen width among flexible columns. Give priority (more width) to `taxonName`. Respect "Locked" columns (do not stretch them).
 *   **Tree/Flat Toggle:**
     *   In the "Tree" column header, include a button (Icon Only) to toggle between Flat View (normal table) and Tree View (groups rows by Genus -> Species -> Infraspecies).
     *   Tree View uses "Virtual" header rows for the groups.

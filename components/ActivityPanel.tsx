@@ -1,3 +1,5 @@
+
+
 import React, { useState, useMemo, useEffect } from 'react';
 import { ActivityItem, ActivityStatus, SearchCandidate } from '../types';
 import { 
@@ -54,7 +56,7 @@ const ActivityPanel: React.FC<ActivityPanelProps> = ({ activities, onCancel, onR
           return (
               <div className="mt-2 p-2 bg-white rounded border border-amber-200">
                   <p className="text-xs text-slate-600 mb-2">
-                      <strong>{candidates[0].scientificName}</strong> is already in your database.
+                      <strong>{candidates[0].taxonName}</strong> is already in your database.
                   </p>
                   <div className="flex gap-2 justify-end">
                       <button 
@@ -79,7 +81,7 @@ const ActivityPanel: React.FC<ActivityPanelProps> = ({ activities, onCancel, onR
           return (
               <div className="mt-2 p-2 bg-white rounded border border-amber-200">
                   <p className="text-xs text-slate-600 mb-2">
-                      Did you mean <strong>{match.scientificName}</strong>? <br/>
+                      Did you mean <strong>{match.taxonName}</strong>? <br/>
                       <span className="text-[10px] text-slate-400">Match: {match.matchType} ({Math.round(match.confidence * 100)}%)</span>
                   </p>
                   <div className="flex gap-2 justify-end">
@@ -108,7 +110,7 @@ const ActivityPanel: React.FC<ActivityPanelProps> = ({ activities, onCancel, onR
                       <div key={idx} className="flex justify-between items-center p-2 bg-white border border-slate-200 rounded hover:border-leaf-300 cursor-pointer"
                            onClick={() => onResolve && onResolve(item.id, 'select', c)}>
                           <div>
-                              <div className="text-xs font-bold text-slate-700">{c.scientificName}</div>
+                              <div className="text-xs font-bold text-slate-700">{c.taxonName}</div>
                               {c.commonName && <div className="text-[10px] text-slate-500">{c.commonName}</div>}
                           </div>
                           <div className="text-[10px] bg-slate-100 px-1 rounded">{c.matchType}</div>
