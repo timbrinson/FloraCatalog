@@ -4,6 +4,20 @@ When the AI halucinates a previous state say "If I hallucinate, simply saying "L
 
 Current code fixes:
 
+In the data mapping I wanted to clearly separate WCVP metadata from additional metadata we (you and/or I) include. This is so we are clear the linage of information and don't muddle sources or be clear if that is something we do. I had intended the Notes column to include your additional notes and to be separate from the WCVP Remarks column.
+
+----------------
+
+The next baby step is add the new fields to DataGridV2 which were added to the Taxon interface.
+
+------------
+
+You told me to remind you to "Look at the file content provided".
+The previous task had an error and your fixes reverted the code again. I restored back to the earlier checkpoint.
+This same error has been occurring over and over the last few days. For some reason the import for Network and AlignJustify gets missed when generating the new DataGridV2.tsx. Earlier you had mentioned something like that the line is getting truncated somewhere. I do see it is a little longer than most other imports but it doesn't seem excessively long. The import line includes a lot of types from lucide-react. Can that line be broken into multiple imports or is there another way to prevent this going forward?
+
+-------
+
 needing to restore to older versions then reapply.
 
 I want to work toward the database integration and have a number of things to work on to get there. That is why I wanted to see the data mapping. Here are some enhancements based on reviewing the data mapping.

@@ -5,7 +5,7 @@ This document maps the columns from the World Checklist of Vascular Plants (WCVP
 
 **Source:** `docs/README_WCVP.csv`
 
-| WCVP Column | WCVP Value | WCVP Class | WCVP Description | WCVP Remark (Notes) | App Interface (`Taxon`) | Grid Column (`DataGridV2`) | Grid Label |
+| WCVP Column | WCVP Value | WCVP Class | WCVP Description | WCVP Remark (Notes) | App Attribute (`Taxon`) | Grid Column (`DataGridV2`) | Grid Label |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
 | **SYSTEM / APP** | | | | | | | |
 | — | — | — | — | — | `id` | `id` | Internal ID |
@@ -33,9 +33,9 @@ This document maps the columns from the World Checklist of Vascular Plants (WCVP
 | **AUTHORSHIP** | | | | | | | |
 | `taxon_authors` | | chr | Concatenation of parenthetical and primary authors. | Missing values indicate instances where authorship is unknown or non-applicable (e.g. autonyms). | `authorship` | `authorship` | Authorship |
 | `parenthetical_author` | | chr | The author of the basionym. | Empty when there is no basionym. | `parentheticalAuthor` | `parentheticalAuthor` | Parenthetical Author |
-| `primary_author` | | chr | The author or authors who published the scientific name. | Missing values indicate instances where authorship is non-applicable (i.e. autonyms) or unknown. | `primaryAuthor` | `primaryAuthor` | Primary Author |
+| `primary_author` | | chr | The author or authors who published the scientific name. | Missing values indicate instances where authorship is non-applicable (i.e. autonyms) or unknown. | `primaryAuthor` | (missing) | (missing) |
 | `publication_author` | | chr | The author or authors of the book where the scientific name is first published when different from the primary author. | Missing values indicate instances where the primary author is also the author of the book or non-applicable (i.e. autonyms). | `publicationAuthor` | `publicationAuthor` | Pub. Author |
-| `replaced_synonym_author`| | chr | The author or authors responsible for publication of the replaced synonym. | Empty when the name is not a replacement name based on another name. | `replacedSynonymAuthor` | `replacedSynonymAuthor` | Replaced Syn. Author |
+| `replaced_synonym_author`| | chr | The author or authors responsible for publication of the replaced synonym. | Empty when the name is not a replacement name based on another name. | `replacedSynonymAuthor` | (missing) | (missing) |
 | **PUBLICATION** | | | | | | | |
 | `place_of_publication` | | chr | The journal, book or other publication in which the taxon name was effectively published. | Abbreviated for brevity. Missing values indicate instances where publication details are unknown or non-applicable (i.e. autonyms). | `publication` | `publication` | Publication |
 | `volume_and_page` | | chr | The volume and page numbers of the original publication of the taxon name, where "5(6): 36" is volume 5, issue 6, page 36. | Not all volumes include issue number. Missing values indicate instances where publication details are unknown or non-applicable (i.e. autonyms). | `volumeAndPage` | `volumeAndPage` | Vol/Page |
@@ -49,8 +49,8 @@ This document maps the columns from the World Checklist of Vascular Plants (WCVP
 | **LINKS / RELATIONS** | | | | | | | |
 | `accepted_plant_name_id` | | chr | The ID of the accepted name of this taxon. | Where the taxon_status is "Accepted", this will be identical to the plant_name_id value. May be empty if taxon status is unplaced, ilegitimate, or in some cases where the accepted name is not a vascular plant (e.g. a moss, alga or animal). | `acceptedNameId` | `acceptedNameId` | Accepted ID |
 | `basionym_plant_name_id` | | chr | ID of the original name that taxon_name was derived from. | If there is a parenthetical author it is a basionym. If there is a replaced synonym author it is a replaced synonym. If empty there have been no name changes. | `basionymId` | `basionymId` | Basionym ID |
-| `parent_plant_name_id` | | chr | ID for the parent genus or parent species of an accepted species or infraspecific name. | Empty for non accepted names or where the parent has not yet been calculated. | `parentPlantNameId` | `parentPlantNameId` | Parent Plant ID |
-| `homotypic_synonym` | | logical | The synonym type - TRUE if homotypic synonym, otherwise NA. | For more information, see the International Code of Nomenclature for algae, fungi and plants: https://www.iapt-taxon.org/nomen/main.php | `homotypicSynonym` | `homotypicSynonym` | Homotypic Syn. |
+| `parent_plant_name_id` | | chr | ID for the parent genus or parent species of an accepted species or infraspecific name. | Empty for non accepted names or where the parent has not yet been calculated. | `parentPlantNameId` | (missing) | (missing) |
+| `homotypic_synonym` | | logical | The synonym type - TRUE if homotypic synonym, otherwise NA. | For more information, see the International Code of Nomenclature for algae, fungi and plants: https://www.iapt-taxon.org/nomen/main.php | `homotypicSynonym` | (missing) | (missing) |
 | — | — | — | — | — | `commonName` | `commonName` | Common Name |
 | — | — | — | — | — | `description` | `description` | Description |
 | — | — | — | — | — | `referenceLinks` | — | — |
