@@ -1,6 +1,16 @@
 Use  "strictly adhere to the XML format required by the system." To successful stream file updates. Otherwise they show up in the Code assistant.
 
+------------------------------------------------
+
+Things to Remember:
+
 When the AI halucinates a previous state say "If I hallucinate, simply saying "Look at the file content provided". This get it to weight the actual file contents over the generalized memory from the AI system from recent conversations.
+
+Reset the conversation periodically to prevent a large contenxt of the conversation being passed to teh AI on every prompt.
+
+Do not have large data/text files in the project. Was keeping a text file of all previous conversations, which is long. Eventually the AI could not run a prompt without an error. Not sure if the problem was with the size of the file or if it was reading the file and trying to process information in it.
+
+------------------------------------------------
 
 Current code fixes to work on:
 
