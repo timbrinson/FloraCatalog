@@ -144,20 +144,20 @@ const DataGridV2: React.FC<DataGridProps> = ({ taxa, onAction, preferences }) =>
       { id: 'plantNameId', label: 'WCVP ID', defaultWidth: 100, filterType: 'text' }, 
       { id: 'ipniId', label: 'IPNI ID', defaultWidth: 100, filterType: 'text' },
       { id: 'powoId', label: 'POWO ID', defaultWidth: 100, filterType: 'text' },
-      { id: 'acceptedNameId', label: 'Accepted ID', defaultWidth: 100, filterType: 'text' },
+      { id: 'acceptedPlantNameId', label: 'Accepted ID', defaultWidth: 100, filterType: 'text' }, 
       { id: 'parentId', label: 'Parent ID', defaultWidth: 100, filterType: 'text' },
-      { id: 'parentPlantNameId', label: 'Parent Plant ID', defaultWidth: 100, filterType: 'text' }, // NEW
-      { id: 'basionymId', label: 'Basionym ID', defaultWidth: 100, filterType: 'text' },
-      { id: 'homotypicSynonym', label: 'Homotypic Syn.', defaultWidth: 100, filterType: 'text' }, // NEW
+      { id: 'parentPlantNameId', label: 'Parent Plant ID', defaultWidth: 100, filterType: 'text' }, 
+      { id: 'basionymPlantNameId', label: 'Basionym ID', defaultWidth: 100, filterType: 'text' }, // Was basionymId
+      { id: 'homotypicSynonym', label: 'Homotypic Syn.', defaultWidth: 100, filterType: 'text' }, 
       { id: 'id', label: 'Internal ID', defaultWidth: 100, filterType: 'text' },
 
-      { id: 'taxonAuthors', label: 'Authorship', defaultWidth: 150, filterType: 'text' }, // Was authorship
-      { id: 'primaryAuthor', label: 'Primary Author', defaultWidth: 150, filterType: 'text' }, // NEW
+      { id: 'taxonAuthors', label: 'Authorship', defaultWidth: 150, filterType: 'text' }, 
+      { id: 'primaryAuthor', label: 'Primary Author', defaultWidth: 150, filterType: 'text' }, 
       { id: 'parentheticalAuthor', label: 'Parenthetical Author', defaultWidth: 140, filterType: 'text' },
       { id: 'publicationAuthor', label: 'Pub. Author', defaultWidth: 120, filterType: 'text' },
-      { id: 'replacedSynonymAuthor', label: 'Replaced Syn. Author', defaultWidth: 150, filterType: 'text' }, // NEW
+      { id: 'replacedSynonymAuthor', label: 'Replaced Syn. Author', defaultWidth: 150, filterType: 'text' }, 
       
-      { id: 'publication', label: 'Publication', defaultWidth: 200, filterType: 'text' },
+      { id: 'placeOfPublication', label: 'Publication', defaultWidth: 200, filterType: 'text' },
       { id: 'volumeAndPage', label: 'Vol/Page', defaultWidth: 100, filterType: 'text' },
       { id: 'firstPublished', label: 'First Published', defaultWidth: 120, filterType: 'text' },
       { id: 'nomenclaturalRemarks', label: 'Nom. Remarks', defaultWidth: 150, filterType: 'text' },
@@ -181,8 +181,8 @@ const DataGridV2: React.FC<DataGridProps> = ({ taxa, onAction, preferences }) =>
       ]);
   });
   
-  // Updated key to rev2 to ensure column order update is picked up
-  const [columnOrder, setColumnOrder] = useState<ColumnId[]>(() => loadState('grid_v2_col_order_rev2', allColumns.map(c => c.id)));
+  // Updated key to rev5 to ensure column order update is picked up
+  const [columnOrder, setColumnOrder] = useState<ColumnId[]>(() => loadState('grid_v2_col_order_rev5', allColumns.map(c => c.id)));
   const [colWidths, setColWidths] = useState<Record<ColumnId, number>>(() => loadState('grid_v2_col_widths', Object.fromEntries(allColumns.map(c => [c.id, c.defaultWidth]))));
   const [sortConfig, setSortConfig] = useState<{ key: ColumnId; direction: 'asc' | 'desc' } | null>(() => loadState('grid_v2_sort', { key: 'scientificName', direction: 'asc' }));
   const [textFilters, setTextFilters] = useState<Record<string, string>>(() => loadState('grid_v2_text_filters', {}));
@@ -198,7 +198,7 @@ const DataGridV2: React.FC<DataGridProps> = ({ taxa, onAction, preferences }) =>
   }, [isHierarchyMode]);
 
   useEffect(() => localStorage.setItem('grid_v2_visible_cols', JSON.stringify(Array.from(visibleColumns))), [visibleColumns]);
-  useEffect(() => localStorage.setItem('grid_v2_col_order_rev2', JSON.stringify(columnOrder)), [columnOrder]); // Persist to new key
+  useEffect(() => localStorage.setItem('grid_v2_col_order_rev5', JSON.stringify(columnOrder)), [columnOrder]); // Persist to new key
   useEffect(() => localStorage.setItem('grid_v2_col_widths', JSON.stringify(colWidths)), [colWidths]);
   useEffect(() => localStorage.setItem('grid_v2_sort', JSON.stringify(sortConfig)), [sortConfig]);
   useEffect(() => localStorage.setItem('grid_v2_text_filters', JSON.stringify(textFilters)), [textFilters]);
@@ -246,13 +246,15 @@ const DataGridV2: React.FC<DataGridProps> = ({ taxa, onAction, preferences }) =>
     return taxa.filter(item => {
         for (const [key, value] of Object.entries(textFilters)) {
             if (!value) continue;
+            const strValue = value as string;
             const itemVal = String(getRowValue(item, key) || '').toLowerCase();
-            if (!itemVal.includes(value.toLowerCase())) return false;
+            if (!itemVal.includes(strValue.toLowerCase())) return false;
         }
         for (const [key, values] of Object.entries(multiFilters)) {
-            if (values.length === 0) continue;
+            const arrValues = values as string[];
+            if (arrValues.length === 0) continue;
             // @ts-ignore
-            if (!values.includes(item[key])) return false;
+            if (!arrValues.includes(item[key])) return false;
         }
         return true;
     });

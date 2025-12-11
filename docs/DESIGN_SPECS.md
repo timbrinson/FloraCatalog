@@ -1,4 +1,5 @@
 
+
 <!--
 HOW TO UPDATE THIS DOCUMENT:
 To regenerate this file based on the latest codebase changes, simply ask the AI:
@@ -21,9 +22,9 @@ The app is a "Smart Spreadsheet" for plants. It allows users to input natural la
 The central data unit is a `Taxon`. It is recursive (has a `parentId`).
 *   **Rank Hierarchy:** Family, Genus, Species, Subspecies, Variety, Form, Cultivar, Hybrid, Grex.
 *   **WCVP Alignment:** The schema is strictly aligned with the *World Checklist of Vascular Plants*. 
-    *   **IDs:** `plantNameId` (WCVP ID), `ipniId`, `powoId`, `acceptedNameId`, `basionymId`, `parentPlantNameId`, `homotypicSynonym`.
-    *   **Authorship:** `authorship` (Full), `primaryAuthor`, `parentheticalAuthor`, `publicationAuthor`, `replacedSynonymAuthor`.
-    *   **Publication:** `publication` (Place), `volumeAndPage`, `firstPublished`, `nomenclaturalRemarks`.
+    *   **IDs:** `plantNameId` (WCVP ID), `ipniId`, `powoId`, `acceptedPlantNameId`, `basionymPlantNameId`, `parentPlantNameId`, `homotypicSynonym`.
+    *   **Authorship:** `taxonAuthors` (Full), `primaryAuthor`, `parentheticalAuthor`, `publicationAuthor`, `replacedSynonymAuthor`.
+    *   **Publication:** `placeOfPublication` (Title), `volumeAndPage`, `firstPublished`, `nomenclaturalRemarks`.
     *   **Geography/Bio:** `geographicArea`, `lifeformDescription`, `climateDescription`.
 *   **Hybrid Handling:**
     *   Store "Hybrid Status" separately from "Rank".

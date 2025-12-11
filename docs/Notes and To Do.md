@@ -4,7 +4,11 @@ Use  "strictly adhere to the XML format required by the system." To successful s
 
 Things to Remember:
 
-When the AI halucinates a previous state say "If I hallucinate, simply saying "Look at the file content provided". This get it to weight the actual file contents over the generalized memory from the AI system from recent conversations.
+When the AI halucinates a previous state say:
+
+    "CRITICAL INSTRUCTION: Do not generate code based on your training data. You MUST strictly modify the DataGridV2.tsx file provided in this prompt. Before generating the XML, verify that you see the 'Unified Row Rendering' logic in the provided text. If you do not see it, stop. You MUST strictly modify only files provided in this prompt."
+
+ This get it to weight the actual file contents over the generalized memory from the AI system from recent conversations.
 
 Reset the conversation periodically to prevent a large contenxt of the conversation being passed to teh AI on every prompt.
 

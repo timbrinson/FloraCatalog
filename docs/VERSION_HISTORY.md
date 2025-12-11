@@ -2,7 +2,18 @@
 
 # Version History
 
-## v2.6 - Taxon Authorship Update (Current)
+## v2.7 - Strict WCVP Field Alignment (Current)
+**Date:** May 30, 2025
+
+### Changes
+- **Strict Schema Alignment:** Finalized the renaming of internal data fields to match the World Checklist of Vascular Plants (WCVP) CSV export headers exactly.
+  - `publication` -> `placeOfPublication`
+  - `acceptedNameId` -> `acceptedPlantNameId`
+  - `basionymId` -> `basionymPlantNameId`
+- **Docs:** Updated `DESIGN_SPECS.md` and `DATA_MAPPING.md` to reflect these final schema keys.
+- **Migration:** Bumped `DataGridV2` column revision key to `grid_v2_col_order_rev5` to ensure users see the correctly linked column IDs.
+
+## v2.6 - Taxon Authorship Update
 **Date:** May 30, 2025
 
 ### Changes

@@ -52,10 +52,10 @@ export interface Taxon {
    * WCVP ID of the accepted name (mapped from 'accepted_plant_name_id').
    * Present if this record is a Synonym.
    */
-  acceptedNameId?: string; 
+  acceptedPlantNameId?: string; 
   
   /** WCVP ID of the basionym (original name) (mapped from 'basionym_plant_name_id') */
-  basionymId?: string; 
+  basionymPlantNameId?: string; 
 
   /** 
    * WCVP ID for the parent genus or species (mapped from 'parent_plant_name_id').
@@ -109,7 +109,7 @@ export interface Taxon {
 
   // Publication
   /** Title of publication (mapped from 'place_of_publication') */
-  publication?: string; 
+  placeOfPublication?: string; 
   
   /** Volume and page number (mapped from 'volume_and_page') */
   volumeAndPage?: string; 
