@@ -4,8 +4,6 @@ When the AI halucinates a previous state say "If I hallucinate, simply saying "L
 
 Current code fixes:
 
-In the data mapping I wanted to clearly separate WCVP metadata from additional metadata we (you and/or I) include. This is so we are clear the linage of information and don't muddle sources or be clear if that is something we do. I had intended the Notes column to include your additional notes and to be separate from the WCVP Remarks column.
-
 ----------------
 
 The next baby step is add the new fields to DataGridV2 which were added to the Taxon interface.

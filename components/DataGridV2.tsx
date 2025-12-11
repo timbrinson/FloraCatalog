@@ -1,7 +1,11 @@
 
 import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { Taxon, UserPreferences, ColorTheme } from '../types';
-import { ArrowUpDown, Settings, Check, ChevronDown, GripVertical, Maximize, Monitor, Pickaxe, Info, Wand2, LayoutList, ChevronRight, Network, AlignJustify, X as XIcon } from 'lucide-react';
+import { 
+  ArrowUpDown, Settings, Check, ChevronDown, GripVertical, Maximize, Monitor, 
+  Pickaxe, Info, Wand2, LayoutList, ChevronRight, Network, AlignJustify,
+  ChevronsDown, ChevronsUp
+} from 'lucide-react';
 import { formatFullScientificName } from '../utils/formatters';
 
 interface DataGridProps {
@@ -141,12 +145,16 @@ const DataGridV2: React.FC<DataGridProps> = ({ taxa, onAction, preferences }) =>
       { id: 'powoId', label: 'POWO ID', defaultWidth: 100, filterType: 'text' },
       { id: 'acceptedNameId', label: 'Accepted ID', defaultWidth: 100, filterType: 'text' },
       { id: 'parentId', label: 'Parent ID', defaultWidth: 100, filterType: 'text' },
+      { id: 'parentPlantNameId', label: 'Parent Plant ID', defaultWidth: 100, filterType: 'text' }, // NEW
       { id: 'basionymId', label: 'Basionym ID', defaultWidth: 100, filterType: 'text' },
+      { id: 'homotypicSynonym', label: 'Homotypic Syn.', defaultWidth: 100, filterType: 'text' }, // NEW
       { id: 'id', label: 'Internal ID', defaultWidth: 100, filterType: 'text' },
 
       { id: 'authorship', label: 'Authorship', defaultWidth: 150, filterType: 'text' },
+      { id: 'primaryAuthor', label: 'Primary Author', defaultWidth: 150, filterType: 'text' }, // NEW
       { id: 'parentheticalAuthor', label: 'Parenthetical Author', defaultWidth: 140, filterType: 'text' },
       { id: 'publicationAuthor', label: 'Pub. Author', defaultWidth: 120, filterType: 'text' },
+      { id: 'replacedSynonymAuthor', label: 'Replaced Syn. Author', defaultWidth: 150, filterType: 'text' }, // NEW
       
       { id: 'publication', label: 'Publication', defaultWidth: 200, filterType: 'text' },
       { id: 'volumeAndPage', label: 'Vol/Page', defaultWidth: 100, filterType: 'text' },
