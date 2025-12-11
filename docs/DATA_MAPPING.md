@@ -5,7 +5,7 @@ This document maps the columns from the World Checklist of Vascular Plants (WCVP
 
 **Source:** `docs/README_WCVP.csv`
 
-| WCVP Column | WCVP Value | WCVP Class | WCVP Description | WCVP Remark | App Attribute (`Taxon`) | Grid Column (`DataGridV2`) | Grid Label |
+| WCVP Column | WCVP Value | WCVP Class | WCVP Description | WCVP Remark (Notes) | App Attribute (`Taxon`) | Grid Column (`DataGridV2`) | Grid Label |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
 | **SYSTEM / APP** | | | | | | | |
 | — | — | — | — | — | `id` | `id` | Internal ID |
@@ -15,10 +15,10 @@ This document maps the columns from the World Checklist of Vascular Plants (WCVP
 | — | — | — | — | — | — | `actions` | Actions |
 | **IDENTIFIERS** | | | | | | | |
 | `plant_name_id` | | chr | World Checklist of Vascular Plants (WCVP) identifier | | `plantNameId` | `plantNameId` | WCVP ID |
-| `ipni_id` | | chr | International Plant Name Index (IPNI) identifier. | Missing values indicate that the name has not been matched with a name in IPNI or is missing from IPNI. | `ipniId` | `ipniId` | IPNI ID |
+| `ipni_id` | | chr | International Plant Name Index (IPNI) identifier. Missing values indicate that the name has not been matched with a name in IPNI or is missing from IPNI. | | `ipniId` | `ipniId` | IPNI ID |
 | `powo_id` | | chr | identifier required to look up the name directly in Plants of the World Online (Powo) | | `powoId` | `powoId` | POWO ID |
 | **TAXONOMY** | | | | | | | |
-| `taxon_name` | | chr | Concatenation of genus with species and, where applicable, infraspecific epithets to make a binomial or trinomial name. | | `scientificName` | `scientificName` | Scientific Name |
+| `taxon_name` | | chr | Concatenation of genus with species and, where applicable, infraspecific epithets to make a binomial or trinomial name. | | `taxonName` | `scientificName` | Scientific Name |
 | `family` | | chr | The name of the family to which the taxon belongs. (The highest rank at which names are presented in WCVP). | | `family` | `family` | Family |
 | `genus` | | chr | The name of the genus to which the record refers. | | `genus` | `genus` | Genus |
 | `genus_hybrid` | +, × | chr | Indication of hybrid status at genus level: + indicates a graft-chimaera and × indicates a hybrid. | | `genusHybrid` | `genusHybrid` | GH |
@@ -27,11 +27,11 @@ This document maps the columns from the World Checklist of Vascular Plants (WCVP
 | `infraspecific_rank` | agamosp., convar., ecas., f., grex, group, lusus, microf., microgene, micromorphe, modif., monstr., mut., nid, nothof., nothosubsp., nothovar., positio, proles, provar., psp., stirps, subf., sublusus, subproles, subsp., subspecioid, subvar., unterrasse, var. | chr | The taxonomic rank of the infraspecific epithet. Empty where the taxon name is species rank or higher. For more information, see the International Code of Nomenclature for algae, fungi and plants: https://www.iapt-taxon.org/nomen/main.php | | `infraspecificRank` | `infraspecificRank` | I Rank |
 | `infraspecies` | | chr | The infraspecific epithet which is combined with a binomial to make a trinomial name at infraspecific rank. Empty when taxon name is at species rank or higher. | | `infraspecies` | `infraspecies` | Infraspecies |
 | — | — | — | — | — | `cultivar` | `cultivar` | Cultivar |
-| `taxon_rank` | Convariety, Form, Genus, proles, Species, Subform, Subspecies, Subvariety, Variety | chr | The level in the taxonomic hierarchy where the taxon name fits. Some infraspecific names are unranked and will have no value in this column. | | `rank` | `rank` | Rank |
+| `taxon_rank` | Convariety, Form, Genus, proles, Species, Subform, Subspecies, Subvariety, Variety | chr | The level in the taxonomic hierarchy where the taxon name fits. Some infraspecific names are unranked and will have no value in this column. | | `taxonRank` | `rank` | Rank |
 | `taxon_status` | Accepted, Artificial Hybrid, Illegitimate, Invalid, Local Biotype, Misapplied, Orthographic, Synonym, Unplaced, Provisionally Accepted | chr | Indication of nomenclatural status and taxonomic opinion re the name: see details in main text. Names with status ‘Provisionally Accepted’ are unplaced names that have synonyms, following the GBIF classification and only used within the Darwin Core Archive downlaod. | | `taxonomicStatus` | `taxonomicStatus` | Status |
 | `hybrid_formula` | | chr | parents of hybrid | | `hybridFormula` | `hybridFormula` | Hybrid Formula |
 | **AUTHORSHIP** | | | | | | | |
-| `taxon_authors` | | chr | Concatenation of parenthetical and primary authors. Missing values indicate instances where authorship is unknown or non-applicable (e.g. autonyms). | | `authorship` | `authorship` | Authorship |
+| `taxon_authors` | | chr | Concatenation of parenthetical and primary authors. Missing values indicate instances where authorship is unknown or non-applicable (e.g. autonyms). | | `taxonAuthors` | `authorship` | Authorship |
 | `parenthetical_author` | | chr | The author of the basionym. Empty when there is no basionym. | | `parentheticalAuthor` | `parentheticalAuthor` | Parenthetical Author |
 | `primary_author` | | chr | The author or authors who published the scientific name. Missing values indicate instances where authorship is non-applicable (i.e. autonyms) or unknown. | | `primaryAuthor` | `primaryAuthor` | Pub. Author |
 | `publication_author` | | chr | The author or authors of the book where the scientific name is first published when different from the primary author. Missing values indicate instances where the primary author is also the author of the book or non-applicable (i.e. autonyms). | | `publicationAuthor` | `publicationAuthor` | Pub. Author |
