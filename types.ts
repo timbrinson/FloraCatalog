@@ -82,7 +82,7 @@ export interface Taxon {
   
   // Status
   /** 'Accepted', 'Synonym', 'Unplaced', etc. (mapped from 'taxon_status') */
-  taxonomicStatus: TaxonomicStatus; 
+  taxonStatus: TaxonomicStatus; 
   
   /** Peer review status: 'Y' or 'N' (mapped from 'reviewed') */
   reviewed?: string; 

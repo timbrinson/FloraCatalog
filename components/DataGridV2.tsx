@@ -137,7 +137,7 @@ const DataGridV2: React.FC<DataGridProps> = ({ taxa, onAction, preferences }) =>
       { id: 'scientificName', label: 'Scientific Name', defaultWidth: 220, filterType: 'text' },
       
       { id: 'rank', label: 'Rank', defaultWidth: 110, filterType: 'multi-select', filterOptions: ['family', 'genus', 'species', 'subspecies', 'variety', 'form', 'hybrid', 'cultivar', 'grex'], lockWidth: true },
-      { id: 'taxonomicStatus', label: 'Status', defaultWidth: 110, filterType: 'multi-select', filterOptions: ['Accepted', 'Synonym', 'Unresolved', 'Artificial'] },
+      { id: 'taxonStatus', label: 'Status', defaultWidth: 110, filterType: 'multi-select', filterOptions: ['Accepted', 'Synonym', 'Unresolved', 'Artificial'] },
       { id: 'commonName', label: 'Common Name', defaultWidth: 150, filterType: 'text' },
       
       { id: 'plantNameId', label: 'WCVP ID', defaultWidth: 100, filterType: 'text' }, 
@@ -340,7 +340,7 @@ const DataGridV2: React.FC<DataGridProps> = ({ taxa, onAction, preferences }) =>
                   rank: field as any, 
                   name: key,
                   scientificName: key,
-                  taxonomicStatus: 'Accepted',
+                  taxonStatus: 'Accepted',
                   family: firstChild?.family,
                   genus: firstChild?.genus,
                   genusHybrid: firstChild?.genusHybrid,
@@ -453,7 +453,7 @@ const DataGridV2: React.FC<DataGridProps> = ({ taxa, onAction, preferences }) =>
       
       flexCols.forEach(col => { 
           let w = ideals[col.id]; 
-          if (['rank', 'taxonomicStatus', 'reviewed'].includes(String(col.id))) w = Math.max(w, 110); 
+          if (['rank', 'taxonStatus', 'reviewed'].includes(String(col.id))) w = Math.max(w, 110); 
           if (col.id === 'scientificName') w = Math.max(w, 180); 
           else w = Math.min(w, maxAllowed); 
           cappedIdeals[col.id] = w; 
@@ -472,7 +472,7 @@ const DataGridV2: React.FC<DataGridProps> = ({ taxa, onAction, preferences }) =>
           flexCols.forEach(col => { 
               let w = cappedIdeals[col.id] * scale; 
               if (col.id === 'scientificName') w = Math.max(w, 150); 
-              if (['rank', 'taxonomicStatus', 'reviewed'].includes(String(col.id))) w = Math.max(w, 80); 
+              if (['rank', 'taxonStatus', 'reviewed'].includes(String(col.id))) w = Math.max(w, 80); 
               newWidths[col.id] = Math.max(40, Math.floor(w)); 
           }); 
       } 
@@ -703,7 +703,7 @@ const DataGridV2: React.FC<DataGridProps> = ({ taxa, onAction, preferences }) =>
                           displayVal = <span className={`px-2 py-0.5 text-[10px] rounded border uppercase font-bold ${rankStyle}`}>{val as string}</span>;
                       } else if (col.id === 'scientificName') {
                           displayVal = formatFullScientificName(tr, preferences);
-                      } else if (col.id === 'taxonomicStatus') {
+                      } else if (col.id === 'taxonStatus') {
                            displayVal = <span className={`px-2 py-0.5 text-[10px] rounded uppercase font-bold ${val === 'Accepted' ? 'bg-green-50 text-green-600' : ''} ${val === 'Synonym' ? 'bg-slate-100 text-slate-500' : ''} ${val === 'Artificial' ? 'bg-yellow-50 text-yellow-600' : ''}`}>{val as string || '-'}</span>;
                       } else if (col.id === 'actions') {
                           const isMineable = ['genus', 'species', 'subspecies', 'variety', 'form', 'hybrid', 'grex'].includes(r);

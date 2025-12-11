@@ -2,37 +2,38 @@ Use  "strictly adhere to the XML format required by the system." To successful s
 
 When the AI halucinates a previous state say "If I hallucinate, simply saying "Look at the file content provided". This get it to weight the actual file contents over the generalized memory from the AI system from recent conversations.
 
-Current code fixes:
+Current code fixes to work on:
 
-----------------
+------------------------------------------------
 
-The next baby step is add the new fields to DataGridV2 which were added to the Taxon interface.
+Feedback on AI Studio to the developers
 
-------------
+2025-12-11
 
-You told me to remind you to "Look at the file content provided".
-The previous task had an error and your fixes reverted the code again. I restored back to the earlier checkpoint.
-This same error has been occurring over and over the last few days. For some reason the import for Network and AlignJustify gets missed when generating the new DataGridV2.tsx. Earlier you had mentioned something like that the line is getting truncated somewhere. I do see it is a little longer than most other imports but it doesn't seem excessively long. The import line includes a lot of types from lucide-react. Can that line be broken into multiple imports or is there another way to prevent this going forward?
+The application state keeps being reset to older point in time. what was just updated was based on at least some files from 2 days ago. The functionality provided n DataGridV2.tsx has been reverted to old functionality. I spent all day yesterday tryig to fix this and the AI even admitted what it is doing wrong.
 
--------
+There is a serious bug/issue/problem in the Gemini model used in AI Studio which causes repeated errors when attempting to make changes to an application. After long conversations with AI Studio it has explained where this problem is coming from. This is serious and took a day to figure out what is happening. However the fix proposed by the AI is not working and I can not get it to work correctly. I am stuck and can not go forward.
 
-needing to restore to older versions then reapply.
+The problem is that AI Studio can get in a state where uses it's memory of what a file's state is (from the past) which is outweighing using the actual file of the application which gets passed to the AI. Because of this it keeps reverting to an old state of the application and loosing many improvements that had been made.
 
-I want to work toward the database integration and have a number of things to work on to get there. That is why I wanted to see the data mapping. Here are some enhancements based on reviewing the data mapping.
+This reverting to use old file state is usually associated with errors during the generation of the new files. I am not sure which is the cause and which is the affect or if both are at play. At least sometimes the errors are the affect since the old file being used is referencing things that are no longer valid in some other files. The opposite may also be at play where an error is causing the AI to use an older file in it analysis of the error, instead of the file provided to the prompt that came from the current applications files.
 
-In the data mapping you shortened some of the information in the columns of metadata from WCVP. Regenerate with all the information so I can see if it is too much.
+The AI said the fix is to tell it to look at the files provided in the prompt but I have found that once it gets into the state of using the wrong file it always fails when it needs to update a the file. If it is only doing a read operation (no updates) have been ale to get it to see the current files at times, when emphasizing it has bad behaviour and needs to figure out why. However with updates it is not clear if is looking at the correct files initially and later switch to the older files at some point like generation or if it is using the older files from it's memory from the beginning of the task on.
 
-Make sure the Taxon interface incudes attributes for all columns from WCVP. Also the attribute name in the Taxon interface must match that from the WCVP column name. Here are some I see that are missing or don't match:
+Please fix this.
+
+
+------------------------------------------------
+
+To Do:
+
+The Taxon interface field names must match that from the WCVP column name (with appropriate name convention applied). Here are some I see that are missing or don't match:
 taxon_name->scientificName;
 taxon_rank->rank;
 taxon_authors->authorship;
-primary_author->(missing);
-replaced_synonym_author->(missing);
 place_of_publication->publication;
 accepted_plant_name_id-> acceptedNameId;
 basionym_plant_name_id-> basionymId;
-parent_plant_name_id->(missing);
-homotypic_synonym->(missing);
 
 Continue to make sure grid columns exist for all attributes in the Taxon interface and that the names match exactly. I realize there are extra grid columns as well for things like the tree, count and actions.
 

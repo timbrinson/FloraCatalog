@@ -191,7 +191,7 @@ function App() {
                       infraspecies: infraspeciesField,
                       infraspecificRank: currentInfraspecificRank,
                       cultivar: cultivarField,
-                      taxonomicStatus: 'Accepted', 
+                      taxonStatus: 'Accepted', 
                       commonName: node.commonName, 
                       family: node.family || currentFamily, 
                       synonyms: [], 
@@ -502,9 +502,7 @@ function App() {
               if (cancelledActivityIds.current.has(actId)) {
                   // If cancelled, clear the rest of the queue logic
                   activeEnrichmentCount.current = 0;
-                  // Use removeProcess (which deletes from state)
                   failActivity(actId, "Cancelled by user");
-                  cancelledActivityIds.current.delete(actId);
                   return;
               }
 
@@ -703,9 +701,9 @@ function App() {
                 <div className={viewMode === 'grid' ? 'block' : 'hidden'}>
                     <div className="h-[calc(100vh-140px)]">
                         <DataGridV2 
-                           taxa={taxa} 
-                           preferences={preferences} 
-                           onAction={handleGridAction} 
+                            taxa={taxa} 
+                            preferences={preferences} 
+                            onAction={handleGridAction} 
                         />
                     </div>
                 </div>
