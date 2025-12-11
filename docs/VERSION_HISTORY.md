@@ -1,7 +1,16 @@
 
+
 # Version History
 
-## v2.5 - Data Schema Alignment (Current)
+## v2.6 - Taxon Authorship Update (Current)
+**Date:** May 30, 2025
+
+### Changes
+- **Schema Alignment:** Renamed `authorship` field to `taxonAuthors` across the application (`types.ts`, `DataGridV2.tsx`, `geminiService.ts`) to match the WCVP source column exactly.
+- **Stability:** Successfully updated `DataGridV2.tsx` while preserving the complex "Unified Row Rendering" logic and tree-grid architecture.
+- **Documentation:** Updated `DATA_MAPPING.md` to reflect the new field name.
+
+## v2.5 - Data Schema Alignment
 **Date:** May 30, 2025
 
 ### Changes

@@ -1,4 +1,5 @@
 
+
 import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { Taxon, UserPreferences, ColorTheme } from '../types';
 import { 
@@ -150,7 +151,7 @@ const DataGridV2: React.FC<DataGridProps> = ({ taxa, onAction, preferences }) =>
       { id: 'homotypicSynonym', label: 'Homotypic Syn.', defaultWidth: 100, filterType: 'text' }, // NEW
       { id: 'id', label: 'Internal ID', defaultWidth: 100, filterType: 'text' },
 
-      { id: 'authorship', label: 'Authorship', defaultWidth: 150, filterType: 'text' },
+      { id: 'taxonAuthors', label: 'Authorship', defaultWidth: 150, filterType: 'text' }, // Was authorship
       { id: 'primaryAuthor', label: 'Primary Author', defaultWidth: 150, filterType: 'text' }, // NEW
       { id: 'parentheticalAuthor', label: 'Parenthetical Author', defaultWidth: 140, filterType: 'text' },
       { id: 'publicationAuthor', label: 'Pub. Author', defaultWidth: 120, filterType: 'text' },
@@ -180,8 +181,8 @@ const DataGridV2: React.FC<DataGridProps> = ({ taxa, onAction, preferences }) =>
       ]);
   });
   
-  // Updated key to rev1 to ensure column order update is picked up
-  const [columnOrder, setColumnOrder] = useState<ColumnId[]>(() => loadState('grid_v2_col_order_rev1', allColumns.map(c => c.id)));
+  // Updated key to rev2 to ensure column order update is picked up
+  const [columnOrder, setColumnOrder] = useState<ColumnId[]>(() => loadState('grid_v2_col_order_rev2', allColumns.map(c => c.id)));
   const [colWidths, setColWidths] = useState<Record<ColumnId, number>>(() => loadState('grid_v2_col_widths', Object.fromEntries(allColumns.map(c => [c.id, c.defaultWidth]))));
   const [sortConfig, setSortConfig] = useState<{ key: ColumnId; direction: 'asc' | 'desc' } | null>(() => loadState('grid_v2_sort', { key: 'scientificName', direction: 'asc' }));
   const [textFilters, setTextFilters] = useState<Record<string, string>>(() => loadState('grid_v2_text_filters', {}));
@@ -197,7 +198,7 @@ const DataGridV2: React.FC<DataGridProps> = ({ taxa, onAction, preferences }) =>
   }, [isHierarchyMode]);
 
   useEffect(() => localStorage.setItem('grid_v2_visible_cols', JSON.stringify(Array.from(visibleColumns))), [visibleColumns]);
-  useEffect(() => localStorage.setItem('grid_v2_col_order_rev1', JSON.stringify(columnOrder)), [columnOrder]); // Persist to new key
+  useEffect(() => localStorage.setItem('grid_v2_col_order_rev2', JSON.stringify(columnOrder)), [columnOrder]); // Persist to new key
   useEffect(() => localStorage.setItem('grid_v2_col_widths', JSON.stringify(colWidths)), [colWidths]);
   useEffect(() => localStorage.setItem('grid_v2_sort', JSON.stringify(sortConfig)), [sortConfig]);
   useEffect(() => localStorage.setItem('grid_v2_text_filters', JSON.stringify(textFilters)), [textFilters]);

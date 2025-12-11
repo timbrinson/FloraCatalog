@@ -1,4 +1,5 @@
 
+
 # Data Mapping: WCVP Source vs FloraCatalog App
 
 This document maps the columns from the World Checklist of Vascular Plants (WCVP) download to the internal data structures (`Taxon` interface) and UI components (`DataGridV2`) of the FloraCatalog application.
@@ -31,7 +32,7 @@ This document maps the columns from the World Checklist of Vascular Plants (WCVP
 | `taxon_status` | Accepted, Artificial Hybrid, Illegitimate, Invalid, Local Biotype, Misapplied, Orthographic, Synonym, Unplaced, Provisionally Accepted | chr | Indication of nomenclatural status and taxonomic opinion re the name: see details in main text. Names with status ‘Provisionally Accepted’ are unplaced names that have synonyms, following the GBIF classification and only used within the Darwin Core Archive downlaod. | | `taxonomicStatus` | `taxonomicStatus` | Status |
 | `hybrid_formula` | | chr | parents of hybrid | | `hybridFormula` | `hybridFormula` | Hybrid Formula |
 | **AUTHORSHIP** | | | | | | | |
-| `taxon_authors` | | chr | Concatenation of parenthetical and primary authors. Missing values indicate instances where authorship is unknown or non-applicable (e.g. autonyms). | | `taxonAuthors` | `authorship` | Authorship |
+| `taxon_authors` | | chr | Concatenation of parenthetical and primary authors. Missing values indicate instances where authorship is unknown or non-applicable (e.g. autonyms). | | `taxonAuthors` | `taxonAuthors` | Authorship |
 | `parenthetical_author` | | chr | The author of the basionym. Empty when there is no basionym. | | `parentheticalAuthor` | `parentheticalAuthor` | Parenthetical Author |
 | `primary_author` | | chr | The author or authors who published the scientific name. Missing values indicate instances where authorship is non-applicable (i.e. autonyms) or unknown. | | `primaryAuthor` | `primaryAuthor` | Pub. Author |
 | `publication_author` | | chr | The author or authors of the book where the scientific name is first published when different from the primary author. Missing values indicate instances where the primary author is also the author of the book or non-applicable (i.e. autonyms). | | `publicationAuthor` | `publicationAuthor` | Pub. Author |

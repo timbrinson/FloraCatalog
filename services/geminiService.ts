@@ -1,4 +1,5 @@
 
+
 import { GoogleGenAI } from "@google/genai";
 import { Taxon, TaxonRank, Link, Synonym, TaxonomicStatus, SearchCandidate } from "../types";
 
@@ -198,7 +199,7 @@ export const enrichTaxon = async (taxon: Taxon): Promise<Partial<Taxon>> => {
         {
           "description": "string",
           "commonName": "string",
-          "authorship": "string",
+          "taxonAuthors": "string",
           "geographicArea": "string",
           "synonyms": [ { "name": "string", "type": "scientific" } ],
           "referenceLinks": [{"title": "string", "url": "string"}]
@@ -226,7 +227,7 @@ export const enrichTaxon = async (taxon: Taxon): Promise<Partial<Taxon>> => {
       return {
           description: details.description || taxon.description,
           commonName: details.commonName || taxon.commonName,
-          authorship: details.authorship || taxon.authorship,
+          taxonAuthors: details.taxonAuthors || taxon.taxonAuthors,
           geographicArea: details.geographicArea || taxon.geographicArea,
           synonyms: details.synonyms || taxon.synonyms,
           referenceLinks: finalLinks

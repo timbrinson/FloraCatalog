@@ -1,4 +1,5 @@
 
+
 /**
  * DATA SOURCE CITATION:
  * Govaerts R (ed.). 2025. WCVP: World Checklist of Vascular Plants. 
@@ -92,7 +93,7 @@ export interface Taxon {
    * Full author string (mapped from 'taxon_authors'). 
    * e.g. "L." or "(Schott) Engelm."
    */
-  authorship?: string; 
+  taxonAuthors?: string; 
   
   /** The primary author of the current name combination (mapped from 'primary_author') */
   primaryAuthor?: string;
