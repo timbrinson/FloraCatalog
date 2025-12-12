@@ -1,5 +1,3 @@
-
-
 <!--
 HOW TO UPDATE THIS DOCUMENT:
 To regenerate this file based on the latest codebase changes, simply ask the AI:
@@ -32,6 +30,17 @@ The central data unit is a `Taxon`. It is recursive (has a `parentId`).
     *   Fields: `genusHybrid` (stores '×'), `speciesHybrid` (stores '×'), `hybridFormula`.
     *   **Rule:** A plant can be Rank: 'Genus' and GenusHybrid: '×' (e.g., × Mangave).
     *   **Normalization:** Input containing 'x' or 'X' in hybrid fields must be converted to '×' before storage.
+
+### 2.1 Data Governance & Lineage (v2.9+)
+To allow the database to mix authoritative data (WCVP) with user/AI data (Cultivars), we implement strict traceability.
+*   **Source of Truth Hierarchy:**
+    1.  **Primary Authority (WCVP):** Immutable nomenclature for Genus/Species/Accepted Infraspecies.
+    2.  **Secondary Authority (Societies/ICRA):** Registered Cultivars.
+    3.  **Enrichment (AI/User):** Descriptions, Common Names, Tags.
+*   **Lineage Tracking:**
+    *   **DataSource:** Every record links to a `DataSource` (e.g., "WCVP v14", "Gemini AI").
+    *   **Audit Logging:** Updates to `Taxon` or `TaxonDetails` must be logged in an `AuditRecord` (Timestamp + Process + User).
+    *   **Verification Levels:** `Verified` (Official Import), `Unverified` (AI Mine), `Ambiguous`.
 
 ## 3. AI Service Layer (`geminiService.ts`)
 Use `gemini-2.5-flash`.

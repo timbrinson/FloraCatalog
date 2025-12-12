@@ -24,6 +24,39 @@ export type TaxonRank = 'family' | 'genus' | 'species' | 'subspecies' | 'variety
 
 export type TaxonomicStatus = 'Accepted' | 'Synonym' | 'Unresolved' | 'Artificial';
 
+// --- DATA LINEAGE TYPES ---
+
+export type VerificationLevel = 'Verified' | 'Unverified' | 'Ambiguous' | 'AI_Generated';
+
+export interface DataSource {
+  id: string;
+  name: string; // e.g. "WCVP", "Gemini AI"
+  version?: string;
+  url?: string;
+  citation?: string;
+  trustLevel: 1 | 2 | 3 | 4 | 5; // 5 is highest (WCVP)
+}
+
+export interface AuditRecord {
+  timestamp: number;
+  process: string; // e.g., "Bulk Import", "User Edit", "Mining"
+  action: 'create' | 'update' | 'enrich';
+  details?: string;
+}
+
+export interface TaxonMetadata {
+  sourceId?: string; // ID of the primary DataSource
+  verificationLevel: VerificationLevel;
+  lastEnrichedAt?: number;
+  editHistory: AuditRecord[];
+  
+  // Track specific attribute sources if different from main source
+  descriptionSourceId?: string;
+  imagesSourceId?: string;
+}
+
+// --- CORE TAXON ---
+
 export interface Taxon {
   /** Internal UUID for the App database */
   id: string; 
@@ -146,6 +179,9 @@ export interface Taxon {
   synonyms: Synonym[];
   referenceLinks: Link[];
   
+  // Traceability & Metadata
+  metadata?: TaxonMetadata;
+
   isDetailsLoaded?: boolean;
   createdAt: number;
   

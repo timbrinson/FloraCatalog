@@ -1,6 +1,13 @@
-
-
 # Version History
+
+## v2.9 - Data Governance & Lineage Architecture
+**Date:** May 30, 2025
+
+### Changes
+- **Data Modeling:** Created `DATA_MODEL.md` defining the strategy for Lineage (Source -> Process -> Timestamp) and Source of Truth hierarchy (WCVP > Societies > AI).
+- **Schema Design:** Updated `wcvp_schema.txt` to include Application Layer tables (`app_data_sources`, `app_audit_log`, `app_taxon_details`) alongside the raw WCVP staging table.
+- **Type Definitions:** Updated `types.ts` with `DataSource`, `AuditRecord`, and `TaxonMetadata` interfaces to support future lineage UI features.
+- **Infrastructure:** Added `.gitignore` for repository health.
 
 ## v2.8 - Taxon Name Alignment
 **Date:** May 30, 2025

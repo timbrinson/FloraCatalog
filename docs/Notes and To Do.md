@@ -10,7 +10,7 @@ When the AI halucinates a previous state say:
 
  This get it to weight the actual file contents over the generalized memory from the AI system from recent conversations.
 
-Reset the conversation periodically to prevent a large contenxt of the conversation being passed to teh AI on every prompt.
+Reset the conversation periodically to prevent a large contenxt of the conversation being passed to teh AI on every prompt. The continual errors was fixed after "Rest the conversation" was selected. BTW, in a conversation with AI Studio it said reseting the conversation periodically is a good practice since the costs can go up as it rereads the conversation (lots of input tokens) and all the files for each prompt.
 
 Do not have large data/text files in the project. Was keeping a text file of all previous conversations, which is long. Eventually the AI could not run a prompt without an error. Not sure if the problem was with the size of the file or if it was reading the file and trying to process information in it.
 
@@ -41,29 +41,11 @@ Please fix this.
 
 To Do:
 
-The Taxon interface field names must match that from the WCVP column name (with appropriate name convention applied). Here are some I see that are missing or don't match:
-taxon_name->scientificName;
-taxon_rank->rank;
-taxon_authors->authorship;
-place_of_publication->publication;
-accepted_plant_name_id-> acceptedNameId;
-basionym_plant_name_id-> basionymId;
 
-Continue to make sure grid columns exist for all attributes in the Taxon interface and that the names match exactly. I realize there are extra grid columns as well for things like the tree, count and actions.
-
-When you first generated the data mapping to the console you added additional columns than what I explicitly asked for (Grid Label and Notes). I liked those and se you did include the Grid Label in the DATA_MAPPING.md. Please include the Notes in the DATA_MAPPING.md file as well.
-
-Issue 2025--12-07
------------------
-
-Tried reporting the error but that would not even send. This is what I tried to send:
-
-Google AI studio prompt is not working. It continually gets an internal error so I can't use it to continue building my app. Retrying does work. Logged out and upgraded the latest Chrome browser but that didn't help. cleared all cache but that didn't help either. My other app is getting prompt responses but they are slow. https://aistudio.google.com/status indicates there is no issue but there is at least with getting you system to even communicate with me on the app. 
-
-The continual errors was fixed after "Rest the conversation" was selected. BTW, in a conversation with AI Studio it said reseting the conversation periodically is a good practice since the costs can go up as it rereads the conversation (lots of input tokens) and all the files for each prompt.
-
+------------------------------------------------
 
 Features to add:
+
 ---------------
 
 Activity Panel:
@@ -85,20 +67,22 @@ Database:
 
 Data Managment:
 
+- Before integrating with a database I would like your help with data modeling and design for data management.
+
+  It is important to maintain lineage of the data and have traceability of changes. It needs to be clear the source of information and how it got from the source to the database. It needs proper citation for the source of the information, a timestamp when the information came from the source and a timestamp when the data was added and updated in the database. Also capture what was the process that made the updates.
+
+  The plant information will be coming from multiple sources. The primary source for Genus, Species and Infraspecies levels will be WCVP. WCVP is the source for some Cultivar level plants but most of the Cultivars will be added from other sources. We may allow adding Genus, species and Infraspecies levels from other sources as well but will need to be clear where they came from vs. WCVP.
+
 -How to handle updates from WCVP while maintaining other data connected to it (cultivars, descriptions, etc.)?
 
 -Dynamically loading and cacheing content from database since can't load everything into memory.
 
--Keeping lineage and traceability. Where did the data come from. When was it added and/or updated.
+-Keeping lineage and traceability. Where did the data come from. When was it added and/or updated. What was the process for adding or updating?
 
 -Hide/show synonyms (or other not accepted) from WCVP.
 
 -Handle adding Genus, Species, Infraspecies that are not in WCVP.
 
-
-Can AI Studio output the full description that could be used to recreate the application?
-
-Can AI Studio output the design decisions that went into this. Describe what was needed, design decisions on how it was accomplished and explaining why that design decision was made and possibly justifications. Not looking for a deep understanding of the pros and cons of alternative but alternatives may be mentioned if needed to explain other justify the decision.
 
 Plant info:
 
@@ -106,19 +90,17 @@ Plant info:
 
 -Include brief quotes about plants from reputable sources, with proper citing and references to the source. Follow guidance provided by Google AI - see document of session conversation.
 
--Include 'a.k.a.' section (or 'Other Names' or 'Known As'). WCVP synonyms, common names, Other Cultivars, commonly misrepresented.
+-Include 'a.k.a.' section. WCVP synonyms, trade names, pattents, trademarks/registered, common names, Other Cultivars, misapplied, commonly misrepresented. Combine synonym information from WCVP with other plant anmes from the Gemini LLM together, indicating the source and also what kind of a name it is (scientific synonym, duplicate name, trade name, pattent, trademark, registered trademark, common name, missaplied, etc.).
 
 -Include origin, history, background, 
 
--Include physical description of plant.
+-Include physical description of plant. plant size-Height/width, growth rate, Plant shape, plant overall texture, floliage shape, foliage size, foliage texture, foliage color, variation throughout the year, Flowering period, flower color and description, description of base/rooting system- type (bulb, rhizonme, etc.), size, shape, etc.
 
 -Include growing conditions.
 
 
-How to train the system to return high quality information by iterating over it. Ask the questions about the answer like: Are you sure? Is there possibly another answer? Justify your answer. 
+How to train the system to return high quality information by iterating over it. Ask the questions about the answer like: Are you sure? Is there possibly another answer? Is this the only answer? Explain why. Justify your answer. 
 
-
-Have the Code Assistant console conversation streamed to a file alongside the source code. This will get backed up and versions with Github. When the conversation gets reset start a new file.
 
 
 Test and optimize searching. Make sure it can handle input in various forms and types of names (synonyms, trademarks, common names, etc.) to identify the correct plant name. 
@@ -133,27 +115,17 @@ Test and optimize searching. Make sure it can handle input in various forms and 
 
 -If multiple potential matches are found then present to the user input for them to resolve by selecting the correct ones to add or to modify the search.
 
-Update algorithm to populate the Infraspecies Rank column instead of prepending he Infraspecies with the term.
+Update the SQL in "wcvp_schema.txt". Include other attributes/columns and other tables needed.
 
-Update the SQL in "wcvp_schema.txt":
-
--More comments for each column that reflect the information for that column from the "README_WCVP" file. Include information about the Value, Class, Description and Remarks. This will carry that information forward as easy access during development.
-
--Includes other columns of data needed by the app which did not come from WCVP.
+-Includes other columns of data needed by the app which did not come from WCVP. Include childCount.
 
 Create details panel that shows all data for a plant. Make this a panel that can be popped up or opened up under the plant row in the grid. Give it an edit mode so data can be updated.
 
-Can the tree column header use the tree icon instead of the text "Tree"? 
-
-I like that the Tree column can be moved but doesn't require the little grab icon to the left of the label in the header. It takes up horizontal space, affecting visibility of the column label when the column is shrunk. I presume that means we can remove the sort icon to the right of the label but sorting still works. Assuming those are correct remove the grab icon and sorting icon from the header for all columns except Genus, Species, Infraspecies, Cultivar and Scientific Name? That way these icons are shown for the main taxonomic columns but the other columns can have these functions and shrink smaller when needed without affecting visibility of the label?
-
-Also change GH, SH and Actions back to being able to be moved. Change the label for Infra Rank to "I Rank" to make the label smaller.
-
-Update colors for Genus, Species, Infraspecies and Cultivar to be separated visually.
-
 Add a fake group under Genus to hold generic cultivars. Use something like "---" or "(none)", etc. in the Species column. Not sure if they should sort before or after the other Species. Maybe do a similar thing for the Cultivars of Species, adding a fake group named "---" or "(none)" in the Infraspecies column?
 
+Rename DataGridV2 to DataGrid.
 
+Update the grid column labels. Keep similar to WCVP where we can. Shorten so the label doesn't extend the column width.
 
 Create groups for the columns in the Column selector and make the group selectable, which selects/deselects all columns in the group. 
 Use the following to set the groups and column order and their default selection state:

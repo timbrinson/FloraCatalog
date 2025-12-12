@@ -1,156 +1,143 @@
 -- -----------------------------------------------------------------------------
 -- WCVP Import Schema (Staging Table)
 -- Matches the column structure of the World Checklist of Vascular Plants CSV.
---
--- DATA SOURCE CITATION:
--- Govaerts R (ed.). 2025. WCVP: World Checklist of Vascular Plants.
--- Facilitated by the Royal Botanic Gardens, Kew.
--- [WWW document] URL https://doi.org/10.34885/b8fr-km05 [accessed 28 May 2025].
--- Extracted: 28/05/2025
 -- -----------------------------------------------------------------------------
 
 CREATE TABLE wcvp_import (
-    -- =========================================================================
-    -- IDENTIFIERS
-    -- =========================================================================
-    
-    -- The unique World Checklist of Vascular Plants identifier (e.g., '12345-1').
-    -- This is the Primary Key for the source data.
     plant_name_id text PRIMARY KEY,
-    
-    -- International Plant Names Index identifier (e.g., '320035-2').
     ipni_id text,
-    
-    -- Plants of the World Online identifier. Often identical to plant_name_id.
     powo_id text,
-    
-    -- =========================================================================
-    -- HIERARCHY & LINKS
-    -- =========================================================================
-    
-    -- If taxonomic_status is 'Synonym', this ID points to the 'Accepted' plant_name_id.
     accepted_plant_name_id text,
-    
-    -- ID of the immediate parent taxon (e.g., Species ID for a Variety, Genus ID for a Species).
     parent_plant_name_id text,
-    
-    -- ID of the basionym (the original name under which the taxon was described).
     basionym_plant_name_id text,
-    
-    -- ID linking homotypic synonyms (names based on the same type specimen).
     homotypic_synonym text,
-    
-    -- =========================================================================
-    -- TAXONOMY & NAMES
-    -- =========================================================================
-    
-    -- The full scientific name including genus, species, and infraspecific epithets.
-    -- Does NOT include authorship.
     taxon_name text,
-    
-    -- The full authorship string for the name (e.g., "L." or "(Schott) Engelm.").
     taxon_authors text,
-    
-    -- The family to which the taxon belongs (e.g., "Asparagaceae").
     family text,
-    
-    -- The Genus name (e.g., "Agave").
     genus text,
-    
-    -- Hybrid marker for the Genus (e.g., '×' or '+').
     genus_hybrid text,
-    
-    -- The Species epithet (e.g., "parryi").
     species text,
-    
-    -- Hybrid marker for the Species (e.g., '×'). Indicates an interspecific hybrid.
     species_hybrid text,
-    
-    -- The Infraspecific epithet (e.g., "truncata").
     infraspecies text,
-    
-    -- The rank of the infraspecies (e.g., "var.", "subsp.", "f.").
     infraspecific_rank text,
-    
-    -- The taxonomic rank of this record (e.g., "Species", "Genus", "Variety").
     taxon_rank text,
-    
-    -- The status of the name: 'Accepted', 'Synonym', 'Unplaced', 'Artificial'.
     taxon_status text,
-    
-    -- The formula for hybrids (e.g., "Agave scabra × Agave victoriae-reginae").
     hybrid_formula text,
-    
-    -- =========================================================================
-    -- DETAILED AUTHORSHIP
-    -- =========================================================================
-    
-    -- The author of the original basionym (in parentheses).
     parenthetical_author text,
-    
-    -- The primary author of the current name combination.
     primary_author text,
-    
-    -- The author who published the name (specific to the publication citation).
     publication_author text,
-    
-    -- The author of the synonym being replaced (if applicable).
     replaced_synonym_author text,
-    
-    -- =========================================================================
-    -- PUBLICATION DETAILS
-    -- =========================================================================
-    
-    -- The title of the publication where the name was validly published.
     place_of_publication text,
-    
-    -- The volume and page number of the publication.
     volume_and_page text,
-    
-    -- The year or date the name was first published.
     first_published text,
-    
-    -- Notes on the name's legitimacy (e.g., "nom. illeg.", "nom. inval.").
     nomenclatural_remarks text,
-    
-    -- =========================================================================
-    -- DATA MANAGEMENT & ECOLOGY
-    -- =========================================================================
-    
-    -- Indicates if the record has been reviewed by Kew botanists ('Y' or 'N').
     reviewed text,
-    
-    -- The description of the native distribution range (e.g., "Mexico Northeast").
     geographic_area text,
-    
-    -- The growth form or habit (e.g., "Succulent", "Tree", "Geophyte").
     lifeform_description text,
-    
-    -- The climate description (e.g., "Wet Tropical", "Subtropical").
     climate_description text
 );
 
--- -----------------------------------------------------------------------------
--- INDEXES
--- -----------------------------------------------------------------------------
-
--- Optimizes searching by full scientific name (critical for autocomplete).
+-- Indexes for Staging
 CREATE INDEX idx_wcvp_name ON wcvp_import (taxon_name text_pattern_ops);
-
--- Optimizes filtering by rank (e.g., "Show only Species").
 CREATE INDEX idx_wcvp_rank ON wcvp_import (taxon_rank);
-
--- Optimizes filtering by status (e.g., "Show only Accepted names").
-CREATE INDEX idx_wcvp_status ON wcvp_import (taxon_status);
-
--- Optimizes hierarchical tree traversal (Finding children of a parent).
 CREATE INDEX idx_wcvp_parent ON wcvp_import (parent_plant_name_id);
-
--- Optimizes linking synonyms to their accepted names.
 CREATE INDEX idx_wcvp_accepted ON wcvp_import (accepted_plant_name_id);
 
--- Optimizes grouping by Family.
-CREATE INDEX idx_wcvp_family ON wcvp_import (family);
+-- =============================================================================
+-- APPLICATION LAYER (FloraCatalog Core)
+-- =============================================================================
 
--- Optimizes grouping by Genus.
-CREATE INDEX idx_wcvp_genus ON wcvp_import (genus);
+-- 1. DATA SOURCES
+-- Registry of where data comes from (WCVP, AI, Manual, Web Scrape)
+CREATE TABLE app_data_sources (
+    id serial PRIMARY KEY,
+    name text NOT NULL,                -- e.g. "WCVP", "Gemini AI", "RHS"
+    version text,                      -- e.g. "v14", "2.5-flash"
+    citation_text text,                -- Full academic citation
+    url text,                          -- Link to source
+    trust_level int DEFAULT 1,         -- 1 (Low/AI) to 5 (Golden/WCVP)
+    last_accessed_at timestamptz DEFAULT NOW()
+);
+
+-- 2. TAXA (The Application's "Real" Table)
+-- Can be populated from wcvp_import OR created manually for Cultivars
+CREATE TABLE app_taxa (
+    -- Internal UUID for the app (independent of WCVP IDs)
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    
+    -- Hierarchy (Adjacency List + Materialized Path)
+    parent_id uuid REFERENCES app_taxa(id),
+    hierarchy_path ltree,              -- Postgres ltree for efficient subtree queries
+    
+    -- Links to External IDs (Nullable, as custom cultivars won't have them)
+    wcvp_id text REFERENCES wcvp_import(plant_name_id),
+    ipni_id text,
+    
+    -- Core Taxonomy (Normalized)
+    taxon_rank text NOT NULL,
+    taxon_name text NOT NULL,          -- Full Scientific Name
+    common_name text,
+    
+    -- Hybrid Markers
+    genus_hybrid char(1),              -- '×' or null
+    species_hybrid char(1),            -- '×' or null
+    
+    -- Lineage / Meta
+    source_id int REFERENCES app_data_sources(id), -- Where did this record primarily come from?
+    verification_level text,           -- 'Verified', 'Unverified', 'Ambiguous'
+    created_at timestamptz DEFAULT NOW(),
+    updated_at timestamptz DEFAULT NOW(),
+    
+    -- Cached Metrics
+    descendant_count int DEFAULT 0     -- Updated via trigger/worker
+);
+
+-- 3. EXTENDED DETAILS (Rich Content)
+-- Holds descriptive data that might come from different sources than the name
+CREATE TABLE app_taxon_details (
+    taxon_id uuid PRIMARY KEY REFERENCES app_taxa(id) ON DELETE CASCADE,
+    
+    -- Description
+    description_text text,
+    description_source_id int REFERENCES app_data_sources(id),
+    
+    -- Physical Traits (Structured)
+    growth_habit text,                 -- e.g. "Rosette", "Upright"
+    foliage_color text,
+    flower_color text,
+    height_range_cm int[],             -- range [min, max]
+    hardiness_zone_min int,
+    
+    -- AKA / Synonyms (JSONB for flexibility)
+    -- Structure: [{ "name": "...", "type": "trade", "source": "..." }]
+    alternative_names jsonb DEFAULT '[]',
+    
+    -- References / Links
+    -- Structure: [{ "title": "...", "url": "...", "cited_text": "..." }]
+    reference_links jsonb DEFAULT '[]'
+);
+
+-- 4. AUDIT LOG (Traceability)
+-- Immutable history of who changed what and how
+CREATE TABLE app_audit_log (
+    id bigserial PRIMARY KEY,
+    entity_id uuid NOT NULL,           -- Link to app_taxa.id
+    table_name text NOT NULL,          -- 'app_taxa' or 'app_taxon_details'
+    operation text NOT NULL,           -- 'INSERT', 'UPDATE', 'DELETE'
+    
+    changed_by text,                   -- User ID or System Process Name (e.g. "MiningWorker")
+    changed_at timestamptz DEFAULT NOW(),
+    
+    -- Delta (using JSONB to store old/new values)
+    changes jsonb                      -- { "field": { "old": "x", "new": "y" } }
+);
+
+-- =============================================================================
+-- INDEXES & OPTIMIZATIONS
+-- =============================================================================
+
+CREATE INDEX idx_app_taxa_parent ON app_taxa(parent_id);
+CREATE INDEX idx_app_taxa_name ON app_taxa(taxon_name);
+CREATE INDEX idx_app_taxa_source ON app_taxa(source_id);
+CREATE INDEX idx_app_audit_entity ON app_audit_log(entity_id);
+CREATE INDEX idx_app_path_gist ON app_taxa USING GIST (hierarchy_path);
