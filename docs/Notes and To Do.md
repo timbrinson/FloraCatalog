@@ -73,6 +73,39 @@ Data Managment:
 
   The plant information will be coming from multiple sources. The primary source for Genus, Species and Infraspecies levels will be WCVP. WCVP is the source for some Cultivar level plants but most of the Cultivars will be added from other sources. We may allow adding Genus, species and Infraspecies levels from other sources as well but will need to be clear where they came from vs. WCVP.
 
+- I see WCVP has its own table, separate from the application. I reallize that simplifies updating with a new version of the WCVP. 
+
+  My intention is that from the user's perspective it looks like one set of data, whether it comes from WCVP or other areas. It looks like the app_taxa pulls that together. Does the app_taxa need initialized from the WCVP when it is loaded so that it has records for all of rhe WCVP? When the WCVP is updated with a new version, how does it handle app_taxa being updated with information that changed in WCVP?
+
+  I was not familiar with ltree. Seems powerful and very useful for this use case. I know it is better for read heavy use case like this but not for write heavy that modifies the tree other than adding to it. I expect there will be updates from WCVP at times which will modify the tree. Is it safe to assume we can run those updates as a batch process to update the ltree as well? 
+  
+  There will be write operations to add Cultivars but they should not be modifying the tree. 
+  
+  We might want an admin mode to be a able to correct data, which could modify the tree.
+
+  There is a lot of work done outside of WCVP that identifies plants which may eventually be adopted in WCVP. At this time I have not concluded whether to allow adding these to the app. First question is if we allowed adding Genus, Species and Infraspscies that are not in WCVP does this design support that or if it doesn't would it be difficult to add later?
+
+- There are a lot of additional plant details we will need to support which we have not discussed yet. Some of these are things like the various physical characteristics of a plant (overall, leaves, flowers, underground growth, etc.) and growing details (seasonal, nutrients, sun. water, longevity, etc), historical notes, etc. For example, would support querying/filtering for things like plants from a climate that is Temperate, Height is 5', zone is 8a and water needs are low. Expect many fo these would be sparsely populated. Expect the need to add more attributes over time unless we identify a complete model to use up front.
+
+  Help me consider different options for how to store data about a taxon that don't have any special purpose other than displaying and querying. This would include many of the wcvp columns and many extended details. Here are some initial thoughts from my limited knowledge.
+
+  1) Purely relational: 
+  This is similar to the current method being used for the wcvp columns and could be extended for other attributes that we need to capture.
+  Pros: works well for core columns. Fast retrieval.
+  Cons: Excessive number of columns are needed which would be sparsely populated. Doesn't handle multiple sources for the same data very well.
+
+  2) Relational core extended with name/value pairs as flexible and dynamic data:
+  This is similar to the current method used for extended details but each detail would have it's own entry in the app_taxon_details table. 
+  Pros: No sparsely populated details because only those that have values are included.
+  Cons: Complex joins to query multiple attributes.
+
+  3) Relational core extended with JSON/BSJON for flexible and dynamic data:
+  You brought this to my attension when you proposed Postgres/Supabase. From my limited learning about it, it seems promising as away to get the benefits of relational db and that of document db.
+  Pros: Handles set structures of the core columns relationally while providing ability to add many optional attributes that could be sparsly populated. Allows queryig on the details.
+  Cons: Specialized skills to handle and debug. Not a traditional db mechanism (but expect it may be getting more popular).
+
+  4) No SQL: Graph DB: might have advantages for the tree structure but don't see advantages for the plant details. Document DB: could be used for the details which provides flexibility on data present. Could be used for the core columns too. Long Column: Don't have as much background on this.
+
 -How to handle updates from WCVP while maintaining other data connected to it (cultivars, descriptions, etc.)?
 
 -Dynamically loading and cacheing content from database since can't load everything into memory.
@@ -83,6 +116,7 @@ Data Managment:
 
 -Handle adding Genus, Species, Infraspecies that are not in WCVP.
 
+-Since lower level taxons are a specialization of the parent can they inherit certain attributes (descriptive) if those attributes are not set an the child? This would not include things like status or authorship but would include climtae, geography and lifeform. May want to make it clear to the user when a description is inherited (generalized) vs specific (specialized) to that taxon.
 
 Plant info:
 

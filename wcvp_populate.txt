@@ -1,0 +1,130 @@
+
+-- =============================================================================
+-- POPULATE APP_TAXA FROM WCVP_IMPORT
+-- Run this AFTER importing the CSV into wcvp_import table.
+-- =============================================================================
+
+-- 1. CLEAR EXISTING DATA (Optional - Use caution)
+-- TRUNCATE TABLE app_taxa CASCADE;
+
+-- 2. INSERT RAW DATA
+-- We generate new UUIDs for our app, but keep the WCVP ID for linking.
+INSERT INTO app_taxa (
+    wcvp_id,
+    ipni_id,
+    powo_id,
+    accepted_plant_name_id,
+    parent_plant_name_id,
+    basionym_plant_name_id,
+    homotypic_synonym,
+    taxon_name,
+    taxon_authors,
+    family,
+    genus,
+    genus_hybrid,
+    species,
+    species_hybrid,
+    infraspecies,
+    infraspecific_rank,
+    taxon_rank,
+    taxon_status,
+    hybrid_formula,
+    parenthetical_author,
+    primary_author,
+    publication_author,
+    replaced_synonym_author,
+    place_of_publication,
+    volume_and_page,
+    first_published,
+    nomenclatural_remarks,
+    reviewed,
+    geographic_area,
+    lifeform_description,
+    climate_description,
+    source_id -- We assume ID 1 is 'WCVP' in app_data_sources
+)
+SELECT 
+    plant_name_id,
+    ipni_id,
+    powo_id,
+    accepted_plant_name_id,
+    parent_plant_name_id,
+    basionym_plant_name_id,
+    homotypic_synonym,
+    taxon_name,
+    taxon_authors,
+    family,
+    genus,
+    genus_hybrid,
+    species,
+    species_hybrid,
+    infraspecies,
+    infraspecific_rank,
+    taxon_rank,
+    taxon_status,
+    hybrid_formula,
+    parenthetical_author,
+    primary_author,
+    publication_author,
+    replaced_synonym_author,
+    place_of_publication,
+    volume_and_page,
+    first_published,
+    nomenclatural_remarks,
+    reviewed,
+    geographic_area,
+    lifeform_description,
+    climate_description,
+    1 -- Source ID 1 (Ensure you have created this in app_data_sources)
+FROM wcvp_import
+ON CONFLICT (id) DO NOTHING;
+
+-- 3. LINK PARENTS (Adjacency List)
+-- Update the internal 'parent_id' UUID based on the string 'parent_plant_name_id'
+UPDATE app_taxa child
+SET parent_id = parent.id
+FROM app_taxa parent
+WHERE child.parent_plant_name_id = parent.wcvp_id
+  AND child.parent_id IS NULL; -- Only update those missing parents
+
+-- 4. BUILD HIERARCHY PATH (LTREE)
+-- This is computationally expensive for 1.4M rows. 
+-- We use a Recursive CTE to walk the tree and build the path.
+
+WITH RECURSIVE tax_tree AS (
+    -- Anchor member: Roots (Taxa with no parent)
+    SELECT 
+        id, 
+        parent_id, 
+        text2ltree(replace(id::text, '-', '_')) as path
+    FROM app_taxa
+    WHERE parent_id IS NULL
+    
+    UNION ALL
+    
+    -- Recursive member: Children
+    SELECT 
+        c.id, 
+        c.parent_id, 
+        p.path || text2ltree(replace(c.id::text, '-', '_'))
+    FROM app_taxa c
+    JOIN tax_tree p ON c.parent_id = p.id
+)
+UPDATE app_taxa
+SET hierarchy_path = tax_tree.path
+FROM tax_tree
+WHERE app_taxa.id = tax_tree.id
+  AND app_taxa.hierarchy_path IS NULL;
+
+-- 5. UPDATE DESCENDANT COUNTS (Optional - can be slow)
+-- Calculates how many children each node has
+-- WITH counts AS (
+--    SELECT parent_id, COUNT(*) as cnt
+--    FROM app_taxa
+--    WHERE parent_id IS NOT NULL
+--    GROUP BY parent_id
+-- )
+-- UPDATE app_taxa
+-- SET descendant_count = counts.cnt
+-- FROM counts
+-- WHERE app_taxa.id = counts.parent_id;

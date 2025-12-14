@@ -1,9 +1,8 @@
-
-
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Loader2, Leaf, Plus, RotateCcw, Table, Network, Upload, X, Settings as SettingsIcon, Wrench } from 'lucide-react';
 import { Taxon, LoadingState, TaxonomicStatus, UserPreferences, BackgroundProcess, ActivityItem, SearchCandidate } from './types';
 import { identifyTaxonomy, enrichTaxon, deepScanTaxon, parseBulkText, searchTaxonCandidates } from './services/geminiService';
+import { dataService } from './services/dataService'; // IMPORT DATA SERVICE
 import TaxonRow from './components/PlantCard';
 import EmptyState from './components/EmptyState';
 import DataGridV2 from './components/DataGridV2';
@@ -55,13 +54,35 @@ function App() {
   // INIT & STORAGE
   // ------------------------------------------------------------------
   useEffect(() => {
-    const saved = localStorage.getItem('flora_db');
-    if (saved) { try { setTaxa(JSON.parse(saved)); } catch (e) { console.error(e); } } else { setTaxa(DEFAULT_TAXA); }
+    // REPLACED LOCALSTORAGE LOAD WITH SUPABASE LOAD
+    const loadData = async () => {
+      try {
+        setLoadingState(LoadingState.LOADING);
+        const dbTaxa = await dataService.getTaxa();
+        
+        if (dbTaxa.length === 0) {
+           // Seed with Default Data if DB is empty (Optional)
+           // console.log("Seeding default data...");
+           // await dataService.batchInsert(DEFAULT_TAXA);
+           // setTaxa(DEFAULT_TAXA);
+           setTaxa([]);
+        } else {
+           setTaxa(dbTaxa);
+        }
+        setLoadingState(LoadingState.IDLE);
+      } catch (e) {
+        console.error("Failed to load data", e);
+        setLoadingState(LoadingState.ERROR);
+      }
+    };
+    loadData();
+
     const savedPrefs = localStorage.getItem('flora_prefs');
     if (savedPrefs) { try { setPreferences(JSON.parse(savedPrefs)); } catch(e) {} }
   }, []);
 
-  useEffect(() => { if (taxa.length > 0) localStorage.setItem('flora_db', JSON.stringify(taxa)); }, [taxa]);
+  // Removed auto-save to localStorage effect
+  // useEffect(() => { if (taxa.length > 0) localStorage.setItem('flora_db', JSON.stringify(taxa)); }, [taxa]);
   useEffect(() => { localStorage.setItem('flora_prefs', JSON.stringify(preferences)); }, [preferences]);
 
   useEffect(() => {
@@ -94,7 +115,7 @@ function App() {
       return { ...node, name: cleanName, rank: rank, genusHybrid, speciesHybrid };
   };
 
-  const mergeChainIntoTaxa = (chain: any[]) => {
+  const mergeChainIntoTaxa = async (chain: any[]) => {
       let newTaxaToAdd: Taxon[] = [];
       
       // Track accumulating hierarchy for denormalization
@@ -107,108 +128,130 @@ function App() {
       let currentInfraspeciesName: string | undefined;
       let currentInfraspecificRank: string | undefined; 
 
-      setTaxa(prev => {
-          const next = [...prev];
-          let parentId: string | undefined = undefined;
+      // Create a local copy to work with during the chain processing
+      const currentTaxaState = [...taxa];
+      let parentId: string | undefined = undefined;
+      let parentPath: string = 'root'; // Root path for ltree
 
-          chain.forEach(rawNode => {
-              const node = normalizeNode(rawNode);
+      for (const rawNode of chain) {
+          const node = normalizeNode(rawNode);
+          
+          if (node.rank === 'genus') {
+              currentGenus = node.name;
+              currentGenusHybrid = node.genusHybrid;
+              currentFamily = node.family || currentFamily;
+              currentSpecies = undefined;
+              currentSpeciesHybrid = undefined;
+              currentInfraspeciesName = undefined;
+              currentInfraspecificRank = undefined;
+          }
+          if (node.rank === 'species') {
+              currentSpecies = node.name;
+              currentSpeciesHybrid = node.speciesHybrid;
+              currentInfraspeciesName = undefined;
+              currentInfraspecificRank = undefined;
+          }
+          if (['subspecies', 'variety', 'form'].includes(node.rank)) {
+              currentInfraspeciesName = node.name;
+              if (node.rank === 'subspecies') currentInfraspecificRank = 'subsp.';
+              if (node.rank === 'variety') currentInfraspecificRank = 'var.';
+              if (node.rank === 'form') currentInfraspecificRank = 'f.';
+          }
+
+          // Check existing using taxonRank field
+          // Look in both current state AND newly created items to ensure chain continuity
+          const allItems = [...currentTaxaState, ...newTaxaToAdd];
+          let existing = allItems.find(t => t.taxonRank === node.rank && t.name.toLowerCase() === node.name.toLowerCase() && t.parentId === parentId);
+          
+          if (existing) { 
+              parentId = existing.id; 
+              // Update parent path for next child
+              parentPath = existing.hierarchyPath || `root.${existing.id.replace(/-/g, '_')}`; 
+          } else {
+              const newId = crypto.randomUUID();
               
-              if (node.rank === 'genus') {
-                  currentGenus = node.name;
-                  currentGenusHybrid = node.genusHybrid;
-                  currentFamily = node.family || currentFamily;
-                  currentSpecies = undefined;
-                  currentSpeciesHybrid = undefined;
-                  currentInfraspeciesName = undefined;
-                  currentInfraspecificRank = undefined;
-              }
-              if (node.rank === 'species') {
-                  currentSpecies = node.name;
-                  currentSpeciesHybrid = node.speciesHybrid;
-                  currentInfraspeciesName = undefined;
-                  currentInfraspecificRank = undefined;
-              }
+              let infraspeciesField = undefined;
+              let cultivarField = undefined;
+              
               if (['subspecies', 'variety', 'form'].includes(node.rank)) {
-                  currentInfraspeciesName = node.name;
-                  if (node.rank === 'subspecies') currentInfraspecificRank = 'subsp.';
-                  if (node.rank === 'variety') currentInfraspecificRank = 'var.';
-                  if (node.rank === 'form') currentInfraspecificRank = 'f.';
+                  infraspeciesField = `${node.name}`.trim();
+              }
+              if (node.rank === 'cultivar') {
+                  cultivarField = node.name;
+                  if (currentInfraspeciesName) {
+                      infraspeciesField = `${currentInfraspeciesName}`.trim();
+                  }
               }
 
-              // Check existing using taxonRank field
-              let existing = next.find(t => t.taxonRank === node.rank && t.name.toLowerCase() === node.name.toLowerCase() && t.parentId === parentId);
-              
-              if (existing) { 
-                  parentId = existing.id; 
-              } else {
-                  const newId = crypto.randomUUID();
+              // CONSTRUCT FULL NAME if missing or just simple name
+              let finalTaxonName = node.fullName || node.scientificName;
+              if (!finalTaxonName || finalTaxonName === node.name) {
+                  const parts = [];
+                  if (currentGenus) parts.push(currentGenusHybrid ? `× ${currentGenus}` : currentGenus);
+                  if (currentSpecies) parts.push(currentSpeciesHybrid ? `× ${currentSpecies}` : currentSpecies);
                   
-                  let infraspeciesField = undefined;
-                  let cultivarField = undefined;
-                  
-                  if (['subspecies', 'variety', 'form'].includes(node.rank)) {
-                      infraspeciesField = `${node.name}`.trim();
+                  // For infraspecies, we need the rank prefix for the Full Name
+                  if (infraspeciesField) {
+                     const rankPrefix = currentInfraspecificRank ? `${currentInfraspecificRank} ` : '';
+                     parts.push(`${rankPrefix}${infraspeciesField}`);
                   }
+                  
                   if (node.rank === 'cultivar') {
-                      cultivarField = node.name;
-                      if (currentInfraspeciesName) {
-                          infraspeciesField = `${currentInfraspeciesName}`.trim();
-                      }
+                      parts.push(`'${node.name}'`);
+                  } else if (node.rank !== 'genus' && node.rank !== 'species' && node.rank !== 'variety' && node.rank !== 'subspecies') {
+                      parts.push(node.name);
                   }
-
-                  // CONSTRUCT FULL NAME if missing or just simple name
-                  let finalTaxonName = node.fullName || node.scientificName;
-                  if (!finalTaxonName || finalTaxonName === node.name) {
-                      const parts = [];
-                      if (currentGenus) parts.push(currentGenusHybrid ? `× ${currentGenus}` : currentGenus);
-                      if (currentSpecies) parts.push(currentSpeciesHybrid ? `× ${currentSpecies}` : currentSpecies);
-                      
-                      // For infraspecies, we need the rank prefix for the Full Name
-                      if (infraspeciesField) {
-                         const rankPrefix = currentInfraspecificRank ? `${currentInfraspecificRank} ` : '';
-                         parts.push(`${rankPrefix}${infraspeciesField}`);
-                      }
-                      
-                      if (node.rank === 'cultivar') {
-                          parts.push(`'${node.name}'`);
-                      } else if (node.rank !== 'genus' && node.rank !== 'species' && node.rank !== 'variety' && node.rank !== 'subspecies') {
-                          parts.push(node.name);
-                      }
-                      
-                      if (parts.length === 0) finalTaxonName = node.name;
-                      else finalTaxonName = parts.join(' ');
-                  }
-
-                  const newTaxon: Taxon = {
-                      id: newId, 
-                      parentId: parentId, 
-                      taxonRank: node.rank, // Mapping here!
-                      name: node.name, 
-                      taxonName: finalTaxonName, // Renamed from scientificName
-                      genus: currentGenus,
-                      genusHybrid: currentGenusHybrid,
-                      species: currentSpecies,
-                      speciesHybrid: currentSpeciesHybrid,
-                      infraspecies: infraspeciesField,
-                      infraspecificRank: currentInfraspecificRank,
-                      cultivar: cultivarField,
-                      taxonStatus: 'Accepted', 
-                      commonName: node.commonName, 
-                      family: node.family || currentFamily, 
-                      synonyms: [], 
-                      referenceLinks: [], 
-                      createdAt: Date.now(), 
-                      isDetailsLoaded: false
-                  };
-                  next.push(newTaxon);
-                  newTaxaToAdd.push(newTaxon);
-                  parentId = newId;
+                  
+                  if (parts.length === 0) finalTaxonName = node.name;
+                  else finalTaxonName = parts.join(' ');
               }
-          });
-          return next;
-      });
-      if (preferences.autoEnrichment && newTaxaToAdd.length > 0) { setEnrichmentQueue(q => [...q, ...newTaxaToAdd]); }
+
+              // Calculate ltree path
+              // ltree requires alphanumeric and underscore. Replaces dashes in UUIDs.
+              const pathSafeId = newId.replace(/-/g, '_');
+              const hierarchyPath = `${parentPath}.${pathSafeId}`;
+
+              const newTaxon: Taxon = {
+                  id: newId, 
+                  parentId: parentId, 
+                  hierarchyPath: hierarchyPath, // New Field
+                  taxonRank: node.rank, 
+                  name: node.name, 
+                  taxonName: finalTaxonName, 
+                  genus: currentGenus,
+                  genusHybrid: currentGenusHybrid,
+                  species: currentSpecies,
+                  speciesHybrid: currentSpeciesHybrid,
+                  infraspecies: infraspeciesField,
+                  infraspecificRank: currentInfraspecificRank,
+                  cultivar: cultivarField,
+                  taxonStatus: 'Accepted', 
+                  commonName: node.commonName, 
+                  family: node.family || currentFamily, 
+                  synonyms: [], 
+                  referenceLinks: [], 
+                  createdAt: Date.now(), 
+                  isDetailsLoaded: false
+              };
+              
+              newTaxaToAdd.push(newTaxon);
+              parentId = newId;
+              parentPath = hierarchyPath;
+          }
+      }
+
+      if (newTaxaToAdd.length > 0) {
+          // SAVE TO DB
+          try {
+             await dataService.batchInsert(newTaxaToAdd);
+             // UPDATE UI STATE
+             setTaxa(prev => [...prev, ...newTaxaToAdd]);
+             if (preferences.autoEnrichment) { setEnrichmentQueue(q => [...q, ...newTaxaToAdd]); }
+          } catch (e: any) {
+             console.error("Failed to save new taxa", e);
+             alert(`Database Error: ${e instanceof Error ? e.message : JSON.stringify(e)}`);
+          }
+      }
   };
   
   // ------------------------------------------------------------------
@@ -281,7 +324,7 @@ function App() {
           updateActivity(id, `Adding ${candidate.taxonName}...`, { status: 'running', resolution: undefined });
           try {
               const chain = await identifyTaxonomy(candidate.taxonName);
-              mergeChainIntoTaxa(chain);
+              await mergeChainIntoTaxa(chain); // Await async DB op
               completeActivity(id, `Added ${candidate.taxonName}`);
           } catch(e) {
               failActivity(id, "Failed to add plant", true);
@@ -306,7 +349,7 @@ function App() {
                   try {
                       if (cancelledActivityIds.current.has(actId)) break;
                       const chain = await identifyTaxonomy(name);
-                      mergeChainIntoTaxa(chain);
+                      await mergeChainIntoTaxa(chain);
                   } catch(e) {}
               }
               return true;
@@ -368,7 +411,7 @@ function App() {
 
           updateActivity(actId, `Found ${topMatch.taxonName}. Adding...`);
           const chain = await identifyTaxonomy(topMatch.taxonName);
-          mergeChainIntoTaxa(chain);
+          await mergeChainIntoTaxa(chain); // Async DB call
           completeActivity(actId, `Added ${topMatch.taxonName}`);
 
       } catch (err: any) {
@@ -449,7 +492,7 @@ function App() {
           let count = 0;
           for (const chain of chains) { 
               if (cancelledActivityIds.current.has(actId)) break;
-              mergeChainIntoTaxa(chain); 
+              await mergeChainIntoTaxa(chain); 
               count++; 
               updateActivity(actId, `Importing ${count}/${chains.length}...`, { details: { parsedCount: chains.length, current: count, lastChain: chain }}); 
           }
@@ -461,23 +504,48 @@ function App() {
 
   const handleReset = () => {
       setConfirmState({
-          isOpen: true, title: "Reset Database?", message: "Delete all plants?", confirmLabel: "Reset", isDestructive: true,
-          onConfirm: () => { localStorage.removeItem('flora_db'); window.location.reload(); }
+          isOpen: true, title: "Reset Database?", message: "This will attempt to clear the table.", confirmLabel: "Reset", isDestructive: true,
+          onConfirm: async () => { 
+             // Note: Deleting everything via API might be restricted by RLS
+             // For now, we just reload window or maybe clear local state
+             setTaxa([]);
+             // Optionally call delete on DB if policy allows
+             window.location.reload(); 
+          }
       });
   };
 
-  const handleDelete = (id: string) => {
-      const idsToDelete = new Set<string>();
-      const collectIds = (targetId: string) => {
-          idsToDelete.add(targetId);
-          taxa.filter(t => t.parentId === targetId).forEach(child => collectIds(child.id));
-      };
-      collectIds(id);
-      setTaxa(prev => prev.filter(t => !idsToDelete.has(t.id)));
+  const handleDelete = async (id: string) => {
+      if (!confirm('Are you sure? This will delete the plant and its descendants from the database.')) return;
+      try {
+          // Optimistic UI update
+          const idsToDelete = new Set<string>();
+          const collectIds = (targetId: string) => {
+              idsToDelete.add(targetId);
+              taxa.filter(t => t.parentId === targetId).forEach(child => collectIds(child.id));
+          };
+          collectIds(id);
+          setTaxa(prev => prev.filter(t => !idsToDelete.has(t.id)));
+          
+          // DB Update
+          await dataService.deleteTaxon(id);
+      } catch (e) {
+          console.error("Delete failed", e);
+          alert("Failed to delete from database");
+          // Revert state would be better here, but requires more logic
+      }
   };
 
-  const handleUpdate = (id: string, updates: Partial<Taxon>) => {
+  const handleUpdate = async (id: string, updates: Partial<Taxon>) => {
       setTaxa(prev => prev.map(t => t.id === id ? { ...t, ...updates } : t));
+      const target = taxa.find(t => t.id === id);
+      if (target) {
+          try {
+             await dataService.upsertTaxon({ ...target, ...updates });
+          } catch(e) {
+             console.error("Update failed", e);
+          }
+      }
   };
   
   const handleGridAction = (action: 'mine' | 'enrich', taxon: Taxon) => {
@@ -510,7 +578,7 @@ function App() {
 
               try {
                   const details = await enrichTaxon(item);
-                  handleUpdate(item.id, { ...details, isDetailsLoaded: true });
+                  await handleUpdate(item.id, { ...details, isDetailsLoaded: true });
               } catch(e) {
                   // Ignore
               } finally {

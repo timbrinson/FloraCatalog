@@ -1,7 +1,24 @@
--- -----------------------------------------------------------------------------
+
+-- Enable required extensions
+CREATE EXTENSION IF NOT EXISTS ltree;
+
+-- =============================================================================
+-- RESET (DROP TABLES)
+-- CAUTION: This deletes existing data to ensure the schema is correct.
+-- =============================================================================
+
+DROP TABLE IF EXISTS app_audit_log CASCADE;
+DROP TABLE IF EXISTS app_taxon_source_records CASCADE;
+DROP TABLE IF EXISTS app_taxon_details CASCADE;
+DROP TABLE IF EXISTS app_taxa CASCADE;
+DROP TABLE IF EXISTS app_attribute_definitions CASCADE;
+DROP TABLE IF EXISTS app_data_sources CASCADE;
+DROP TABLE IF EXISTS wcvp_import CASCADE;
+
+-- =============================================================================
 -- WCVP Import Schema (Staging Table)
 -- Matches the column structure of the World Checklist of Vascular Plants CSV.
--- -----------------------------------------------------------------------------
+-- =============================================================================
 
 CREATE TABLE wcvp_import (
     plant_name_id text PRIMARY KEY,
@@ -48,7 +65,6 @@ CREATE INDEX idx_wcvp_accepted ON wcvp_import (accepted_plant_name_id);
 -- =============================================================================
 
 -- 1. DATA SOURCES
--- Registry of where data comes from (WCVP, AI, Manual, Web Scrape)
 CREATE TABLE app_data_sources (
     id serial PRIMARY KEY,
     name text NOT NULL,                -- e.g. "WCVP", "Gemini AI", "RHS"
@@ -59,8 +75,20 @@ CREATE TABLE app_data_sources (
     last_accessed_at timestamptz DEFAULT NOW()
 );
 
--- 2. TAXA (The Application's "Real" Table)
--- Can be populated from wcvp_import OR created manually for Cultivars
+-- 2. ATTRIBUTE REGISTRY (Data Dictionary)
+CREATE TABLE app_attribute_definitions (
+    key_name text PRIMARY KEY,         -- The actual JSON key (e.g. "leaf_shape")
+    category text NOT NULL,            -- 'morphology', 'ecology', 'history'
+    label text NOT NULL,               -- UI Display Name (e.g. "Leaf Shape")
+    description text,                  -- Tooltip for the user
+    data_type text NOT NULL,           -- 'text', 'number', 'boolean', 'select', 'multiselect'
+    unit text,                         -- e.g. "cm", "days", "pH"
+    options jsonb DEFAULT '[]',
+    is_active boolean DEFAULT true,    -- If false, hide from UI but keep data
+    display_order int DEFAULT 0
+);
+
+-- 3. TAXA (The Application's "Real" Table)
 CREATE TABLE app_taxa (
     -- Internal UUID for the app (independent of WCVP IDs)
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -69,18 +97,53 @@ CREATE TABLE app_taxa (
     parent_id uuid REFERENCES app_taxa(id),
     hierarchy_path ltree,              -- Postgres ltree for efficient subtree queries
     
-    -- Links to External IDs (Nullable, as custom cultivars won't have them)
+    -- Links to External IDs
     wcvp_id text REFERENCES wcvp_import(plant_name_id),
     ipni_id text,
+    powo_id text,
     
-    -- Core Taxonomy (Normalized)
+    -- WCVP Relationship IDs
+    accepted_plant_name_id text,
+    parent_plant_name_id text,
+    basionym_plant_name_id text,
+    homotypic_synonym text,
+
+    -- Core Taxonomy
     taxon_rank text NOT NULL,
     taxon_name text NOT NULL,          -- Full Scientific Name
+    taxon_status text,                 -- 'Accepted', 'Synonym', 'Unplaced'
+    family text,
     common_name text,
     
     -- Hybrid Markers
+    genus text,                        -- Explicit Genus Column
     genus_hybrid char(1),              -- '×' or null
+    species text,                      -- Explicit Species Column
     species_hybrid char(1),            -- '×' or null
+    infraspecies text,
+    infraspecific_rank text,
+    cultivar text,                     -- Explicit Cultivar Column
+    
+    hybrid_formula text,               -- "Parent A x Parent B"
+
+    -- Authorship (Fully Denormalized)
+    taxon_authors text,
+    parenthetical_author text,
+    primary_author text,
+    publication_author text,
+    replaced_synonym_author text,
+
+    -- Publication Data
+    place_of_publication text,
+    volume_and_page text,
+    first_published text,
+    nomenclatural_remarks text,
+    reviewed text,                     -- 'Y' or 'N'
+
+    -- Geography & Biology
+    geographic_area text,
+    lifeform_description text,
+    climate_description text,
     
     -- Lineage / Meta
     source_id int REFERENCES app_data_sources(id), -- Where did this record primarily come from?
@@ -92,8 +155,7 @@ CREATE TABLE app_taxa (
     descendant_count int DEFAULT 0     -- Updated via trigger/worker
 );
 
--- 3. EXTENDED DETAILS (Rich Content)
--- Holds descriptive data that might come from different sources than the name
+-- 4. GOLDEN RECORD (Consolidated Details)
 CREATE TABLE app_taxon_details (
     taxon_id uuid PRIMARY KEY REFERENCES app_taxa(id) ON DELETE CASCADE,
     
@@ -101,43 +163,76 @@ CREATE TABLE app_taxon_details (
     description_text text,
     description_source_id int REFERENCES app_data_sources(id),
     
-    -- Physical Traits (Structured)
-    growth_habit text,                 -- e.g. "Rosette", "Upright"
-    foliage_color text,
-    flower_color text,
-    height_range_cm int[],             -- range [min, max]
-    hardiness_zone_min int,
+    -- 4.1 CORE FILTERABLE TRAITS
+    hardiness_zone_min int,            -- e.g. 7
+    hardiness_zone_max int,            -- e.g. 10
     
-    -- AKA / Synonyms (JSONB for flexibility)
-    -- Structure: [{ "name": "...", "type": "trade", "source": "..." }]
+    height_min_cm int,
+    height_max_cm int,
+    width_min_cm int,
+    width_max_cm int,
+    
+    origin_year int,                   -- Year introduced/discovered
+    
+    -- 4.2 FLEXIBLE TRAITS (JSONB Bags)
+    morphology jsonb DEFAULT '{}',     -- { "leaf_shape": "Ovate" }
+    ecology jsonb DEFAULT '{}',        -- { "soil_type": "Loam" }
+    history_metadata jsonb DEFAULT '{}',
+    
+    -- 4.3 PROVENANCE MAP
+    field_sources jsonb DEFAULT '{}',
+    
+    -- 4.4 NAMING & LINKS
     alternative_names jsonb DEFAULT '[]',
-    
-    -- References / Links
-    -- Structure: [{ "title": "...", "url": "...", "cited_text": "..." }]
     reference_links jsonb DEFAULT '[]'
 );
 
--- 4. AUDIT LOG (Traceability)
--- Immutable history of who changed what and how
+-- 5. SOURCE ARCHIVE
+CREATE TABLE app_taxon_source_records (
+    id bigserial PRIMARY KEY,
+    taxon_id uuid NOT NULL REFERENCES app_taxa(id) ON DELETE CASCADE,
+    source_id int NOT NULL REFERENCES app_data_sources(id),
+    raw_data jsonb NOT NULL,
+    created_at timestamptz DEFAULT NOW(),
+    import_batch_id text 
+);
+
+-- 6. AUDIT LOG
 CREATE TABLE app_audit_log (
     id bigserial PRIMARY KEY,
     entity_id uuid NOT NULL,           -- Link to app_taxa.id
     table_name text NOT NULL,          -- 'app_taxa' or 'app_taxon_details'
     operation text NOT NULL,           -- 'INSERT', 'UPDATE', 'DELETE'
-    
-    changed_by text,                   -- User ID or System Process Name (e.g. "MiningWorker")
+    changed_by_process text,           -- System Process Name (e.g. "MiningWorker", "BulkImport")
+    user_id text,                      -- Identity of the user executing the command (if applicable)
+    app_name text,                     -- e.g. "FloraCatalog"
+    app_version text,                  -- e.g. "v2.9.1"
     changed_at timestamptz DEFAULT NOW(),
-    
-    -- Delta (using JSONB to store old/new values)
     changes jsonb                      -- { "field": { "old": "x", "new": "y" } }
 );
 
 -- =============================================================================
--- INDEXES & OPTIMIZATIONS
+-- INDEXES
 -- =============================================================================
 
 CREATE INDEX idx_app_taxa_parent ON app_taxa(parent_id);
 CREATE INDEX idx_app_taxa_name ON app_taxa(taxon_name);
-CREATE INDEX idx_app_taxa_source ON app_taxa(source_id);
-CREATE INDEX idx_app_audit_entity ON app_audit_log(entity_id);
+CREATE INDEX idx_app_taxa_family ON app_taxa(family);
 CREATE INDEX idx_app_path_gist ON app_taxa USING GIST (hierarchy_path);
+
+-- =============================================================================
+-- PERMISSIONS (DISABLE RLS FOR PROTOTYPE)
+-- =============================================================================
+
+ALTER TABLE wcvp_import DISABLE ROW LEVEL SECURITY;
+ALTER TABLE app_data_sources DISABLE ROW LEVEL SECURITY;
+ALTER TABLE app_attribute_definitions DISABLE ROW LEVEL SECURITY;
+ALTER TABLE app_taxa DISABLE ROW LEVEL SECURITY;
+ALTER TABLE app_taxon_details DISABLE ROW LEVEL SECURITY;
+ALTER TABLE app_taxon_source_records DISABLE ROW LEVEL SECURITY;
+ALTER TABLE app_audit_log DISABLE ROW LEVEL SECURITY;
+
+-- =============================================================================
+-- CACHE RELOAD (MAGIC COMMAND)
+-- =============================================================================
+NOTIFY pgrst, 'reload schema';

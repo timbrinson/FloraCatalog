@@ -1,5 +1,13 @@
 # Version History
 
+## v2.10 - Strict Audit Context
+**Date:** May 30, 2025
+
+### Changes
+- **Data Governance:** Updated `DATA_MODEL.md` to strictly require `appName`, `appVersion`, and `userId` in lineage tracking.
+- **Schema:** Updated `wcvp_schema.txt` `app_audit_log` table to include columns for Application Context and User Identity.
+- **Types:** Updated `AuditRecord` interface in `types.ts` to include `appName`, `appVersion`, and `userId` fields.
+
 ## v2.9 - Data Governance & Lineage Architecture
 **Date:** May 30, 2025
 

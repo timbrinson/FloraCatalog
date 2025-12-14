@@ -24,6 +24,41 @@ export type TaxonRank = 'family' | 'genus' | 'species' | 'subspecies' | 'variety
 
 export type TaxonomicStatus = 'Accepted' | 'Synonym' | 'Unresolved' | 'Artificial';
 
+// --- DATA GOVERNANCE & ATTRIBUTES ---
+
+/**
+ * Defines a valid key for JSONB columns.
+ * Mirrors 'app_attribute_definitions' table.
+ */
+export interface AttributeDefinition {
+  key: string;            // e.g. "leaf_shape"
+  category: 'morphology' | 'ecology' | 'history';
+  label: string;          // e.g. "Leaf Shape"
+  dataType: 'text' | 'number' | 'boolean' | 'select' | 'multiselect';
+  unit?: string;
+  options?: string[];     // For dropdowns
+}
+
+// Strict interfaces for the JSONB bags to prevent key drift in Code
+export interface MorphologyAttributes {
+  [key: string]: any; // Allow flexibility, but prefer specific keys below
+  
+  foliage_color?: string;
+  flower_color?: string;
+  leaf_shape?: string;
+  root_type?: string;
+  spine_color?: string;
+}
+
+export interface EcologyAttributes {
+  [key: string]: any;
+  
+  sun_exposure?: string[]; // Multi-select
+  water_needs?: 'Low' | 'Moderate' | 'High';
+  soil_type?: string;
+  pests_diseases?: string[];
+}
+
 // --- DATA LINEAGE TYPES ---
 
 export type VerificationLevel = 'Verified' | 'Unverified' | 'Ambiguous' | 'AI_Generated';
@@ -39,8 +74,14 @@ export interface DataSource {
 
 export interface AuditRecord {
   timestamp: number;
-  process: string; // e.g., "Bulk Import", "User Edit", "Mining"
+  process: string; // The high-level action, e.g., "Bulk Import", "User Edit", "Mining"
   action: 'create' | 'update' | 'enrich';
+  
+  // Contextual Lineage
+  appName: string;       // e.g. "FloraCatalog"
+  appVersion: string;    // e.g. "v2.9.1"
+  userId?: string;       // ID of user if triggered by command, null if system background task
+  
   details?: string;
 }
 
@@ -65,6 +106,12 @@ export interface Taxon {
   /** UUID of the parent Taxon in the App database */
   parentId?: string; 
   
+  /** 
+   * The ltree path for database hierarchy.
+   * Format: root.{genus_id}.{species_id}...
+   */
+  hierarchyPath?: string;
+
   /** 
    * The taxonomic rank (mapped from 'taxon_rank').
    * e.g. "Genus", "Species", "Variety"
@@ -178,6 +225,10 @@ export interface Taxon {
   description?: string;
   synonyms: Synonym[];
   referenceLinks: Link[];
+  
+  // Extended JSONB Attributes (Loaded on demand or part of full object)
+  morphology?: MorphologyAttributes;
+  ecology?: EcologyAttributes;
   
   // Traceability & Metadata
   metadata?: TaxonMetadata;
