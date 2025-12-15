@@ -1,0 +1,18 @@
+
+-- =============================================================================
+-- STEP 2 (Batch 4/6): LINK PARENTS (M - P)
+-- =============================================================================
+
+UPDATE app_taxa child
+SET parent_id = parent.id
+FROM app_taxa parent
+WHERE child.parent_plant_name_id = parent.wcvp_id
+  AND child.parent_id IS NULL
+  AND child.taxon_name >= 'M' 
+  AND child.taxon_name < 'Q';
+
+SELECT 'Batch 4 (M-P) Parents Linked' as status, count(*) as updated_count 
+FROM app_taxa 
+WHERE parent_id IS NOT NULL 
+  AND taxon_name >= 'M' 
+  AND taxon_name < 'Q';

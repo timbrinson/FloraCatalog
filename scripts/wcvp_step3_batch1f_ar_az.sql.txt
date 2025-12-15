@@ -1,0 +1,68 @@
+
+-- =============================================================================
+-- STEP 3 (Batch 1f): Roots Ar - Az
+-- Includes: Araceae, Arecaceae, Asparagaceae, Aspleniaceae
+-- Excludes: Asteraceae (Already processed)
+-- =============================================================================
+
+-- -----------------------------------------------------------------------------
+-- BLOCK 1: Ar - As (Includes Araceae, Arecaceae, Asparagaceae)
+-- -----------------------------------------------------------------------------
+WITH RECURSIVE tax_tree AS (
+    SELECT 
+        id, 
+        parent_id, 
+        text2ltree('root') || text2ltree(replace(id::text, '-', '_')) as path
+    FROM app_taxa
+    WHERE parent_id IS NULL 
+      AND taxon_name >= 'Ar' 
+      AND taxon_name < 'At'
+      AND family != 'Asteraceae'
+    
+    UNION ALL
+    
+    SELECT 
+        c.id, 
+        c.parent_id, 
+        p.path || text2ltree(replace(c.id::text, '-', '_'))
+    FROM app_taxa c
+    JOIN tax_tree p ON c.parent_id = p.id
+)
+UPDATE app_taxa
+SET hierarchy_path = tax_tree.path
+FROM tax_tree
+WHERE app_taxa.id = tax_tree.id
+  AND app_taxa.hierarchy_path IS NULL;
+
+SELECT 'Batch 1f Block 1 (Ar-As) Complete' as status;
+
+-- -----------------------------------------------------------------------------
+-- BLOCK 2: At - Az
+-- -----------------------------------------------------------------------------
+WITH RECURSIVE tax_tree AS (
+    SELECT 
+        id, 
+        parent_id, 
+        text2ltree('root') || text2ltree(replace(id::text, '-', '_')) as path
+    FROM app_taxa
+    WHERE parent_id IS NULL 
+      AND taxon_name >= 'At' 
+      AND taxon_name < 'B'
+      AND family != 'Asteraceae'
+    
+    UNION ALL
+    
+    SELECT 
+        c.id, 
+        c.parent_id, 
+        p.path || text2ltree(replace(c.id::text, '-', '_'))
+    FROM app_taxa c
+    JOIN tax_tree p ON c.parent_id = p.id
+)
+UPDATE app_taxa
+SET hierarchy_path = tax_tree.path
+FROM tax_tree
+WHERE app_taxa.id = tax_tree.id
+  AND app_taxa.hierarchy_path IS NULL;
+
+SELECT 'Batch 1f Block 2 (At-Az) Complete' as status;

@@ -1,0 +1,139 @@
+
+-- =============================================================================
+-- STEP 3 (Batch 1a): ASTERACEAE HIERARCHY (Corrected)
+-- Diagnosis: The dataset contains ~86k "Orphan" records (Synonyms/Unplaced) 
+-- that do not link to the Family record. We must treat them as Roots.
+-- =============================================================================
+
+-- -----------------------------------------------------------------------------
+-- BLOCK 1: Roots A - G (Includes 'Asteraceae' family record)
+-- -----------------------------------------------------------------------------
+WITH RECURSIVE tax_tree AS (
+    -- Anchor: Find ALL roots in this family starting with A-G
+    SELECT 
+        id, 
+        parent_id, 
+        text2ltree('root') || text2ltree(replace(id::text, '-', '_')) as path
+    FROM app_taxa
+    WHERE parent_id IS NULL 
+      AND family = 'Asteraceae'
+      AND taxon_name < 'H'
+    
+    UNION ALL
+    
+    -- Recursive: Find children of these roots
+    SELECT 
+        c.id, 
+        c.parent_id, 
+        p.path || text2ltree(replace(c.id::text, '-', '_'))
+    FROM app_taxa c
+    JOIN tax_tree p ON c.parent_id = p.id
+)
+UPDATE app_taxa
+SET hierarchy_path = tax_tree.path
+FROM tax_tree
+WHERE app_taxa.id = tax_tree.id
+  AND app_taxa.hierarchy_path IS NULL;
+
+SELECT 'Asteraceae Hierarchy Block 1 (Roots A-G) Built' as status;
+
+-- -----------------------------------------------------------------------------
+-- BLOCK 2: Roots H - O
+-- -----------------------------------------------------------------------------
+WITH RECURSIVE tax_tree AS (
+    SELECT 
+        id, 
+        parent_id, 
+        text2ltree('root') || text2ltree(replace(id::text, '-', '_')) as path
+    FROM app_taxa
+    WHERE parent_id IS NULL 
+      AND family = 'Asteraceae'
+      AND taxon_name >= 'H' AND taxon_name < 'P'
+    
+    UNION ALL
+    
+    SELECT 
+        c.id, 
+        c.parent_id, 
+        p.path || text2ltree(replace(c.id::text, '-', '_'))
+    FROM app_taxa c
+    JOIN tax_tree p ON c.parent_id = p.id
+)
+UPDATE app_taxa
+SET hierarchy_path = tax_tree.path
+FROM tax_tree
+WHERE app_taxa.id = tax_tree.id
+  AND app_taxa.hierarchy_path IS NULL;
+
+SELECT 'Asteraceae Hierarchy Block 2 (Roots H-O) Built' as status;
+
+-- -----------------------------------------------------------------------------
+-- BLOCK 3: Roots P - S
+-- -----------------------------------------------------------------------------
+WITH RECURSIVE tax_tree AS (
+    SELECT 
+        id, 
+        parent_id, 
+        text2ltree('root') || text2ltree(replace(id::text, '-', '_')) as path
+    FROM app_taxa
+    WHERE parent_id IS NULL 
+      AND family = 'Asteraceae'
+      AND taxon_name >= 'P' AND taxon_name < 'T'
+    
+    UNION ALL
+    
+    SELECT 
+        c.id, 
+        c.parent_id, 
+        p.path || text2ltree(replace(c.id::text, '-', '_'))
+    FROM app_taxa c
+    JOIN tax_tree p ON c.parent_id = p.id
+)
+UPDATE app_taxa
+SET hierarchy_path = tax_tree.path
+FROM tax_tree
+WHERE app_taxa.id = tax_tree.id
+  AND app_taxa.hierarchy_path IS NULL;
+
+SELECT 'Asteraceae Hierarchy Block 3 (Roots P-S) Built' as status;
+
+-- -----------------------------------------------------------------------------
+-- BLOCK 4: Roots T - Z
+-- -----------------------------------------------------------------------------
+WITH RECURSIVE tax_tree AS (
+    SELECT 
+        id, 
+        parent_id, 
+        text2ltree('root') || text2ltree(replace(id::text, '-', '_')) as path
+    FROM app_taxa
+    WHERE parent_id IS NULL 
+      AND family = 'Asteraceae'
+      AND taxon_name >= 'T'
+    
+    UNION ALL
+    
+    SELECT 
+        c.id, 
+        c.parent_id, 
+        p.path || text2ltree(replace(c.id::text, '-', '_'))
+    FROM app_taxa c
+    JOIN tax_tree p ON c.parent_id = p.id
+)
+UPDATE app_taxa
+SET hierarchy_path = tax_tree.path
+FROM tax_tree
+WHERE app_taxa.id = tax_tree.id
+  AND app_taxa.hierarchy_path IS NULL;
+
+SELECT 'Asteraceae Hierarchy Block 4 (Roots T-Z) Built' as status;
+
+-- -----------------------------------------------------------------------------
+-- FINAL CHECK
+-- -----------------------------------------------------------------------------
+SELECT 
+    'Asteraceae Completion' as check_name,
+    count(*) as total_records,
+    count(hierarchy_path) as paths_built,
+    round(count(hierarchy_path) * 100.0 / count(*), 1) || '%' as completion_rate
+FROM app_taxa
+WHERE family = 'Asteraceae';

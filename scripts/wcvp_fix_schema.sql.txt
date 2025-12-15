@@ -1,0 +1,24 @@
+
+-- =============================================================================
+-- WCVP SCHEMA HOTFIX
+-- Run this if you encounter "violates not-null constraint" errors on taxon_rank.
+-- =============================================================================
+
+-- 1. Remove the NOT NULL constraint from taxon_rank
+-- The WCVP dataset contains null ranks (e.g. for synonyms). 
+-- This ensures the database accepts them.
+ALTER TABLE app_taxa ALTER COLUMN taxon_rank DROP NOT NULL;
+
+-- 2. Ensure the source exists (Prevents Foreign Key errors)
+-- UPDATED CITATION: Now includes the DOI link and access date.
+INSERT INTO app_data_sources (id, name, version, citation_text, url, trust_level)
+VALUES (
+    1, 
+    'WCVP', 
+    '14 (2025)', 
+    'Govaerts R (ed.). 2025. WCVP: World Checklist of Vascular Plants. Facilitated by the Royal Botanic Gardens, Kew. [WWW document] URL https://doi.org/10.34885/b8fr-km05 [accessed 28 May 2025].', 
+    'https://powo.science.kew.org/', 
+    5
+)
+ON CONFLICT (id) DO UPDATE SET
+    citation_text = EXCLUDED.citation_text;

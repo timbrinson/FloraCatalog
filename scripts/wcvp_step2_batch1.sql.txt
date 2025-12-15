@@ -1,0 +1,19 @@
+
+-- =============================================================================
+-- STEP 2 (Batch 1/6): LINK PARENTS (A - C)
+-- =============================================================================
+
+-- OPTIMIZATION: Temporarily drop the index on parent_id to speed up updates.
+-- We will recreate it in the final batch/cleanup script.
+DROP INDEX IF EXISTS idx_app_taxa_parent;
+
+UPDATE app_taxa child
+SET parent_id = parent.id
+FROM app_taxa parent
+WHERE child.parent_plant_name_id = parent.wcvp_id
+  AND child.parent_id IS NULL
+  AND child.taxon_name < 'D';
+
+SELECT 'Batch 1 (A-C) Parents Linked' as status, count(*) as updated_count 
+FROM app_taxa 
+WHERE parent_id IS NOT NULL AND taxon_name < 'D';

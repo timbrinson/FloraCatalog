@@ -1,3 +1,4 @@
+
 <!--
 HOW TO UPDATE THIS DOCUMENT:
 To regenerate this file based on the latest codebase changes, simply ask the AI:
@@ -56,6 +57,10 @@ Use `gemini-2.5-flash`.
 
 ## 4. UI: The Advanced Data Grid (`DataGridV2.tsx`)
 This is the most complex component. It is a "Tree Grid" that renders a flat list but groups visually.
+*   **Performance Strategy (v2.11+):**
+    *   **Batch Size:** Limit fetches to 100 rows to prevent DB timeouts.
+    *   **Lightweight Fetch:** The initial grid query must **exclude** joined tables like `app_taxon_details`.
+    *   **Lazy Loading:** Heavy attributes (description, links, synonyms) are fetched only when the user clicks "Details" to expand a row.
 *   **Columns:** Tree Control, # (Count), Actions, Family, Genus, GH (Genus Hybrid), Species, SH (Species Hybrid), Infraspecific Rank, Infraspecies, Cultivar, Taxon Name, Common Name, + all WCVP fields.
 *   **Visual Logic:**
     *   **Dimming:** If the row is a "Genus", dim columns to the right (Species, Cultivar).

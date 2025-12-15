@@ -1,0 +1,8 @@
+
+-- DEPRECATED
+-- The A-C batch was too large due to Asteraceae.
+-- Please use:
+-- 1. wcvp_step3_batch1a_asteraceae.sql.txt
+-- 2. wcvp_step3_batch1b_a_rest.sql.txt
+-- 3. wcvp_step3_batch1c_b.sql.txt
+-- 4. wcvp_step3_batch1d_c.sql.txt

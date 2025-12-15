@@ -1,7 +1,8 @@
 
-import React from 'react';
-import { X, Settings, Layout, Zap, Palette } from 'lucide-react';
+import React, { useState } from 'react';
+import { X, Settings, Layout, Zap, Palette, Database, Save } from 'lucide-react';
 import { UserPreferences, ColorTheme } from '../types';
+import { reloadClient } from '../services/supabaseClient';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -12,6 +13,9 @@ interface SettingsModalProps {
 
 const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, preferences, onUpdate }) => {
   if (!isOpen) return null;
+
+  const [dbUrl, setDbUrl] = useState(localStorage.getItem('supabase_url') || '');
+  const [dbKey, setDbKey] = useState(localStorage.getItem('supabase_anon_key') || '');
 
   // Pattern for preview: Genus -> Species -> Infraspecies -> Cultivar -> Repeat
   const PREVIEW_SEQUENCE = [
@@ -34,6 +38,29 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, preferen
       return `bg-${c}-50 border-${c}-200 text-${c}-900`;
   };
 
+  const saveConnection = () => {
+      // Trim inputs to avoid copy-paste errors (newlines, spaces)
+      const cleanUrl = dbUrl.trim();
+      const cleanKey = dbKey.trim();
+
+      if (cleanUrl && cleanKey) {
+          localStorage.setItem('supabase_url', cleanUrl);
+          localStorage.setItem('supabase_anon_key', cleanKey);
+          
+          // Re-initialize the client immediately
+          reloadClient();
+          
+          // Optional: Force reload to be 100% sure, but dynamic client should handle it
+          if (confirm("Connection saved. The app will reload to connect.")) {
+              window.location.reload();
+          } else {
+              onClose(); // Close modal if they cancel reload (client is already reloaded in memory)
+          }
+      } else {
+          alert("Please enter both Project URL and Key.");
+      }
+  };
+
   return (
     <div className="fixed inset-0 bg-black/50 z-[60] flex items-center justify-center p-4 animate-in fade-in duration-200">
       <div className="bg-white rounded-xl shadow-2xl w-full max-w-md p-6 relative max-h-[90vh] overflow-y-auto">
@@ -48,6 +75,44 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, preferen
 
         <div className="space-y-8">
             
+            {/* Database Connection */}
+            <div>
+                <h4 className="text-sm font-bold text-slate-700 uppercase tracking-wide mb-3 flex items-center gap-2">
+                    <Database size={14}/> Database Connection
+                </h4>
+                <div className="bg-slate-50 p-4 rounded-lg border border-slate-200 space-y-3">
+                    <p className="text-xs text-slate-500">
+                        Connect to your Supabase project. Keys are stored locally in your browser.
+                    </p>
+                    <div>
+                        <label className="block text-xs font-bold text-slate-600 mb-1">Project URL</label>
+                        <input 
+                            type="text" 
+                            className="w-full text-xs p-2 border border-slate-300 rounded focus:ring-2 ring-leaf-200 outline-none font-mono"
+                            placeholder="https://xyz.supabase.co"
+                            value={dbUrl}
+                            onChange={(e) => setDbUrl(e.target.value)}
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-xs font-bold text-slate-600 mb-1">Anon / Public Key</label>
+                        <input 
+                            type="password" 
+                            className="w-full text-xs p-2 border border-slate-300 rounded focus:ring-2 ring-leaf-200 outline-none font-mono"
+                            placeholder="eyJh..."
+                            value={dbKey}
+                            onChange={(e) => setDbKey(e.target.value)}
+                        />
+                    </div>
+                    <button 
+                        onClick={saveConnection}
+                        className="w-full flex items-center justify-center gap-2 py-2 bg-leaf-600 text-white rounded hover:bg-leaf-700 text-xs font-bold"
+                    >
+                        <Save size={14} /> Save & Connect
+                    </button>
+                </div>
+            </div>
+
             {/* Color Theme Section */}
             <div>
                 <h4 className="text-sm font-bold text-slate-700 uppercase tracking-wide mb-3 flex items-center gap-2">

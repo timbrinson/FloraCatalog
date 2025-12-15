@@ -1,0 +1,130 @@
+
+-- =============================================================================
+-- STEP 3 (Batch 1b): Roots A - An (Excluding Asteraceae)
+-- Includes: Acanthaceae, Amaranthaceae, Amaryllidaceae, Anacardiaceae
+-- Segmented into 4 blocks to prevent timeouts (~10-15k rows each)
+-- =============================================================================
+
+-- -----------------------------------------------------------------------------
+-- BLOCK 1: A - Ac (Includes Acanthaceae)
+-- -----------------------------------------------------------------------------
+WITH RECURSIVE tax_tree AS (
+    SELECT 
+        id, 
+        parent_id, 
+        text2ltree('root') || text2ltree(replace(id::text, '-', '_')) as path
+    FROM app_taxa
+    WHERE parent_id IS NULL 
+      AND taxon_name LIKE 'A%' 
+      AND taxon_name < 'Ad'
+      AND family != 'Asteraceae' -- CRITICAL: Skip already processed family
+    
+    UNION ALL
+    
+    SELECT 
+        c.id, 
+        c.parent_id, 
+        p.path || text2ltree(replace(c.id::text, '-', '_'))
+    FROM app_taxa c
+    JOIN tax_tree p ON c.parent_id = p.id
+)
+UPDATE app_taxa
+SET hierarchy_path = tax_tree.path
+FROM tax_tree
+WHERE app_taxa.id = tax_tree.id
+  AND app_taxa.hierarchy_path IS NULL;
+
+SELECT 'Batch 1b Block 1 (A-Ac) Complete' as status;
+
+-- -----------------------------------------------------------------------------
+-- BLOCK 2: Ad - Ah (Includes Agavaceae/Asparagaceae starts)
+-- -----------------------------------------------------------------------------
+WITH RECURSIVE tax_tree AS (
+    SELECT 
+        id, 
+        parent_id, 
+        text2ltree('root') || text2ltree(replace(id::text, '-', '_')) as path
+    FROM app_taxa
+    WHERE parent_id IS NULL 
+      AND taxon_name >= 'Ad' 
+      AND taxon_name < 'Ai'
+      AND family != 'Asteraceae'
+    
+    UNION ALL
+    
+    SELECT 
+        c.id, 
+        c.parent_id, 
+        p.path || text2ltree(replace(c.id::text, '-', '_'))
+    FROM app_taxa c
+    JOIN tax_tree p ON c.parent_id = p.id
+)
+UPDATE app_taxa
+SET hierarchy_path = tax_tree.path
+FROM tax_tree
+WHERE app_taxa.id = tax_tree.id
+  AND app_taxa.hierarchy_path IS NULL;
+
+SELECT 'Batch 1b Block 2 (Ad-Ah) Complete' as status;
+
+-- -----------------------------------------------------------------------------
+-- BLOCK 3: Ai - Al (Includes Aizoaceae, Alliaceae)
+-- -----------------------------------------------------------------------------
+WITH RECURSIVE tax_tree AS (
+    SELECT 
+        id, 
+        parent_id, 
+        text2ltree('root') || text2ltree(replace(id::text, '-', '_')) as path
+    FROM app_taxa
+    WHERE parent_id IS NULL 
+      AND taxon_name >= 'Ai' 
+      AND taxon_name < 'Am'
+      AND family != 'Asteraceae'
+    
+    UNION ALL
+    
+    SELECT 
+        c.id, 
+        c.parent_id, 
+        p.path || text2ltree(replace(c.id::text, '-', '_'))
+    FROM app_taxa c
+    JOIN tax_tree p ON c.parent_id = p.id
+)
+UPDATE app_taxa
+SET hierarchy_path = tax_tree.path
+FROM tax_tree
+WHERE app_taxa.id = tax_tree.id
+  AND app_taxa.hierarchy_path IS NULL;
+
+SELECT 'Batch 1b Block 3 (Ai-Al) Complete' as status;
+
+-- -----------------------------------------------------------------------------
+-- BLOCK 4: Am - An (Includes Amaranthaceae, Amaryllidaceae, Anacardiaceae, Annonaceae)
+-- -----------------------------------------------------------------------------
+WITH RECURSIVE tax_tree AS (
+    SELECT 
+        id, 
+        parent_id, 
+        text2ltree('root') || text2ltree(replace(id::text, '-', '_')) as path
+    FROM app_taxa
+    WHERE parent_id IS NULL 
+      AND taxon_name >= 'Am' 
+      AND taxon_name < 'Ao'
+      AND family != 'Asteraceae'
+    
+    UNION ALL
+    
+    SELECT 
+        c.id, 
+        c.parent_id, 
+        p.path || text2ltree(replace(c.id::text, '-', '_'))
+    FROM app_taxa c
+    JOIN tax_tree p ON c.parent_id = p.id
+)
+UPDATE app_taxa
+SET hierarchy_path = tax_tree.path
+FROM tax_tree
+WHERE app_taxa.id = tax_tree.id
+  AND app_taxa.hierarchy_path IS NULL;
+
+SELECT 'Batch 1b Block 4 (Am-An) Complete' as status;

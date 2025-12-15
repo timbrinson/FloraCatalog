@@ -109,7 +109,7 @@ CREATE TABLE app_taxa (
     homotypic_synonym text,
 
     -- Core Taxonomy
-    taxon_rank text NOT NULL,
+    taxon_rank text,                   -- Can be null in WCVP, populated as 'Unranked' if needed
     taxon_name text NOT NULL,          -- Full Scientific Name
     taxon_status text,                 -- 'Accepted', 'Synonym', 'Unplaced'
     family text,

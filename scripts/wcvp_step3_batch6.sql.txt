@@ -1,0 +1,94 @@
+
+-- =============================================================================
+-- STEP 3 (Batch 6): Roots T - Z
+-- Segmented into 3 blocks
+-- =============================================================================
+
+-- -----------------------------------------------------------------------------
+-- BLOCK 1: T
+-- -----------------------------------------------------------------------------
+WITH RECURSIVE tax_tree AS (
+    SELECT 
+        id, 
+        parent_id, 
+        text2ltree('root') || text2ltree(replace(id::text, '-', '_')) as path
+    FROM app_taxa
+    WHERE parent_id IS NULL 
+      AND taxon_name >= 'T' 
+      AND taxon_name < 'U'
+    
+    UNION ALL
+    
+    SELECT 
+        c.id, 
+        c.parent_id, 
+        p.path || text2ltree(replace(c.id::text, '-', '_'))
+    FROM app_taxa c
+    JOIN tax_tree p ON c.parent_id = p.id
+)
+UPDATE app_taxa
+SET hierarchy_path = tax_tree.path
+FROM tax_tree
+WHERE app_taxa.id = tax_tree.id
+  AND app_taxa.hierarchy_path IS NULL;
+
+SELECT 'Batch 6 Block 1 (T) Complete' as status;
+
+-- -----------------------------------------------------------------------------
+-- BLOCK 2: U - V (Includes Veronica, Viola)
+-- -----------------------------------------------------------------------------
+WITH RECURSIVE tax_tree AS (
+    SELECT 
+        id, 
+        parent_id, 
+        text2ltree('root') || text2ltree(replace(id::text, '-', '_')) as path
+    FROM app_taxa
+    WHERE parent_id IS NULL 
+      AND taxon_name >= 'U' 
+      AND taxon_name < 'W'
+    
+    UNION ALL
+    
+    SELECT 
+        c.id, 
+        c.parent_id, 
+        p.path || text2ltree(replace(c.id::text, '-', '_'))
+    FROM app_taxa c
+    JOIN tax_tree p ON c.parent_id = p.id
+)
+UPDATE app_taxa
+SET hierarchy_path = tax_tree.path
+FROM tax_tree
+WHERE app_taxa.id = tax_tree.id
+  AND app_taxa.hierarchy_path IS NULL;
+
+SELECT 'Batch 6 Block 2 (U-V) Complete' as status;
+
+-- -----------------------------------------------------------------------------
+-- BLOCK 3: W - Z
+-- -----------------------------------------------------------------------------
+WITH RECURSIVE tax_tree AS (
+    SELECT 
+        id, 
+        parent_id, 
+        text2ltree('root') || text2ltree(replace(id::text, '-', '_')) as path
+    FROM app_taxa
+    WHERE parent_id IS NULL 
+      AND taxon_name >= 'W'
+    
+    UNION ALL
+    
+    SELECT 
+        c.id, 
+        c.parent_id, 
+        p.path || text2ltree(replace(c.id::text, '-', '_'))
+    FROM app_taxa c
+    JOIN tax_tree p ON c.parent_id = p.id
+)
+UPDATE app_taxa
+SET hierarchy_path = tax_tree.path
+FROM tax_tree
+WHERE app_taxa.id = tax_tree.id
+  AND app_taxa.hierarchy_path IS NULL;
+
+SELECT 'Batch 6 Block 3 (W-Z) Complete' as status;

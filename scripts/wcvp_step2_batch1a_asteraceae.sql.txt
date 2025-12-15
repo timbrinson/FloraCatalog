@@ -1,0 +1,71 @@
+
+-- =============================================================================
+-- STEP 2 (Batch 1a): LINK PARENTS - ASTERACEAE (Segmented)
+-- The giant Asteraceae family (~138k rows) is too big for one update.
+-- Run these blocks SEQUENTIALLY.
+-- =============================================================================
+
+-- OPTIMIZATION: Drop index to speed up massive updates (if not already dropped)
+DROP INDEX IF EXISTS idx_app_taxa_parent;
+
+-- -----------------------------------------------------------------------------
+-- BLOCK 1: Children A - G (~35k rows)
+-- -----------------------------------------------------------------------------
+UPDATE app_taxa child
+SET parent_id = parent.id
+FROM app_taxa parent
+WHERE child.parent_plant_name_id = parent.wcvp_id
+  AND child.parent_id IS NULL
+  AND child.family = 'Asteraceae'
+  AND child.taxon_name < 'H';
+
+SELECT 'Asteraceae Block 1 (A-G) Linked' as status;
+
+-- -----------------------------------------------------------------------------
+-- BLOCK 2: Children H - O (~35k rows)
+-- -----------------------------------------------------------------------------
+UPDATE app_taxa child
+SET parent_id = parent.id
+FROM app_taxa parent
+WHERE child.parent_plant_name_id = parent.wcvp_id
+  AND child.parent_id IS NULL
+  AND child.family = 'Asteraceae'
+  AND child.taxon_name >= 'H' AND child.taxon_name < 'P';
+
+SELECT 'Asteraceae Block 2 (H-O) Linked' as status;
+
+-- -----------------------------------------------------------------------------
+-- BLOCK 3: Children P - S (~35k rows)
+-- -----------------------------------------------------------------------------
+UPDATE app_taxa child
+SET parent_id = parent.id
+FROM app_taxa parent
+WHERE child.parent_plant_name_id = parent.wcvp_id
+  AND child.parent_id IS NULL
+  AND child.family = 'Asteraceae'
+  AND child.taxon_name >= 'P' AND child.taxon_name < 'T';
+
+SELECT 'Asteraceae Block 3 (P-S) Linked' as status;
+
+-- -----------------------------------------------------------------------------
+-- BLOCK 4: Children T - Z (~30k rows)
+-- -----------------------------------------------------------------------------
+UPDATE app_taxa child
+SET parent_id = parent.id
+FROM app_taxa parent
+WHERE child.parent_plant_name_id = parent.wcvp_id
+  AND child.parent_id IS NULL
+  AND child.family = 'Asteraceae'
+  AND child.taxon_name >= 'T';
+
+SELECT 'Asteraceae Block 4 (T-Z) Linked' as status;
+
+-- -----------------------------------------------------------------------------
+-- VERIFICATION
+-- -----------------------------------------------------------------------------
+SELECT 
+    'Asteraceae Progress' as check_name,
+    count(*) as total_records,
+    count(parent_id) as parents_linked 
+FROM app_taxa 
+WHERE family = 'Asteraceae';

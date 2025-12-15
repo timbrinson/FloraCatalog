@@ -1,0 +1,16 @@
+
+-- =============================================================================
+-- STEP 2 (Pre-requisite): CREATE PERFORMANCE INDEXES
+-- Estimated Runtime: 10-20 seconds
+-- =============================================================================
+
+-- We need these indexes to make the Parent/Child join efficient.
+-- Without them, the database has to scan the whole table 1.4 million times.
+
+CREATE INDEX IF NOT EXISTS idx_app_taxa_wcvp_id ON app_taxa(wcvp_id);
+CREATE INDEX IF NOT EXISTS idx_app_taxa_parent_plant_name_id ON app_taxa(parent_plant_name_id);
+
+-- While we are here, index the other IDs too for future lookups
+CREATE INDEX IF NOT EXISTS idx_app_taxa_accepted_id ON app_taxa(accepted_plant_name_id);
+CREATE INDEX IF NOT EXISTS idx_app_taxa_powo_id ON app_taxa(powo_id);
+CREATE INDEX IF NOT EXISTS idx_app_taxa_ipni_id ON app_taxa(ipni_id);

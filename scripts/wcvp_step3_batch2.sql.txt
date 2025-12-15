@@ -1,0 +1,156 @@
+
+-- =============================================================================
+-- STEP 3 (Batch 2): Roots D - G
+-- Includes: Euphorbiaceae, Fabaceae (Massive), Gentianaceae
+-- Segmented into 5 blocks
+-- =============================================================================
+
+-- -----------------------------------------------------------------------------
+-- BLOCK 1: D (Includes Dryopteridaceae)
+-- -----------------------------------------------------------------------------
+WITH RECURSIVE tax_tree AS (
+    SELECT 
+        id, 
+        parent_id, 
+        text2ltree('root') || text2ltree(replace(id::text, '-', '_')) as path
+    FROM app_taxa
+    WHERE parent_id IS NULL 
+      AND taxon_name >= 'D' 
+      AND taxon_name < 'E'
+    
+    UNION ALL
+    
+    SELECT 
+        c.id, 
+        c.parent_id, 
+        p.path || text2ltree(replace(c.id::text, '-', '_'))
+    FROM app_taxa c
+    JOIN tax_tree p ON c.parent_id = p.id
+)
+UPDATE app_taxa
+SET hierarchy_path = tax_tree.path
+FROM tax_tree
+WHERE app_taxa.id = tax_tree.id
+  AND app_taxa.hierarchy_path IS NULL;
+
+SELECT 'Batch 2 Block 1 (D) Complete' as status;
+
+-- -----------------------------------------------------------------------------
+-- BLOCK 2: E (Includes Ericaceae, Euphorbiaceae)
+-- -----------------------------------------------------------------------------
+WITH RECURSIVE tax_tree AS (
+    SELECT 
+        id, 
+        parent_id, 
+        text2ltree('root') || text2ltree(replace(id::text, '-', '_')) as path
+    FROM app_taxa
+    WHERE parent_id IS NULL 
+      AND taxon_name >= 'E' 
+      AND taxon_name < 'F'
+    
+    UNION ALL
+    
+    SELECT 
+        c.id, 
+        c.parent_id, 
+        p.path || text2ltree(replace(c.id::text, '-', '_'))
+    FROM app_taxa c
+    JOIN tax_tree p ON c.parent_id = p.id
+)
+UPDATE app_taxa
+SET hierarchy_path = tax_tree.path
+FROM tax_tree
+WHERE app_taxa.id = tax_tree.id
+  AND app_taxa.hierarchy_path IS NULL;
+
+SELECT 'Batch 2 Block 2 (E) Complete' as status;
+
+-- -----------------------------------------------------------------------------
+-- BLOCK 3: F - Fab (Fabaceae Start)
+-- -----------------------------------------------------------------------------
+WITH RECURSIVE tax_tree AS (
+    SELECT 
+        id, 
+        parent_id, 
+        text2ltree('root') || text2ltree(replace(id::text, '-', '_')) as path
+    FROM app_taxa
+    WHERE parent_id IS NULL 
+      AND taxon_name >= 'F' 
+      AND taxon_name < 'Fac'
+    
+    UNION ALL
+    
+    SELECT 
+        c.id, 
+        c.parent_id, 
+        p.path || text2ltree(replace(c.id::text, '-', '_'))
+    FROM app_taxa c
+    JOIN tax_tree p ON c.parent_id = p.id
+)
+UPDATE app_taxa
+SET hierarchy_path = tax_tree.path
+FROM tax_tree
+WHERE app_taxa.id = tax_tree.id
+  AND app_taxa.hierarchy_path IS NULL;
+
+SELECT 'Batch 2 Block 3 (F-Fab) Complete' as status;
+
+-- -----------------------------------------------------------------------------
+-- BLOCK 4: Fac - Faz (Rest of F)
+-- -----------------------------------------------------------------------------
+WITH RECURSIVE tax_tree AS (
+    SELECT 
+        id, 
+        parent_id, 
+        text2ltree('root') || text2ltree(replace(id::text, '-', '_')) as path
+    FROM app_taxa
+    WHERE parent_id IS NULL 
+      AND taxon_name >= 'Fac' 
+      AND taxon_name < 'G'
+    
+    UNION ALL
+    
+    SELECT 
+        c.id, 
+        c.parent_id, 
+        p.path || text2ltree(replace(c.id::text, '-', '_'))
+    FROM app_taxa c
+    JOIN tax_tree p ON c.parent_id = p.id
+)
+UPDATE app_taxa
+SET hierarchy_path = tax_tree.path
+FROM tax_tree
+WHERE app_taxa.id = tax_tree.id
+  AND app_taxa.hierarchy_path IS NULL;
+
+SELECT 'Batch 2 Block 4 (Fac-Faz) Complete' as status;
+
+-- -----------------------------------------------------------------------------
+-- BLOCK 5: G (Includes Gentianaceae, Gesneriaceae)
+-- -----------------------------------------------------------------------------
+WITH RECURSIVE tax_tree AS (
+    SELECT 
+        id, 
+        parent_id, 
+        text2ltree('root') || text2ltree(replace(id::text, '-', '_')) as path
+    FROM app_taxa
+    WHERE parent_id IS NULL 
+      AND taxon_name >= 'G' 
+      AND taxon_name < 'H'
+    
+    UNION ALL
+    
+    SELECT 
+        c.id, 
+        c.parent_id, 
+        p.path || text2ltree(replace(c.id::text, '-', '_'))
+    FROM app_taxa c
+    JOIN tax_tree p ON c.parent_id = p.id
+)
+UPDATE app_taxa
+SET hierarchy_path = tax_tree.path
+FROM tax_tree
+WHERE app_taxa.id = tax_tree.id
+  AND app_taxa.hierarchy_path IS NULL;
+
+SELECT 'Batch 2 Block 5 (G) Complete' as status;

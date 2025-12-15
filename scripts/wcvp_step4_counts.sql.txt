@@ -1,0 +1,199 @@
+
+-- =============================================================================
+-- STEP 4: UPDATE DESCENDANT COUNTS (Micro-Segmented Remediation)
+-- Target: Batch 1 (A-E) and Batch 4 (P-T) which failed previously.
+-- Skipped: Batch 2, 3, 5 (Already successful).
+-- =============================================================================
+
+-- -----------------------------------------------------------------------------
+-- BATCH 1a: A
+-- -----------------------------------------------------------------------------
+WITH counts AS (
+   SELECT parent_id, COUNT(*) as cnt
+   FROM app_taxa
+   WHERE parent_id IS NOT NULL
+   GROUP BY parent_id
+)
+UPDATE app_taxa
+SET descendant_count = counts.cnt
+FROM counts
+WHERE app_taxa.id = counts.parent_id
+  AND app_taxa.taxon_name >= 'A' AND app_taxa.taxon_name < 'B';
+
+SELECT 'Batch 1a (A) Complete' as status;
+
+-- -----------------------------------------------------------------------------
+-- BATCH 1b: B
+-- -----------------------------------------------------------------------------
+WITH counts AS (
+   SELECT parent_id, COUNT(*) as cnt
+   FROM app_taxa
+   WHERE parent_id IS NOT NULL
+   GROUP BY parent_id
+)
+UPDATE app_taxa
+SET descendant_count = counts.cnt
+FROM counts
+WHERE app_taxa.id = counts.parent_id
+  AND app_taxa.taxon_name >= 'B' AND app_taxa.taxon_name < 'C';
+
+SELECT 'Batch 1b (B) Complete' as status;
+
+-- -----------------------------------------------------------------------------
+-- BATCH 1c: C
+-- -----------------------------------------------------------------------------
+WITH counts AS (
+   SELECT parent_id, COUNT(*) as cnt
+   FROM app_taxa
+   WHERE parent_id IS NOT NULL
+   GROUP BY parent_id
+)
+UPDATE app_taxa
+SET descendant_count = counts.cnt
+FROM counts
+WHERE app_taxa.id = counts.parent_id
+  AND app_taxa.taxon_name >= 'C' AND app_taxa.taxon_name < 'D';
+
+SELECT 'Batch 1c (C) Complete' as status;
+
+-- -----------------------------------------------------------------------------
+-- BATCH 1d: D
+-- -----------------------------------------------------------------------------
+WITH counts AS (
+   SELECT parent_id, COUNT(*) as cnt
+   FROM app_taxa
+   WHERE parent_id IS NOT NULL
+   GROUP BY parent_id
+)
+UPDATE app_taxa
+SET descendant_count = counts.cnt
+FROM counts
+WHERE app_taxa.id = counts.parent_id
+  AND app_taxa.taxon_name >= 'D' AND app_taxa.taxon_name < 'E';
+
+SELECT 'Batch 1d (D) Complete' as status;
+
+-- -----------------------------------------------------------------------------
+-- BATCH 1e: E
+-- -----------------------------------------------------------------------------
+WITH counts AS (
+   SELECT parent_id, COUNT(*) as cnt
+   FROM app_taxa
+   WHERE parent_id IS NOT NULL
+   GROUP BY parent_id
+)
+UPDATE app_taxa
+SET descendant_count = counts.cnt
+FROM counts
+WHERE app_taxa.id = counts.parent_id
+  AND app_taxa.taxon_name >= 'E' AND app_taxa.taxon_name < 'F';
+
+SELECT 'Batch 1e (E) Complete' as status;
+
+-- -----------------------------------------------------------------------------
+-- BATCH 4a: P - Ph (Splitting the massive P section)
+-- -----------------------------------------------------------------------------
+WITH counts AS (
+   SELECT parent_id, COUNT(*) as cnt
+   FROM app_taxa
+   WHERE parent_id IS NOT NULL
+   GROUP BY parent_id
+)
+UPDATE app_taxa
+SET descendant_count = counts.cnt
+FROM counts
+WHERE app_taxa.id = counts.parent_id
+  AND app_taxa.taxon_name >= 'P' AND app_taxa.taxon_name < 'Pi';
+
+SELECT 'Batch 4a (P-Ph) Complete' as status;
+
+-- -----------------------------------------------------------------------------
+-- BATCH 4b: Pi - Pz
+-- -----------------------------------------------------------------------------
+WITH counts AS (
+   SELECT parent_id, COUNT(*) as cnt
+   FROM app_taxa
+   WHERE parent_id IS NOT NULL
+   GROUP BY parent_id
+)
+UPDATE app_taxa
+SET descendant_count = counts.cnt
+FROM counts
+WHERE app_taxa.id = counts.parent_id
+  AND app_taxa.taxon_name >= 'Pi' AND app_taxa.taxon_name < 'Q';
+
+SELECT 'Batch 4b (Pi-Pz) Complete' as status;
+
+-- -----------------------------------------------------------------------------
+-- BATCH 4c: Q - R
+-- -----------------------------------------------------------------------------
+WITH counts AS (
+   SELECT parent_id, COUNT(*) as cnt
+   FROM app_taxa
+   WHERE parent_id IS NOT NULL
+   GROUP BY parent_id
+)
+UPDATE app_taxa
+SET descendant_count = counts.cnt
+FROM counts
+WHERE app_taxa.id = counts.parent_id
+  AND app_taxa.taxon_name >= 'Q' AND app_taxa.taxon_name < 'S';
+
+SELECT 'Batch 4c (Q-R) Complete' as status;
+
+-- -----------------------------------------------------------------------------
+-- BATCH 4d: S - Sh (Splitting the massive S section)
+-- -----------------------------------------------------------------------------
+WITH counts AS (
+   SELECT parent_id, COUNT(*) as cnt
+   FROM app_taxa
+   WHERE parent_id IS NOT NULL
+   GROUP BY parent_id
+)
+UPDATE app_taxa
+SET descendant_count = counts.cnt
+FROM counts
+WHERE app_taxa.id = counts.parent_id
+  AND app_taxa.taxon_name >= 'S' AND app_taxa.taxon_name < 'Si';
+
+SELECT 'Batch 4d (S-Sh) Complete' as status;
+
+-- -----------------------------------------------------------------------------
+-- BATCH 4e: Si - Sz
+-- -----------------------------------------------------------------------------
+WITH counts AS (
+   SELECT parent_id, COUNT(*) as cnt
+   FROM app_taxa
+   WHERE parent_id IS NOT NULL
+   GROUP BY parent_id
+)
+UPDATE app_taxa
+SET descendant_count = counts.cnt
+FROM counts
+WHERE app_taxa.id = counts.parent_id
+  AND app_taxa.taxon_name >= 'Si' AND app_taxa.taxon_name < 'T';
+
+SELECT 'Batch 4e (Si-Sz) Complete' as status;
+
+-- -----------------------------------------------------------------------------
+-- BATCH 4f: T (Last part of original Batch 4)
+-- -----------------------------------------------------------------------------
+WITH counts AS (
+   SELECT parent_id, COUNT(*) as cnt
+   FROM app_taxa
+   WHERE parent_id IS NOT NULL
+   GROUP BY parent_id
+)
+UPDATE app_taxa
+SET descendant_count = counts.cnt
+FROM counts
+WHERE app_taxa.id = counts.parent_id
+  AND app_taxa.taxon_name >= 'T' AND app_taxa.taxon_name < 'U';
+
+SELECT 'Batch 4f (T) Complete' as status;
+
+-- -----------------------------------------------------------------------------
+-- FINAL VALIDATION
+-- -----------------------------------------------------------------------------
+ANALYZE app_taxa;
+SELECT count(*) as total_taxa, sum(descendant_count) as total_descendants_mapped FROM app_taxa;

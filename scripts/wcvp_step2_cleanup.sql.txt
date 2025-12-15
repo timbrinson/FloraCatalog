@@ -1,0 +1,9 @@
+
+-- =============================================================================
+-- STEP 2: CLEANUP / RESTORE
+-- =============================================================================
+
+-- Restore the index we dropped in Batch 1 to ensure application read performance.
+CREATE INDEX IF NOT EXISTS idx_app_taxa_parent ON app_taxa(parent_id);
+
+SELECT 'Cleanup Complete: Indexes Restored' as status;

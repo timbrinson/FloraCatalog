@@ -1,5 +1,6 @@
 
 
+
 /**
  * DATA SOURCE CITATION:
  * Govaerts R (ed.). 2025. WCVP: World Checklist of Vascular Plants. 
@@ -20,7 +21,7 @@ export interface Synonym {
   type: SynonymType;
 }
 
-export type TaxonRank = 'family' | 'genus' | 'species' | 'subspecies' | 'variety' | 'form' | 'hybrid' | 'cultivar' | 'grex';
+export type TaxonRank = 'family' | 'genus' | 'species' | 'subspecies' | 'variety' | 'form' | 'hybrid' | 'cultivar' | 'grex' | 'unranked' | 'Unranked';
 
 export type TaxonomicStatus = 'Accepted' | 'Synonym' | 'Unresolved' | 'Artificial';
 
@@ -242,6 +243,9 @@ export interface Taxon {
   infraspecies?: string;
   infraspecificRank?: string;
   cultivar?: string;
+  
+  /** Pre-calculated count of all descendants (recursive) in the DB */
+  descendantCount?: number;
 }
 
 export interface TaxonChain {

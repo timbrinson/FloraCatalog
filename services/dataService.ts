@@ -1,4 +1,5 @@
-import { supabase, isOffline } from './supabaseClient';
+
+import { getSupabase, getIsOffline } from './supabaseClient';
 import { Taxon, TaxonRank, TaxonomicStatus, Synonym, Link } from '../types';
 
 /**
@@ -40,7 +41,7 @@ const mapFromDB = (row: any): Taxon => {
     speciesHybrid: row.species_hybrid,
     infraspecies: row.infraspecies,
     infraspecificRank: row.infraspecific_rank,
-    cultivar: row.cultivar || (row.taxon_rank === 'cultivar' ? row.taxon_name.split("'")[1] : undefined), // Fallback extraction
+    cultivar: row.cultivar || (row.taxon_rank === 'cultivar' && row.taxon_name.includes("'") ? row.taxon_name.split("'")[1] : undefined), 
     
     hybridFormula: row.hybrid_formula,
 
@@ -68,12 +69,17 @@ const mapFromDB = (row: any): Taxon => {
           ? row.taxon_name.match(/'([^']+)'/)?.[1] || row.taxon_name 
           : (row.infraspecies || row.species || row.genus || row.taxon_name),
 
-    description: row.details?.description_text, // Joined from details
-    synonyms: [], // TODO: Load from details if stored there
-    referenceLinks: [], // TODO: Load from details
+    // OPTIMIZATION: In the list view, we no longer join details to save bandwidth/performance.
+    // If 'details' is missing, these fields will be undefined, which is fine for the grid.
+    description: row.details?.description_text, 
+    synonyms: [], 
+    referenceLinks: [], 
     
     isDetailsLoaded: !!row.details,
     createdAt: new Date(row.created_at).getTime(),
+    
+    // Use the pre-calculated count from Step 4
+    descendantCount: row.descendant_count || 0
   };
 };
 
@@ -129,36 +135,79 @@ const mapToDB = (taxon: Taxon) => {
 
 // --- CRUD OPERATIONS ---
 
+export interface FetchOptions {
+    offset?: number;
+    limit?: number;
+    search?: string;
+    sortBy?: string;
+    sortDirection?: 'asc' | 'desc';
+}
+
 export const dataService = {
   
-  async getTaxa(): Promise<Taxon[]> {
-    if (isOffline) {
+  async getTaxa(options: FetchOptions = {}): Promise<{ data: Taxon[], count: number }> {
+    const { 
+        offset = 0, 
+        limit = 100, // REDUCED LIMIT from 1000 to 100 to prevent 57014 Timeout
+        search = '',
+        sortBy = 'taxon_name',
+        sortDirection = 'asc'
+    } = options;
+
+    if (getIsOffline()) {
         console.warn("App is in offline mode. Returning empty list.");
-        return [];
+        return { data: [], count: 0 };
     }
 
-    const { data, error } = await supabase
+    // PERFORMANCE FIX: Removed the `details:app_taxon_details(*)` join.
+    // Joining 1.4M rows causes massive overhead. We fetch only core columns now.
+    let query = getSupabase()
       .from(DB_TABLE)
-      .select(`
-        *,
-        details:app_taxon_details(*)
-      `)
-      .order('taxon_name', { ascending: true });
+      .select('*', { count: 'estimated' });
+
+    // Server-side search
+    if (search && search.trim().length > 0) {
+        // Use a simpler filter to start
+        query = query.or(`taxon_name.ilike.%${search}%,common_name.ilike.%${search}%`);
+    }
+
+    // Server-side Sort
+    const dbSortKey = sortBy === 'taxonName' ? 'taxon_name' 
+                    : sortBy === 'taxonRank' ? 'taxon_rank'
+                    : sortBy === 'family' ? 'family'
+                    : sortBy === 'genus' ? 'genus'
+                    : sortBy === 'species' ? 'species'
+                    : 'taxon_name'; // Default fallback
+
+    query = query.order(dbSortKey, { ascending: sortDirection === 'asc' });
+
+    const to = offset + limit - 1;
+
+    const { data, error, count } = await query
+      .range(offset, to);
 
     if (error) {
       console.error("Error fetching taxa:", JSON.stringify(error, null, 2));
+      // Swallow 57014 timeout gracefully by returning empty
+      if (error.code === '57014') {
+          console.warn("Query timed out. Reducing load...");
+          return { data: [], count: 0 };
+      }
       throw error;
     }
 
-    return (data || []).map(mapFromDB);
+    return { 
+        data: (data || []).map(mapFromDB), 
+        count: count || 0
+    };
   },
 
   async upsertTaxon(taxon: Taxon) {
-    if (isOffline) return;
+    if (getIsOffline()) return;
 
     // 1. Upsert Core Taxon
     const dbPayload = mapToDB(taxon);
-    const { error: taxonError } = await supabase
+    const { error: taxonError } = await getSupabase()
       .from(DB_TABLE)
       .upsert(dbPayload);
 
@@ -172,10 +221,9 @@ export const dataService = {
       const detailsPayload = {
         taxon_id: taxon.id,
         description_text: taxon.description,
-        // Map other details like hardiness, morphology jsonb etc here
       };
       
-      const { error: detailsError } = await supabase
+      const { error: detailsError } = await getSupabase()
         .from(DETAILS_TABLE)
         .upsert(detailsPayload);
         
@@ -184,9 +232,9 @@ export const dataService = {
   },
 
   async deleteTaxon(id: string) {
-    if (isOffline) return;
+    if (getIsOffline()) return;
 
-    const { error } = await supabase
+    const { error } = await getSupabase()
       .from(DB_TABLE)
       .delete()
       .eq('id', id);
@@ -194,13 +242,12 @@ export const dataService = {
   },
   
   async batchInsert(taxa: Taxon[]) {
-      if (isOffline || taxa.length === 0) return;
+      if (getIsOffline() || taxa.length === 0) return;
       const payloads = taxa.map(mapToDB);
-      const { error } = await supabase.from(DB_TABLE).insert(payloads);
+      const { error } = await getSupabase().from(DB_TABLE).insert(payloads);
       
       if (error) {
           console.error("Batch Insert Failed. Error:", JSON.stringify(error, null, 2));
-          console.error("Failed Payload Sample:", JSON.stringify(payloads[0], null, 2));
           throw new Error(error.message || "Unknown Supabase Error");
       }
   }

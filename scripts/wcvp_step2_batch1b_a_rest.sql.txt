@@ -1,0 +1,14 @@
+
+-- =============================================================================
+-- STEP 2 (Batch 1b): LINK PARENTS - A (Excluding Asteraceae)
+-- =============================================================================
+
+UPDATE app_taxa child
+SET parent_id = parent.id
+FROM app_taxa parent
+WHERE child.parent_plant_name_id = parent.wcvp_id
+  AND child.parent_id IS NULL
+  AND child.taxon_name LIKE 'A%'
+  AND child.family != 'Asteraceae';
+
+SELECT 'Batch 1b (Rest of A Links) Complete' as status;

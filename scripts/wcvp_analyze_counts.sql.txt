@@ -1,0 +1,35 @@
+
+-- =============================================================================
+-- DIAGNOSTICS: FAMILY COUNTS
+-- =============================================================================
+
+-- 1. Overview by First Letter
+-- This helps decide how to batch the Alphabet.
+SELECT 
+    substring(family, 1, 1) as family_letter, 
+    count(*) as total_records,
+    round((count(*) * 100.0 / (SELECT count(*) FROM app_taxa)), 2) as percentage
+FROM app_taxa
+GROUP BY 1
+ORDER BY 1;
+
+-- 2. Top 20 Largest Families
+-- These are the "Giants" that likely need their own batch.
+SELECT 
+    family, 
+    count(*) as total_records
+FROM app_taxa
+GROUP BY 1
+ORDER BY 2 DESC
+LIMIT 20;
+
+-- 3. Specific Breakdown of 'A' Families
+-- To see why Batch 1 (A-C) is failing.
+SELECT 
+    family, 
+    count(*) as total_records
+FROM app_taxa
+WHERE family LIKE 'A%'
+GROUP BY 1
+ORDER BY 2 DESC
+LIMIT 10;

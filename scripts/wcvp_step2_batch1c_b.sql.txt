@@ -1,0 +1,13 @@
+
+-- =============================================================================
+-- STEP 2 (Batch 1c): LINK PARENTS - B
+-- =============================================================================
+
+UPDATE app_taxa child
+SET parent_id = parent.id
+FROM app_taxa parent
+WHERE child.parent_plant_name_id = parent.wcvp_id
+  AND child.parent_id IS NULL
+  AND child.taxon_name LIKE 'B%';
+
+SELECT 'Batch 1c (B Links) Complete' as status;

@@ -1,4 +1,13 @@
+
 # Version History
+
+## v2.11 - Performance & Stability
+**Date:** May 30, 2025
+
+### Critical Fixes
+- **Database Optimization:** Reduced Data Grid fetch batch size from 1,000 to **100 records**. This eliminates the `57014` "statement timeout" errors caused by large datasets on the Supabase free tier.
+- **Query Performance:** Modified the main `getTaxa` service to stop joining the heavy `app_taxon_details` table by default. The grid now loads lightweight rows, and full details (descriptions, links) are fetched lazily only when a user expands a row.
+- **Dynamic Connectivity:** Refactored `supabaseClient` to allow runtime credential updates. Users can now switch from Offline Mode to Connected Mode via Settings without a full page reload.
 
 ## v2.10 - Strict Audit Context
 **Date:** May 30, 2025

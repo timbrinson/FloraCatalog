@@ -1,0 +1,39 @@
+
+-- =============================================================================
+-- WCVP IMPORT RECOVERY SCRIPT
+-- Use this if a CSV part (e.g. part_05) fails halfway through uploading.
+-- =============================================================================
+
+-- STEP 1: Create a temporary recovery table
+-- This creates a table with the exact same columns as the main table, 
+-- but completely empty.
+CREATE TABLE wcvp_error_recovery AS 
+SELECT * FROM wcvp_import 
+WITH NO DATA;
+
+-- STEP 2: MANUAL ACTION REQUIRED
+-- 1. Go to the Supabase Table Editor (GUI).
+-- 2. Select the 'wcvp_error_recovery' table.
+-- 3. Click "Insert" -> "Import Data from CSV".
+-- 4. Select the specific file that failed (e.g., wcvp_part_05.csv).
+-- 5. Import it. (This will work because this table is empty).
+
+-- STEP 3: Merge into the Main Table
+-- This copies all rows from recovery to the main table.
+-- The "ON CONFLICT DO NOTHING" clause ensures that rows which were 
+-- already successfully loaded in the first attempt are skipped, 
+-- preventing "Duplicate Key" errors.
+
+INSERT INTO wcvp_import
+SELECT * FROM wcvp_error_recovery
+ON CONFLICT (plant_name_id) DO NOTHING;
+
+-- STEP 4: Cleanup
+-- Remove the temporary table so you are ready for the next file.
+DROP TABLE wcvp_error_recovery;
+
+-- =============================================================================
+-- VERIFICATION
+-- Run this to check how many rows you have loaded so far.
+-- =============================================================================
+-- SELECT count(*) FROM wcvp_import;

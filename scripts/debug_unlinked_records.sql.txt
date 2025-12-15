@@ -1,0 +1,36 @@
+
+-- =============================================================================
+-- DEBUG: UNLINKED RECORDS ANALYSIS
+-- =============================================================================
+
+-- 1. SUMMARY OF UNLINKED ASTERACEAE
+SELECT 
+    'Asteraceae Unlinked Analysis' as check_name,
+    count(*) as total_unlinked,
+    count(CASE WHEN parent_plant_name_id IS NULL THEN 1 END) as missing_parent_id_in_source,
+    count(CASE WHEN parent_plant_name_id IS NOT NULL THEN 1 END) as has_parent_id_but_not_linked
+FROM app_taxa
+WHERE family = 'Asteraceae' AND parent_id IS NULL;
+
+-- 2. INVESTIGATE 5 SPECIFIC EXAMPLES
+-- We grab 5 records that HAVE a parent ID in the text column, but failed to link.
+-- We then check if that parent ID actually exists in your database.
+WITH sample_unlinked AS (
+    SELECT id, taxon_name, wcvp_id, parent_plant_name_id
+    FROM app_taxa
+    WHERE family = 'Asteraceae' 
+      AND parent_id IS NULL 
+      AND parent_plant_name_id IS NOT NULL
+    LIMIT 5
+)
+SELECT 
+    c.taxon_name as unlinked_child,
+    c.wcvp_id as child_wcvp_id,
+    c.parent_plant_name_id as looking_for_parent_id,
+    CASE 
+        WHEN p.id IS NOT NULL THEN 'Found! (Link Logic Failed)' 
+        ELSE 'MISSING from DB' 
+    END as parent_status,
+    p.taxon_name as parent_name_found
+FROM sample_unlinked c
+LEFT JOIN app_taxa p ON c.parent_plant_name_id = p.wcvp_id;

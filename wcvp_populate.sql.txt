@@ -4,11 +4,29 @@
 -- Run this AFTER importing the CSV into wcvp_import table.
 -- =============================================================================
 
--- 1. CLEAR EXISTING DATA (Optional - Use caution)
--- TRUNCATE TABLE app_taxa CASCADE;
+-- PRE-FLIGHT: Increase Timeout for Large Operations
+-- 1.4M rows can take > 1 minute. We attempt to set a local timeout.
+-- If this fails (permissions), you may need to run the blocks below one by one.
+SET statement_timeout = '10min';
 
--- 2. INSERT RAW DATA
+-- 0. ENSURE DATA SOURCE EXISTS
+-- We need a source ID for the Foreign Key constraint.
+-- Creates the 'WCVP' source record if it doesn't exist.
+INSERT INTO app_data_sources (id, name, version, citation_text, url, trust_level)
+VALUES (
+    1, 
+    'WCVP', 
+    '14 (2025)', 
+    'Govaerts R (ed.). 2025. WCVP: World Checklist of Vascular Plants. Facilitated by the Royal Botanic Gardens, Kew. [WWW document] URL https://doi.org/10.34885/b8fr-km05 [accessed 28 May 2025].', 
+    'https://powo.science.kew.org/', 
+    5
+)
+ON CONFLICT (id) DO UPDATE SET
+    citation_text = EXCLUDED.citation_text;
+
+-- 1. INSERT RAW DATA
 -- We generate new UUIDs for our app, but keep the WCVP ID for linking.
+-- FIX: taxon_rank can be NULL in WCVP. We cast it to 'Unranked'.
 INSERT INTO app_taxa (
     wcvp_id,
     ipni_id,
@@ -41,7 +59,7 @@ INSERT INTO app_taxa (
     geographic_area,
     lifeform_description,
     climate_description,
-    source_id -- We assume ID 1 is 'WCVP' in app_data_sources
+    source_id
 )
 SELECT 
     plant_name_id,
@@ -60,7 +78,7 @@ SELECT
     species_hybrid,
     infraspecies,
     infraspecific_rank,
-    taxon_rank,
+    COALESCE(taxon_rank, 'Unranked'), -- Handle NULL ranks
     taxon_status,
     hybrid_formula,
     parenthetical_author,
@@ -75,28 +93,31 @@ SELECT
     geographic_area,
     lifeform_description,
     climate_description,
-    1 -- Source ID 1 (Ensure you have created this in app_data_sources)
+    1 -- Source ID 1 (WCVP)
 FROM wcvp_import
 ON CONFLICT (id) DO NOTHING;
 
--- 3. LINK PARENTS (Adjacency List)
+-- 2. LINK PARENTS (Adjacency List)
 -- Update the internal 'parent_id' UUID based on the string 'parent_plant_name_id'
+-- This runs a massive join between the new app_taxa table and itself.
 UPDATE app_taxa child
 SET parent_id = parent.id
 FROM app_taxa parent
 WHERE child.parent_plant_name_id = parent.wcvp_id
-  AND child.parent_id IS NULL; -- Only update those missing parents
+  AND child.parent_id IS NULL; 
 
--- 4. BUILD HIERARCHY PATH (LTREE)
+-- 3. BUILD HIERARCHY PATH (LTREE)
 -- This is computationally expensive for 1.4M rows. 
 -- We use a Recursive CTE to walk the tree and build the path.
+-- Path Format: root.genus_uuid.species_uuid...
+-- We replace dashes in UUIDs with underscores because ltree doesn't support dashes.
 
 WITH RECURSIVE tax_tree AS (
     -- Anchor member: Roots (Taxa with no parent)
     SELECT 
         id, 
         parent_id, 
-        text2ltree(replace(id::text, '-', '_')) as path
+        text2ltree('root') || text2ltree(replace(id::text, '-', '_')) as path
     FROM app_taxa
     WHERE parent_id IS NULL
     
@@ -116,15 +137,20 @@ FROM tax_tree
 WHERE app_taxa.id = tax_tree.id
   AND app_taxa.hierarchy_path IS NULL;
 
--- 5. UPDATE DESCENDANT COUNTS (Optional - can be slow)
--- Calculates how many children each node has
--- WITH counts AS (
---    SELECT parent_id, COUNT(*) as cnt
---    FROM app_taxa
---    WHERE parent_id IS NOT NULL
---    GROUP BY parent_id
--- )
--- UPDATE app_taxa
--- SET descendant_count = counts.cnt
--- FROM counts
--- WHERE app_taxa.id = counts.parent_id;
+-- 4. UPDATE DESCENDANT COUNTS
+-- This calculates how many children each node has.
+-- Useful for the "Child Count" column in the grid.
+WITH counts AS (
+   SELECT parent_id, COUNT(*) as cnt
+   FROM app_taxa
+   WHERE parent_id IS NOT NULL
+   GROUP BY parent_id
+)
+UPDATE app_taxa
+SET descendant_count = counts.cnt
+FROM counts
+WHERE app_taxa.id = counts.parent_id;
+
+-- 5. ANALYZE
+-- Update statistics for the query planner
+ANALYZE app_taxa;

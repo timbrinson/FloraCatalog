@@ -1,4 +1,5 @@
-import { createClient } from '@supabase/supabase-js';
+
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
 // --- SECURITY WARNING ---
 // Do NOT commit real keys to GitHub. Use environment variables.
@@ -8,23 +9,65 @@ import { createClient } from '@supabase/supabase-js';
 const MANUAL_URL = ''; // Leave empty for GitHub commit
 const MANUAL_KEY = ''; // Leave empty for GitHub commit
 
-// ------------------------------------------------------------------
+let supabaseInstance: SupabaseClient | null = null;
+let isOfflineMode = true;
 
-// Try to get keys from environment (Vite/Node) first, then fall back to manual
-const envUrl = (import.meta as any).env?.VITE_SUPABASE_URL || (process as any).env?.VITE_SUPABASE_URL;
-const envKey = (import.meta as any).env?.VITE_SUPABASE_ANON_KEY || (process as any).env?.VITE_SUPABASE_ANON_KEY;
+// Initialization Logic
+const initClient = () => {
+  // 1. Try Environment Variables (Vite/Node)
+  const envUrl = (import.meta as any).env?.VITE_SUPABASE_URL || (process as any).env?.VITE_SUPABASE_URL;
+  const envKey = (import.meta as any).env?.VITE_SUPABASE_ANON_KEY || (process as any).env?.VITE_SUPABASE_ANON_KEY;
 
-// Logic: Use Environment -> Manual -> Placeholder (to prevent crash)
-const supabaseUrl = envUrl || MANUAL_URL || 'https://placeholder.supabase.co';
-const supabaseKey = envKey || MANUAL_KEY || 'placeholder-key';
+  // 2. Try Local Storage (For runtime configuration in browser)
+  const storageUrl = typeof localStorage !== 'undefined' ? localStorage.getItem('supabase_url') : null;
+  const storageKey = typeof localStorage !== 'undefined' ? localStorage.getItem('supabase_anon_key') : null;
 
-// Check if we are truly connected
-const isConfigured = (envUrl || MANUAL_URL) && (envKey || MANUAL_KEY);
+  // Logic: LocalStorage -> Environment -> Manual -> Placeholder
+  // We trim to handle copy-paste errors with spaces
+  const url = (storageUrl || envUrl || MANUAL_URL || 'https://placeholder.supabase.co').trim();
+  const key = (storageKey || envKey || MANUAL_KEY || 'placeholder-key').trim();
 
-if (!isConfigured) {
-  console.warn("Supabase credentials missing. App will run in offline mode (UI only).");
-}
+  // Check if we are truly connected to a real backend
+  const hasValidUrl = url.startsWith('http') && url !== 'https://placeholder.supabase.co';
+  const hasValidKey = key.length > 20 && key !== 'placeholder-key'; // Basic length check for JWT
 
-export const supabase = createClient(supabaseUrl, supabaseKey);
+  isOfflineMode = !(hasValidUrl && hasValidKey);
 
-export const isOffline = !isConfigured;
+  if (isOfflineMode) {
+    if (typeof window !== 'undefined') {
+       console.warn("Supabase credentials missing or invalid. App running in offline mode.");
+    }
+    // Create a dummy client so the app doesn't crash on property access, 
+    // but dataService will check isOfflineMode before calling it.
+    supabaseInstance = createClient('https://placeholder.supabase.co', 'placeholder-key');
+  } else {
+    try {
+        supabaseInstance = createClient(url, key);
+        console.log("Supabase Client Initialized");
+    } catch (e) {
+        console.error("Failed to initialize Supabase client:", e);
+        isOfflineMode = true;
+        supabaseInstance = createClient('https://placeholder.supabase.co', 'placeholder-key');
+    }
+  }
+};
+
+// Initialize on load
+initClient();
+
+// --- EXPORTS ---
+
+export const getSupabase = (): SupabaseClient => {
+    if (!supabaseInstance) initClient();
+    return supabaseInstance!;
+};
+
+export const getIsOffline = (): boolean => {
+    return isOfflineMode;
+};
+
+// Allow the App to force a reload of the client (e.g. after Settings save)
+export const reloadClient = () => {
+    console.log("Reloading Supabase Client configuration...");
+    initClient();
+};

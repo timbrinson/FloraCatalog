@@ -1,0 +1,50 @@
+import csv
+import sys
+import os
+
+def convert_wcvp():
+    # Configuration
+    INPUT_FILENAME = 'wcvp_names.csv'
+    OUTPUT_FILENAME = 'wcvp_names_clean.csv'
+    
+    # Check if input file exists
+    if not os.path.exists(INPUT_FILENAME):
+        print(f"Error: Input file '{INPUT_FILENAME}' not found.")
+        print("1. Download the WCVP zip from https://powo.science.kew.org/about-wcvp")
+        print("2. Extract 'wcvp_names.txt' (or rename the checklist_names.txt file)")
+        print(f"3. Place it in this directory as '{INPUT_FILENAME}'")
+        return
+
+    print(f"Converting '{INPUT_FILENAME}' to '{OUTPUT_FILENAME}'...")
+    print("This may take a minute for large files (1.4M+ rows)...")
+
+    try:
+        # Increase field size limit for safety with large text fields
+        csv.field_size_limit(sys.maxsize)
+        
+        row_count = 0
+        
+        with open(INPUT_FILENAME, mode='r', encoding='utf-8', errors='replace') as infile, \
+             open(OUTPUT_FILENAME, mode='w', encoding='utf-8', newline='') as outfile:
+            
+            # WCVP Format: Pipe delimited '|', often no quotes
+            reader = csv.reader(infile, delimiter='|', quoting=csv.QUOTE_NONE)
+            
+            # Output Format: Standard CSV, comma delimited, quoting fields with commas/quotes
+            writer = csv.writer(outfile, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
+            
+            for row in reader:
+                writer.writerow(row)
+                row_count += 1
+                
+                if row_count % 100000 == 0:
+                    print(f"  Processed {row_count:,} rows...")
+
+        print(f"Success! Converted {row_count:,} rows.")
+        print(f"Created: {os.path.abspath(OUTPUT_FILENAME)}")
+
+    except Exception as e:
+        print(f"\nFATAL ERROR: {str(e)}")
+
+if __name__ == "__main__":
+    convert_wcvp()

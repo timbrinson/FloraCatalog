@@ -1,0 +1,21 @@
+
+-- =============================================================================
+-- DIAGNOSTIC: ASTERACEAE HEALTH CHECK
+-- Run this to see why Step 3 might be failing.
+-- =============================================================================
+
+SELECT 
+    'Asteraceae Stats' as check_name,
+    count(*) as total_records,
+    count(parent_id) as parents_linked, 
+    -- If parents_linked is 0 or low, Step 2 failed/wasn't run.
+    
+    count(hierarchy_path) as paths_built
+    -- If paths_built is 0, Step 3 failed.
+FROM app_taxa
+WHERE family = 'Asteraceae';
+
+-- Check the Root Node specifically
+SELECT id, taxon_name, parent_id, hierarchy_path
+FROM app_taxa 
+WHERE taxon_name = 'Asteraceae';

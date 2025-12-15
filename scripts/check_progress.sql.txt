@@ -1,0 +1,42 @@
+
+-- =============================================================================
+-- DATA IMPORT DIAGNOSTIC TOOL
+-- Run this to see how much of your database is fully linked and calculated.
+-- =============================================================================
+
+-- 1. OVERALL HEALTH
+SELECT 
+    count(*) as total_plants,
+    count(parent_id) as parents_linked,
+    count(hierarchy_path) as paths_calculated,
+    round(count(hierarchy_path) * 100.0 / count(*), 1) || '%' as overall_completion
+FROM app_taxa;
+
+-- 2. PROGRESS BY FAMILY GROUP (To track Step 3 Batches)
+-- This helps you see which batches (1a, 1b, 2, etc.) are finished.
+SELECT 
+    CASE 
+        WHEN family = 'Asteraceae' THEN 'Batch 1a: Asteraceae'
+        WHEN family LIKE 'A%' AND family != 'Asteraceae' THEN 'Batch 1b: Other A'
+        WHEN family LIKE 'B%' THEN 'Batch 1c: B'
+        WHEN family LIKE 'C%' THEN 'Batch 1d: C'
+        WHEN family LIKE 'D%' OR family LIKE 'E%' OR family LIKE 'F%' OR family LIKE 'G%' THEN 'Batch 2: D-G'
+        WHEN family >= 'H' AND family < 'M' THEN 'Batch 3: H-L'
+        WHEN family >= 'M' AND family < 'Q' THEN 'Batch 4: M-P'
+        WHEN family >= 'Q' AND family < 'T' THEN 'Batch 5: Q-S'
+        WHEN family >= 'T' THEN 'Batch 6: T-Z'
+        ELSE 'Unknown'
+    END as batch_group,
+    count(*) as total_records,
+    count(hierarchy_path) as paths_built,
+    round(count(hierarchy_path) * 100.0 / count(*), 1) || '%' as completion
+FROM app_taxa
+GROUP BY 1
+ORDER BY 1;
+
+-- 3. SPOT CHECK: HIERARCHY SAMPLE
+-- If these look like "root.uuid.uuid...", it is working.
+SELECT taxon_name, hierarchy_path 
+FROM app_taxa 
+WHERE hierarchy_path IS NOT NULL 
+LIMIT 5;

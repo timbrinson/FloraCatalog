@@ -1,0 +1,18 @@
+
+-- =============================================================================
+-- DISK SPACE RECOVERY
+-- =============================================================================
+-- You are over the storage quota (1.9GB / 0.5GB).
+-- Since the import into app_taxa is complete, we can safely drop the staging table.
+-- This table contains the raw CSV data which is now duplicated, essentially double-parking.
+-- Dropping it should free up ~300-500MB of logical space.
+
+DROP TABLE IF EXISTS wcvp_import;
+
+-- If you used the error recovery table during import, drop that too.
+DROP TABLE IF EXISTS wcvp_error_recovery;
+
+-- Note: In managed Postgres, 'VACUUM FULL' is often required to return space to the OS,
+-- but it requires extra free space to run. Simply dropping the table is the safest
+-- first step to get back under quota limits for logical storage.
+SELECT 'Staging tables dropped. Storage usage should decrease.' as status;
