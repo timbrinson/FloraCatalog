@@ -5,7 +5,7 @@
 
 FloraCatalog is a high-performance web application designed to manage complex botanical taxonomy. It combines the rigorous scientific standards of the World Checklist of Vascular Plants (WCVP) with the flexibility of AI-powered enrichment for cultivars and garden hybrids.
 
-![Version](https://img.shields.io/badge/version-2.11.0-emerald)
+![Version](https://img.shields.io/badge/version-2.11.1-emerald)
 ![Tech](https://img.shields.io/badge/stack-React%20%7C%20Supabase%20%7C%20Gemini%20AI-blue)
 
 ## Key Features

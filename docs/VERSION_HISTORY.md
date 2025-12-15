@@ -1,6 +1,12 @@
 
 # Version History
 
+## v2.11.1 - Script Completeness
+**Date:** May 30, 2025
+
+### Maintenance
+- **Script Restoration:** Restored Batches 2, 3, and 5 in `scripts/wcvp_step4_counts.sql.txt`. The script now represents a complete A-Z execution flow for calculating descendant counts, ensuring reproducibility if the database needs to be rebuilt from scratch.
+
 ## v2.11 - Performance & Stability
 **Date:** May 30, 2025
 
