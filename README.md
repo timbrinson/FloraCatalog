@@ -5,7 +5,7 @@
 
 FloraCatalog is a high-performance web application designed to manage complex botanical taxonomy. It combines the rigorous scientific standards of the World Checklist of Vascular Plants (WCVP) with the flexibility of AI-powered enrichment for cultivars and garden hybrids.
 
-![Version](https://img.shields.io/badge/version-2.11.1-emerald)
+![Version](https://img.shields.io/badge/version-2.12.0-emerald)
 ![Tech](https://img.shields.io/badge/stack-React%20%7C%20Supabase%20%7C%20Gemini%20AI-blue)
 
 ## Key Features
@@ -22,6 +22,7 @@ FloraCatalog is a high-performance web application designed to manage complex bo
 ## Documentation
 
 *   [**Setup Guide**](./docs/SETUP_GUIDE.md): How to configure Supabase and API keys.
+*   [**Automation Plan**](./docs/AUTOMATION_PLAN.md): Details the interactive CLI tool used to rebuild the database from scratch.
 *   [**Data Import Guide**](./docs/DATA_IMPORT_GUIDE.md): How to load the 1.4 million record WCVP dataset.
 *   [**Design Specs**](./docs/DESIGN_SPECS.md): Detailed architectural decisions and prompt context.
 *   [**Data Model**](./docs/DATA_MODEL.md): Database schema and lineage strategy.

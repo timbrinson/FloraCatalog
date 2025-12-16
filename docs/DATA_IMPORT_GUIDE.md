@@ -1,6 +1,8 @@
 
 # WCVP Data Import Guide
 
+> **NEW:** A fully automated CLI tool is now available to handle these steps. See [**Automation Plan**](./AUTOMATION_PLAN.md) or run `npm run db:build` (`node scripts/automate_build.js`).
+
 This guide explains how to populate your FloraCatalog database with the 1.4 million plant records from the World Checklist of Vascular Plants (WCVP).
 
 ## Phase 1: Download the Data

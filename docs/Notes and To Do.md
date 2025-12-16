@@ -61,13 +61,18 @@ Integrate the project with Github.
 
 Database:
 
--Create the database, load it with WCVP data and integrate the FloraCatalog to use it.
+-Done Create the database, load it with WCVP data and integrate the FloraCatalog to use it.
 
--What is the best database given the needs which is easy to set up, evolve and administer? Consider backups, traceability, lineage, merging records, updating records with most recent from sources, updating records with data following the latest rules of what to include, etc.
+-Done What is the best database given the needs which is easy to set up, evolve and administer? Consider backups, traceability, lineage, merging records, updating records with most recent from sources, updating records with data following the latest rules of what to include, etc.
+
+-Do we need more indexes, e.g. on Genus, Species, Infraspecies, Cultivar, GH, SH and combinations?
+
+-Can we use the Supabase Authentication for end users? How to set that up?
+
 
 Data Managment:
 
-- Before integrating with a database I would like your help with data modeling and design for data management.
+-(done) Before integrating with a database I would like your help with data modeling and design for data management.
 
   It is important to maintain lineage of the data and have traceability of changes. It needs to be clear the source of information and how it got from the source to the database. It needs proper citation for the source of the information, a timestamp when the information came from the source and a timestamp when the data was added and updated in the database. Also capture what was the process that made the updates.
 
@@ -85,7 +90,7 @@ Data Managment:
 
   There is a lot of work done outside of WCVP that identifies plants which may eventually be adopted in WCVP. At this time I have not concluded whether to allow adding these to the app. First question is if we allowed adding Genus, Species and Infraspscies that are not in WCVP does this design support that or if it doesn't would it be difficult to add later?
 
-- There are a lot of additional plant details we will need to support which we have not discussed yet. Some of these are things like the various physical characteristics of a plant (overall, leaves, flowers, underground growth, etc.) and growing details (seasonal, nutrients, sun. water, longevity, etc), historical notes, etc. For example, would support querying/filtering for things like plants from a climate that is Temperate, Height is 5', zone is 8a and water needs are low. Expect many fo these would be sparsely populated. Expect the need to add more attributes over time unless we identify a complete model to use up front.
+-(done) There are a lot of additional plant details we will need to support which we have not discussed yet. Some of these are things like the various physical characteristics of a plant (overall, leaves, flowers, underground growth, etc.) and growing details (seasonal, nutrients, sun. water, longevity, etc), historical notes, etc. For example, would support querying/filtering for things like plants from a climate that is Temperate, Height is 5', zone is 8a and water needs are low. Expect many fo these would be sparsely populated. Expect the need to add more attributes over time unless we identify a complete model to use up front.
 
   Help me consider different options for how to store data about a taxon that don't have any special purpose other than displaying and querying. This would include many of the wcvp columns and many extended details. Here are some initial thoughts from my limited knowledge.
 
@@ -108,9 +113,7 @@ Data Managment:
 
 -How to handle updates from WCVP while maintaining other data connected to it (cultivars, descriptions, etc.)?
 
--Dynamically loading and cacheing content from database since can't load everything into memory.
-
--Keeping lineage and traceability. Where did the data come from. When was it added and/or updated. What was the process for adding or updating?
+-Done Dynamically loading and cacheing content from database since can't load everything into memory.
 
 -Hide/show synonyms (or other not accepted) from WCVP.
 
@@ -133,25 +136,24 @@ Plant info:
 -Include growing conditions.
 
 
+General:
+
 How to train the system to return high quality information by iterating over it. Ask the questions about the answer like: Are you sure? Is there possibly another answer? Is this the only answer? Explain why. Justify your answer. 
 
 
 
-Test and optimize searching. Make sure it can handle input in various forms and types of names (synonyms, trademarks, common names, etc.) to identify the correct plant name. 
+-Test and optimize searching. Make sure it can handle input in various forms and types of names (synonyms, trademarks, common names, etc.) to identify the correct plant name. 
 
--How to make sure it is not hallucinating (random, off topic), is precise (finds the lowest level taxon), consistent (the same answer every time), accurate (with respect to the WCVP accepted name), etc.
+  -How to make sure it is not hallucinating (random, off topic), is precise (finds the lowest level taxon), consistent (the same answer every time), accurate (with respect to the WCVP accepted name), etc.
 
--If the exact plant searched for is found and validated as the correct name and it is not already in the database then add it. 
+  -If the exact plant searched for is found and validated as the correct name and it is not already in the database then add it. 
 
--If the plant searched for is found (exact match or with high likelihood) and is already in the database then notify user in the user input to confirm or modify search and retry. 
+  -If the plant searched for is found (exact match or with high likelihood) and is already in the database then notify user in the user input to confirm or modify search and retry. 
 
--If a single plant is found with high likelihood but the name is different (misspellings or not preferred name) then present for user input to validate before entering into database.
+  -If a single plant is found with high likelihood but the name is different (misspellings or not preferred name) then present for user input to validate before entering into database.
 
--If multiple potential matches are found then present to the user input for them to resolve by selecting the correct ones to add or to modify the search.
+  -If multiple potential matches are found then present to the user input for them to resolve by selecting the correct ones to add or to modify the search.
 
-Update the SQL in "wcvp_schema.txt". Include other attributes/columns and other tables needed.
-
--Includes other columns of data needed by the app which did not come from WCVP. Include childCount.
 
 Create details panel that shows all data for a plant. Make this a panel that can be popped up or opened up under the plant row in the grid. Give it an edit mode so data can be updated.
 
@@ -207,5 +209,15 @@ Use the following to set the groups and column order and their default selection
     Basionym ID (not selected)
 
 
+Productionizing:
 
+How to run FloraCatalog as a web application outside of AI Studio deeloper environment?
+
+  Would this be a 3-tier app?
+
+  Create architecture documentation for it.
+
+  What are options for where to run the web application?
+
+  What is the path to production? Automate as much as possible.
 

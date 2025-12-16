@@ -1,6 +1,15 @@
 
 # Version History
 
+## v2.12.0 - Database Automation CLI
+**Date:** May 30, 2025
+
+### New Features
+- **Automated Build Script:** Added `scripts/automate_build.js`, an interactive CLI tool that orchestrates the entire database setup process.
+- **Workflow Automation:** The script handles Python data conversion, schema creation, high-speed TCP streaming import, and complex SQL batch execution (linking parents, calculating hierarchy) in a single flow.
+- **Resume Capability:** The builder includes a granular resume menu, allowing administrators to retry specific steps (like imports or hierarchy calculations) without restarting the entire process.
+- **Documentation:** Added `docs/AUTOMATION_PLAN.md` detailing the build architecture and `scripts/` directory structure.
+
 ## v2.11.1 - Script Completeness
 **Date:** May 30, 2025
 

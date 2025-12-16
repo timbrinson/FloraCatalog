@@ -1,3 +1,4 @@
+
 # FloraCatalog - Setup Guide
 
 ## 1. Cloud Infrastructure (Supabase)
@@ -12,6 +13,10 @@ This application uses Supabase for its PostgreSQL database and real-time capabil
 
 ### Step 2: Initialize Database Schema
 The application requires specific tables (`app_taxa`, `app_taxon_details`, etc.) to function.
+
+> **Automated Option:** You can skip the manual steps below by using the build script: `node scripts/automate_build.js` and selecting Option 2.
+
+**Manual Steps:**
 1.  In your Supabase Dashboard, go to the **SQL Editor** (icon on the left sidebar).
 2.  Click **"New Query"**.
 3.  Open the file `wcvp_schema.txt` from this project's root directory.
