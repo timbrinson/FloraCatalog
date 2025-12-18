@@ -1,7 +1,7 @@
 {
   "name": "FloraCatalog",
   "private": true,
-  "version": "2.12.0",
+  "version": "2.15.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -19,13 +19,13 @@
   "devDependencies": {
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
-    "@vitejs/plugin-react": "^4.2.1",
+    "@vitejs/plugin-react": "^4.3.4",
     "autoprefixer": "^10.4.18",
-    "pg": "^8.11.3",
-    "pg-copy-streams": "^6.0.6",
+    "pg": "^8.13.1",
+    "pg-copy-streams": "^7.0.0",
     "postcss": "^8.4.35",
     "tailwindcss": "^3.4.1",
     "typescript": "^5.2.2",
-    "vite": "^5.1.4"
+    "vite": "^6.2.0"
   }
 }
