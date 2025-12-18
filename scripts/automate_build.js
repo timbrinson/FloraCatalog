@@ -1,6 +1,6 @@
 
 /**
- * AUTOMATED DATABASE BUILDER (CLI) v2.5
+ * AUTOMATED DATABASE BUILDER (CLI) v2.6
  * 
  * Orchestrates the transformation of raw WCVP data into the FloraCatalog database.
  */
@@ -212,7 +212,7 @@ async function stepOptimize(client) {
 // --- MAIN LOOP ---
 
 async function main() {
-    console.log("\n🌿 FLORA CATALOG - DATABASE AUTOMATION v2.5 🌿\n");
+    console.log("\n🌿 FLORA CATALOG - DATABASE AUTOMATION v2.6 🌿\n");
     
     let dbUrl = process.env.DATABASE_URL;
     let finalConfig;
@@ -221,8 +221,7 @@ async function main() {
         log("Using DATABASE_URL from .env");
         finalConfig = { 
             connectionString: dbUrl,
-            ssl: { rejectUnauthorized: false },
-            family: 4 
+            ssl: { rejectUnauthorized: false }
         };
     } else {
         let dbPass = process.env.DATABASE_PASSWORD;
@@ -234,24 +233,24 @@ async function main() {
         
         if (!dbPass) { err("Password required."); process.exit(1); }
 
-        // Construct parameters explicitly
-        const host = 'aws-0-us-west-2.pooler.supabase.com';
         const user = `postgres.${DEFAULT_PROJECT_ID}`;
+        const host = 'aws-0-us-west-2.pooler.supabase.com';
         
-        console.log(`\n📡 Connection Parameters:`);
+        log(`Input Verification: Password length is ${dbPass.length} characters.`);
+        
+        // Build the URI string manually to handle special characters and proxy routing correctly
+        const encodedUser = encodeURIComponent(user);
+        const encodedPass = encodeURIComponent(dbPass);
+        const connectionString = `postgresql://${encodedUser}:${encodedPass}@${host}:6543/postgres?sslmode=require`;
+
+        console.log(`\n📡 Connection Method: URI String (Encoded)`);
         console.log(`   Host: ${host}`);
         console.log(`   User: ${user}`);
-        console.log(`   Port: 6543 (Transaction Pooler)`);
-        console.log(`   SSL: Enabled (Required)\n`);
+        console.log(`   Port: 6543 (Transaction Pooler)\n`);
 
         finalConfig = {
-            user: user,
-            host: host,
-            database: 'postgres',
-            password: dbPass,
-            port: 6543,
-            ssl: { rejectUnauthorized: false }, // CRITICAL for Supabase
-            family: 4 
+            connectionString: connectionString,
+            ssl: { rejectUnauthorized: false }
         };
     }
 
@@ -259,7 +258,7 @@ async function main() {
 
     try {
         await client.connect();
-        log("✅ Connected Successfully to Supabase.");
+        log("✅ Connection Successful!");
         
         const steps = [
             { id: '1', name: "Prepare Data (Python)", fn: () => stepPrepareData() },
@@ -293,14 +292,10 @@ async function main() {
     } catch (e) { 
         err(`Connection or build failed: ${e.message}`);
         if (e.message.includes('authentication failed')) {
-            console.log("\n💡 TROUBLESHOOTING TIP:");
-            console.log("1. Ensure you are using your DATABASE password, not your Supabase dashboard login password.");
-            console.log("2. Check that your project ID matches: " + DEFAULT_PROJECT_ID);
-            console.log("3. Reset your Database Password in Supabase Dashboard -> Settings -> Database.\n");
-        } else if (e.message.includes('EHOSTUNREACH') || e.message.includes('ETIMEDOUT')) {
-            console.log("\n💡 TROUBLESHOOTING TIP:");
-            console.log("Connection timed out. You might be behind a firewall that blocks port 6543.");
-            console.log("Current host: aws-0-us-west-2.pooler.supabase.com.\n");
+            console.log("\n💡 AUTHENTICATION TROUBLESHOOTING:");
+            console.log("1. Ensure this is your DATABASE password (set during project creation), not your Supabase dashboard login.");
+            console.log("2. If your password contains '@', the script has encoded it. If it still fails, try changing the password to alphanumeric-only via Supabase Dashboard -> Settings -> Database.");
+            console.log("3. Project ID: " + DEFAULT_PROJECT_ID);
         }
     } finally { 
         try { await client.end(); } catch(e) {} 
