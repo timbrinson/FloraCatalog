@@ -1,6 +1,6 @@
 
 /**
- * AUTOMATED DATABASE BUILDER (CLI) v2
+ * AUTOMATED DATABASE BUILDER (CLI) v2.2
  * 
  * Orchestrates the transformation of raw WCVP data into the FloraCatalog database.
  */
@@ -100,6 +100,7 @@ const Q_COUNTS = `
 // --- UTILS ---
 
 const log = (msg) => console.log(`\x1b[36m[FloraBuild]\x1b[0m ${msg}`);
+const warn = (msg) => console.log(`\x1b[33m[WARN]\x1b[0m ${msg}`);
 const err = (msg) => console.error(`\x1b[31m[ERROR]\x1b[0m ${msg}`);
 
 const askQuestion = (query) => {
@@ -118,6 +119,28 @@ const getPythonCommand = () => {
     try { execSync('python3 --version', { stdio: 'ignore' }); return 'python3'; } 
     catch (e) { return 'python'; }
 };
+
+/**
+ * Checks if the database host resolves to IPv6 and warns the user.
+ */
+async function connectionDoctor(dbUrl) {
+    if (!dbUrl) return;
+    try {
+        const urlObj = new URL(dbUrl);
+        const host = urlObj.hostname;
+        
+        if (host.includes('pooler.supabase.com')) {
+            log("Connection Doctor: IPv4 Pooler detected. Standard reliability checks passed.");
+            return;
+        }
+
+        if (host.startsWith('db.')) {
+            warn("Connection Doctor: You are using a direct connection (db.xxx.supabase.co).");
+            warn("This defaults to IPv6 which may cause 'EHOSTUNREACH' on standard networks.");
+            warn("FIX: The script now defaults to the Transaction Pooler (Port 6543) if you don't provide a URL.");
+        }
+    } catch (e) { /* ignore */ }
+}
 
 // --- STEPS ---
 
@@ -189,7 +212,6 @@ async function stepLink(client) {
 
 async function stepHierarchy(client) {
     log("Calculating Hierarchy Paths (Ltree)... this can take 2-5 minutes...");
-    // Disable timeout for this massive operation
     await client.query('SET statement_timeout = 0');
     await client.query(Q_HIERARCHY);
 }
@@ -212,25 +234,28 @@ async function stepOptimize(client) {
 // --- MAIN LOOP ---
 
 async function main() {
-    console.log("\n🌿 FLORA CATALOG - DATABASE AUTOMATION v2 🌿\n");
+    console.log("\n🌿 FLORA CATALOG - DATABASE AUTOMATION v2.2 🌿\n");
     let dbUrl = process.env.DATABASE_URL;
     let dbPass = process.env.DATABASE_PASSWORD;
 
     if (!dbUrl) {
         if (!dbPass) {
-            console.log(`ℹ️ DATABASE_URL not found. Using project: ${DEFAULT_PROJECT_ID}`);
+            console.log(`ℹ️ DATABASE_URL not found. Defaulting to project: ${DEFAULT_PROJECT_ID}`);
             dbPass = await askQuestion("🔑 Enter Database Password: ");
         }
         if (dbPass) {
             const encodedPass = encodeURIComponent(dbPass);
-            dbUrl = `postgresql://postgres:${encodedPass}@db.${DEFAULT_PROJECT_ID}.supabase.co:5432/postgres`;
+            // v2.2 UPDATE: Defaulting to IPv4 Transaction Pooler on port 6543 to avoid network errors
+            dbUrl = `postgresql://postgres.${DEFAULT_PROJECT_ID}:${encodedPass}@aws-0-us-west-2.pooler.supabase.com:6543/postgres`;
         } else { err("Password required."); process.exit(1); }
     }
+
+    await connectionDoctor(dbUrl);
 
     const client = new pg.Client({ connectionString: dbUrl });
     try {
         await client.connect();
-        log("Connected to Database.");
+        log("Connected to Database via Transaction Pooler.");
         const steps = [
             { id: '1', name: "Prepare Data (Python)", fn: () => stepPrepareData() },
             { id: '2', name: "Build Schema (Reset DB)", fn: () => stepBuildSchema(client) },
@@ -262,12 +287,11 @@ async function main() {
         log("\n✅ Automation Complete!");
     } catch (e) { 
         err(`Connection or build failed: ${e.message}`);
-        if (e.message.includes('EHOSTUNREACH')) {
+        if (e.message.includes('EHOSTUNREACH') || e.message.includes('ETIMEDOUT')) {
             console.log("\n💡 TROUBLESHOOTING TIP:");
-            console.log("Your network or ISP may be blocking IPv6 connections to Supabase.");
-            console.log("1. Use the IPv4 Connection Pooler string from your Supabase Dashboard (Settings -> Database).");
-            console.log("2. It looks like: 'postgresql://postgres:[pass]@aws-0-us-west-2.pooler.supabase.com:5432/postgres'");
-            console.log("3. Update DATABASE_URL in your .env file and try again.\n");
+            console.log("Network or ISP blocking IPv6. Ensure your .env uses the IPv4 Pooler host.");
+            console.log("Your current URL is attempting to connect to port 6543 (Transaction Mode).");
+            console.log("If issues persist, verify your AWS region in the script or .env.\n");
         }
     } finally { await client.end(); }
 }

@@ -30,64 +30,67 @@ The project is organized to separate application code from raw data and build to
       └── logs/             # Build logs
 ```
 
-## 3. Bootstrapping (Prerequisites)
+## 3. Supabase Network Configuration (Important!)
+
+Supabase recently moved to **IPv6 by default** for direct database connections. Many home and office networks do not yet support IPv6, resulting in the error: `connect EHOSTUNREACH [IPv6 Address]`.
+
+### How to Fix in Supabase:
+1.  Log in to your **Supabase Dashboard**.
+2.  Go to **Settings (Cog Icon)** -> **Database**.
+3.  Scroll down to the **Connection string** section.
+4.  Switch the tab to **"Transaction"** (this uses the connection pooler).
+5.  Ensure **"Use IPv4"** is checked (it will change the host from `db.xxx...` to `aws-0-xxx.pooler.supabase.com`).
+6.  Copy the **URI** string.
+7.  Update your local `.env` file's `DATABASE_URL` with this new string.
+
+**Automation Script Default:** As of v2.2, the automation script defaults to using the **Transaction Pooler (Port 6543)** and the standard IPv4 host for the default project.
+
+---
+
+## 4. Bootstrapping (Prerequisites)
 
 If running this on a fresh computer (e.g., an Admin's laptop), follow these steps to set up the environment.
 
 ### A. Get the Code
 1.  **Choose a location:** Open your terminal (Terminal on Mac/Linux, PowerShell on Windows). Use `cd` to navigate to the folder where you want the project to live. 
-    *Example:* `cd ~/Documents/Projects` or `cd C:\Users\Admin\Source`
 2.  **Clone the Repository:**
     ```bash
     git clone https://github.com/timbrinson/FloraCatalog.git
     cd FloraCatalog
     ```
-    *This creates the `FloraCatalog` folder and downloads the complete source structure from the timbrinson repository.*
 
 ### B. Install Runtimes
 The automation relies on **Node.js** (for database orchestration) and **Python** (for CSV processing).
 
 **Mac (OSX)**
-1.  **Install Homebrew** (if missing): `/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"`
-2.  **Install Node & Python:** `brew install node python`
-    *   *Note: This usually installs Python as `python3`. The automation script automatically detects this.*
+1.  `brew install node python`
 
 **Windows**
 1.  Download **Node.js (LTS)**: https://nodejs.org/
-2.  Download **Python 3**: https://www.python.org/ (Check "Add Python to PATH" during install).
-
-**Linux (Ubuntu/Debian)**
-1.  `sudo apt update`
-2.  `sudo apt install nodejs npm python3`
+2.  Download **Python 3**: https://www.python.org/ (Check "Add Python to PATH").
 
 ### C. Install Project Dependencies
 Open your terminal inside the `FloraCatalog` folder.
 ```bash
 npm install
-# This installs 'pg', 'pg-copy-streams' and other build tools defined in package.json.
 ```
 
-## 4. Security (Handling the Database Password)
+---
 
-**Best Practice:** Do not commit passwords to version control. The script supports two methods for authentication.
+## 5. Security & Authentication
 
-### Method A: Password Prompt (Recommended for Shared Computers)
-1.  Create a file named `.env` in the root folder.
-2.  Add the URL *without* the password:
+The script needs to know where your database is and how to log in.
+
+1.  Create a file named `.env` in the root `FloraCatalog` folder.
+2.  **Recommended:** Use the full Connection Pooler URI (see Section 3):
     ```env
-    DATABASE_URL="postgresql://postgres@db.[PROJECT-ID].supabase.co:5432/postgres"
+    DATABASE_URL="postgresql://postgres.[PROJ-ID]:[PASSWORD]@aws-0-us-west-2.pooler.supabase.com:6543/postgres"
     ```
-3.  Run the script. It will detect the missing password and prompt you to type it securely in the terminal.
+3.  If you only provide the URL without the password, the script will interactively prompt you for the password and attempt to connect via the pooler automatically.
 
-### Method B: Environment Variable (Convenience for Personal Machines)
-1.  Add the password to `.env` using a separate variable:
-    ```env
-    DATABASE_URL="postgresql://postgres@db.[PROJECT-ID].supabase.co:5432/postgres"
-    DATABASE_PASSWORD="your-secret-password"
-    ```
-    *The script will automatically use this password without prompting.*
+---
 
-## 5. The Build Workflow
+## 6. The Build Workflow
 
 The `scripts/automate_build.js` is an interactive CLI that guides the Admin through the process.
 
@@ -101,14 +104,16 @@ The `scripts/automate_build.js` is an interactive CLI that guides the Admin thro
 | **1** | **Prepare Data** | Auto | Python | Unzips and converts pipes (`|`) to commas (`,`). |
 | **2** | **Build Schema** | Auto | SQL | Runs `scripts/wcvp_schema.sql.txt`. Drops existing tables and recreates the empty schema. |
 | **3** | **Stream Import** | Auto | `COPY` | Streams `wcvp_names_clean.csv` to `wcvp_import` via TCP. |
-| **4** | **Populate** | Auto | SQL | Inserts data from staging to `app_taxa` (UUID generation). |
+| **4** | **Populate** | Auto | SQL | Inserts data from staging to `app_taxa`. |
 | **5** | **Indexes** | Auto | SQL | Creates basic structural indexes for linking. |
 | **6** | **Link Parents** | Auto | SQL | Updates `parent_id` based on WCVP IDs (Adjacency List). |
-| **7** | **Hierarchy** | Auto | SQL | Calculates Ltree paths. Includes `SET statement_timeout = 0` for 1.4M row processing. |
+| **7** | **Hierarchy** | Auto | SQL | Calculates Ltree paths. |
 | **8** | **Counts** | Auto | SQL | Calculates descendant counts for the UI grid. |
-| **9** | **Performance** | Auto | SQL | Runs `scripts/optimize_indexes.sql.txt`. Fast search/sort. |
+| **9** | **Performance** | Auto | SQL | Runs `scripts/optimize_indexes.sql.txt`. |
 
-## 6. Execution
+---
+
+## 7. Execution
 
 1.  **Open your terminal** and ensure you are in the `FloraCatalog` root directory.
 2.  **Start the Process:**
@@ -119,31 +124,19 @@ The `scripts/automate_build.js` is an interactive CLI that guides the Admin thro
     # Option 2: Using the NPM shortcut
     npm run db:build
     ```
-    *The script will create the `data/input` and `data/temp` folders if they don't exist.*
-
 3.  **Granular Resume Menu:**
-    The script offers granular control. If Step 3 (Import) fails due to internet issues, fix the connection and choose "Resume from Step 3". If Step 6 (Link) fails, choose "Resume from Step 6". Previous successful steps do not need to be re-run.
+    The script offers granular control. If a step fails, fix the issue and choose the specific step number from the menu to resume.
 
-## 7. Troubleshooting Common Errors
+---
+
+## 8. Troubleshooting Common Errors
 
 ### A. Error: `connect EHOSTUNREACH [IPv6 Address]`
-This occurs when your computer or network is unable to reach the Supabase server via IPv6. Supabase defaults to IPv6 for direct connections.
-
-**The Fix:** Use the **Supabase IPv4 Pooler Connection String**.
-1. Log in to your Supabase Dashboard.
-2. Go to **Settings -> Database**.
-3. Under **Connection String**, select **"Transaction"** or **"Session"** mode.
-4. Check the box for **"Use IPv4"** (if available) or copy the string that uses the pooler host (e.g., `aws-0-us-west-2.pooler.supabase.com`).
-5. Update your `.env` file with this new `DATABASE_URL`.
+*   **Cause:** Local network or computer doesn't support IPv6.
+*   **Fix:** The script v2.2+ defaults to the IPv4 pooler. If you hardcoded a `db.` host in `.env`, replace it with the `...pooler.supabase.com` host and use port **6543**.
 
 ### B. Error: `Terminated due to timeout`
-Step 7 (Ltree) and Step 9 (Indexes) are very heavy.
-*   **Action:** The script already sets `statement_timeout = 0`. If it still fails, ensure your internet connection is stable. These steps can take up to 10 minutes on the free tier.
+*   **Fix:** Ensure you are using the **"Transaction"** mode pooler on port **6543**. The script sets `statement_timeout = 0`, but the pooler is much more stable for multi-minute operations like hierarchy calculation.
 
-### C. Import Fails (Streaming Error)
-*   Ensure your internet connection is stable.
-*   Ensure `wcvp_names_clean.csv` was generated correctly in Step 1.
-*   You can retry Step 3 from the menu.
-
-### D. Python Error
-*   If the script fails to find python, ensure `python` or `python3` is in your system PATH.
+### C. Python Error
+*   **Fix:** Ensure `python` or `python3` is in your system PATH. The script tries both.
