@@ -264,6 +264,17 @@ function App() {
               return;
           }
 
+          // SYNONYM REDIRECTION LOGIC
+          const firstCandidate = candidates[0];
+          if (firstCandidate.matchType === 'synonym' && firstCandidate.acceptedName) {
+              requireInputActivity(actId, "Synonym identified.", {
+                  type: 'synonym',
+                  candidates: candidates,
+                  originalQuery: queryTerm
+              });
+              return;
+          }
+
           if (candidates.length > 1 && candidates[0].confidence < 0.95) {
               requireInputActivity(actId, "Multiple matches found.", {
                   type: 'ambiguous',
@@ -586,7 +597,7 @@ function App() {
                              Note: Tree view only shows relationships for records loaded on the current page.
                          </div>
                          <table className="w-full text-left">
-                             <thead className="bg-slate-50 text-xs font-bold text-slate-400 uppercase tracking-wider border-b border-slate-200">
+                             <thead className="bg-slate-50 text-xs font-bold text-slate-500 uppercase tracking-wider border-b border-slate-200">
                                  <tr><th className="p-3 pl-8 w-1/2">Taxon Name</th><th className="p-3 w-1/4">Common Name</th><th className="p-3">Family / Notes</th><th className="p-3 text-right">Actions</th></tr>
                              </thead>
                              <tbody>{renderTree(undefined, 0)}</tbody>

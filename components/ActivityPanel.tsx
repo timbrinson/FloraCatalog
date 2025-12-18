@@ -3,7 +3,8 @@ import React, { useState, useMemo } from 'react';
 import { ActivityItem, ActivityStatus, SearchCandidate } from '../types';
 import { 
     Loader2, CheckCircle2, XCircle, AlertTriangle, 
-    Activity, RotateCcw, X, Check, ChevronDown, ChevronRight
+    Activity, RotateCcw, X, Check, ChevronDown, ChevronRight,
+    ArrowRight
 } from 'lucide-react';
 
 interface ActivityPanelProps {
@@ -57,6 +58,45 @@ const ActivityPanel: React.FC<ActivityPanelProps> = ({
                           className="px-2 py-1 text-xs bg-slate-100 text-slate-600 rounded hover:bg-slate-200"
                       >
                           Cancel
+                      </button>
+                  </div>
+              </div>
+          );
+      }
+
+      if (type === 'synonym') {
+          const match = candidates[0];
+          return (
+              <div className="mt-2 p-2 bg-white rounded border border-amber-200 shadow-sm">
+                  <p className="text-xs text-slate-700 mb-3">
+                      <strong>{match.taxonName}</strong> is a synonym for <strong>{match.acceptedName}</strong>. Which would you like to add?
+                  </p>
+                  <div className="space-y-2">
+                      <button 
+                          onClick={() => onResolve && onResolve(item.id, 'accept', { ...match, taxonName: match.acceptedName })}
+                          className="w-full flex items-center justify-between p-2 text-xs border border-leaf-200 bg-leaf-50 text-leaf-800 rounded hover:bg-leaf-100 transition-colors"
+                      >
+                          <div className="text-left">
+                              <div className="font-bold">Add Accepted Name</div>
+                              <div className="text-[10px] opacity-70">{match.acceptedName}</div>
+                          </div>
+                          <Check size={14}/>
+                      </button>
+                      <button 
+                          onClick={() => onResolve && onResolve(item.id, 'accept', match)}
+                          className="w-full flex items-center justify-between p-2 text-xs border border-slate-200 bg-white text-slate-600 rounded hover:bg-slate-50 transition-colors"
+                      >
+                          <div className="text-left">
+                              <div className="font-medium">Add Synonym Name</div>
+                              <div className="text-[10px] opacity-70">{match.taxonName}</div>
+                          </div>
+                          <ArrowRight size={14}/>
+                      </button>
+                      <button 
+                          onClick={() => onDismiss(item.id)}
+                          className="w-full py-1.5 text-xs text-slate-400 hover:text-slate-600"
+                      >
+                          Cancel Search
                       </button>
                   </div>
               </div>
@@ -198,7 +238,7 @@ const ActivityPanel: React.FC<ActivityPanelProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="absolute top-full right-0 mt-2 w-[450px] max-h-[80vh] bg-white border border-slate-200 shadow-2xl rounded-xl z-50 flex flex-col animate-in fade-in zoom-in-95 duration-200 origin-top-right">
+    <div className="absolute top-full right-0 mt-2 w-[450px] max-h-[85vh] bg-white border border-slate-200 shadow-2xl rounded-xl z-50 flex flex-col animate-in fade-in zoom-in-95 duration-200 origin-top-right">
         
         {/* Header */}
         <div className="p-3 flex items-center justify-between border-b border-slate-100 bg-slate-50 rounded-t-xl">
@@ -214,7 +254,7 @@ const ActivityPanel: React.FC<ActivityPanelProps> = ({
         <div className="flex-1 overflow-hidden flex flex-col bg-slate-50">
             
             {needsInput.length > 0 && (
-                <div className="p-3 border-b border-amber-200 bg-amber-50/50 overflow-y-auto flex-shrink-0 max-h-[40vh]">
+                <div className="p-3 border-b border-amber-200 bg-amber-50/50 overflow-y-auto flex-shrink-0 max-h-[50vh]">
                     <div className="text-[10px] font-bold text-amber-700 uppercase tracking-wide mb-2 flex items-center gap-2">
                         <AlertTriangle size={12}/> Action Required
                     </div>

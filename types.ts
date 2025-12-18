@@ -96,6 +96,7 @@ export interface TaxonMetadata {
   editHistory: AuditRecord[];
   
   // Track specific attribute sources if different from main source
+  // Fix: Removed duplicate descriptionSourceId property found on lines 99-100
   descriptionSourceId?: string;
   imagesSourceId?: string;
 }
@@ -279,6 +280,7 @@ export type ActivityStatus = 'running' | 'paused' | 'completed' | 'error' | 'nee
 export interface SearchCandidate {
   taxonName: string; // Was scientificName
   commonName?: string;
+  acceptedName?: string; // NEW: The correct botanical name if this is a synonym
   taxonRank?: string; 
   matchType: 'exact' | 'synonym' | 'fuzzy' | 'common_name';
   confidence: number; // 0-1
@@ -286,7 +288,7 @@ export interface SearchCandidate {
 }
 
 export interface ResolutionData {
-  type: 'duplicate' | 'ambiguous' | 'correction';
+  type: 'duplicate' | 'ambiguous' | 'correction' | 'synonym';
   candidates: SearchCandidate[];
   originalQuery: string;
   existingId?: string; // If duplicate, ID of existing plant

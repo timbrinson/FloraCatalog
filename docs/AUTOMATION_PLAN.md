@@ -7,7 +7,7 @@ This document defines the standard operating procedure (SOP) for rebuilding the 
 The project is organized to separate application code from raw data and build tools.
 
 ```text
-/flora-catalog
+/FloraCatalog
   ├── .env                  # Secrets (git-ignored)
   ├── package.json          # Dependency manifest
   ├── App.tsx               # Main application logic
@@ -39,10 +39,10 @@ If running this on a fresh computer (e.g., an Admin's laptop), follow these step
     *Example:* `cd ~/Documents/Projects` or `cd C:\Users\Admin\Source`
 2.  **Clone the Repository:**
     ```bash
-    git clone https://github.com/timbrinson/flora-catalog.git
-    cd flora-catalog
+    git clone https://github.com/timbrinson/FloraCatalog.git
+    cd FloraCatalog
     ```
-    *This creates the `flora-catalog` folder and downloads the complete source structure from the timbrinson repository.*
+    *This creates the `FloraCatalog` folder and downloads the complete source structure from the timbrinson repository.*
 
 ### B. Install Runtimes
 The automation relies on **Node.js** (for database orchestration) and **Python** (for CSV processing).
@@ -61,7 +61,7 @@ The automation relies on **Node.js** (for database orchestration) and **Python**
 2.  `sudo apt install nodejs npm python3`
 
 ### C. Install Project Dependencies
-Open your terminal inside the `flora-catalog` folder.
+Open your terminal inside the `FloraCatalog` folder.
 ```bash
 npm install
 # This installs 'pg', 'pg-copy-streams' and other build tools defined in package.json.

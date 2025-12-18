@@ -1,5 +1,4 @@
 
-
 import { GoogleGenAI } from "@google/genai";
 import { Taxon, TaxonRank, Link, Synonym, TaxonomicStatus, SearchCandidate } from "../types";
 
@@ -157,7 +156,7 @@ export const identifyTaxonomy = async (query: string): Promise<RawTaxonNode[]> =
       `;
 
       const response = await ai.models.generateContent({
-        model: "gemini-2.5-flash",
+        model: "gemini-3-flash-preview",
         contents: prompt,
       });
 
@@ -209,7 +208,7 @@ export const enrichTaxon = async (taxon: Taxon): Promise<Partial<Taxon>> => {
       `;
 
       const response = await ai.models.generateContent({
-        model: "gemini-2.5-flash",
+        model: "gemini-3-flash-preview",
         contents: prompt,
       });
 
@@ -254,7 +253,7 @@ export const getBotanicalSuggestions = async (
      JSON Array of strings ONLY. No Markdown.
   `;
   try {
-      const response = await ai.models.generateContent({ model: "gemini-2.5-flash", contents: prompt });
+      const response = await ai.models.generateContent({ model: "gemini-3-flash-preview", contents: prompt });
       const text = getResponseText(response);
       const json = extractJSON(text);
       return json ? JSON.parse(json) : [];
@@ -265,7 +264,7 @@ export const findAdditionalLinks = async (name: string, existing: Link[]): Promi
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     try {
         const prompt = `Find 5 distinct reference links for "${name}". Exclude: ${existing.map(l=>l.url).join(', ')}. Return JSON array of {title, url}.`;
-        const res = await ai.models.generateContent({ model: "gemini-2.5-flash", contents: prompt });
+        const res = await ai.models.generateContent({ model: "gemini-3-flash-preview", contents: prompt });
         const text = getResponseText(res);
         const json = extractJSON(text);
         return json ? JSON.parse(json) : [];
@@ -309,7 +308,7 @@ export const deepScanTaxon = async (
              `;
              
              const res = await ai.models.generateContent({
-                 model: "gemini-2.5-flash",
+                 model: "gemini-3-flash-preview",
                  contents: prompt,
                  // Tools removed to save costs
              });
@@ -344,7 +343,7 @@ export const parseBulkText = async (rawText: string): Promise<RawTaxonNode[][]> 
             Task: Identify every distinct plant. Return array of Taxonomic Chains.
             Output JSON Format: [[ { "rank": "genus", "name": "...", "genusHybrid": "×" }, { "rank": "species", ... } ]]
         `;
-        const res = await ai.models.generateContent({ model: "gemini-2.5-flash", contents: prompt });
+        const res = await ai.models.generateContent({ model: "gemini-3-flash-preview", contents: prompt });
         const text = getResponseText(res);
         const json = extractJSON(text);
         const parsed = json ? JSON.parse(json) : [];
@@ -372,11 +371,17 @@ export const searchTaxonCandidates = async (query: string): Promise<SearchCandid
     
     Return a JSON Array of up to 3 candidates, sorted by likelihood.
     
+    CRITICAL SYNONYM RULE:
+    If the name is a synonym, you MUST identify the 'acceptedName'.
+    - Example: "Dicentra spectabilis" 
+      -> { scientificName: "Dicentra spectabilis", matchType: "synonym", acceptedName: "Lamprocapnos spectabilis" }
+
     Format:
     [
       { 
         "scientificName": "Full botanical name with authors omitted", 
         "commonName": "Common Name", 
+        "acceptedName": "Accepted botanical name (if searched name is a synonym)",
         "rank": "species|cultivar|etc",
         "matchType": "exact|synonym|fuzzy|common_name",
         "confidence": 0.95
@@ -386,7 +391,7 @@ export const searchTaxonCandidates = async (query: string): Promise<SearchCandid
 
   try {
       const response = await ai.models.generateContent({
-        model: "gemini-2.5-flash",
+        model: "gemini-3-flash-preview",
         contents: prompt,
       });
 
@@ -400,6 +405,7 @@ export const searchTaxonCandidates = async (query: string): Promise<SearchCandid
       return rawCandidates.map((c: any) => ({
           taxonName: c.scientificName, // Map AI 'scientificName' to 'taxonName'
           commonName: c.commonName,
+          acceptedName: c.acceptedName,
           taxonRank: c.rank, 
           matchType: c.matchType,
           confidence: c.confidence,

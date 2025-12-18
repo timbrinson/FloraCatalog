@@ -172,11 +172,10 @@ export const dataService = {
         if (key === 'plantNameId') dbKey = 'wcvp_id'; 
         
         if (key === 'taxonName') {
-            // SEARCH UPGRADE: GIN Index Enabled
-            // We can now use ILIKE with wildcards at both ends.
-            // The GIN index (trgm_idx_app_taxa_name) makes this fast.
+            // PERFORMANCE FIX (v2.13.0): 
+            // Switched from Contains (%term%) to Prefix Match (term%) to leverage B-Tree index.
             const cleanSearch = (value as string).trim();
-            query = query.ilike('taxon_name', `%${cleanSearch}%`);
+            query = query.ilike('taxon_name', `${cleanSearch}%`);
         } else if (Array.isArray(value)) {
             // Multi-select handling
             if (value.length > 0) {
@@ -199,9 +198,7 @@ export const dataService = {
                  if (key.endsWith('Id') || key === 'firstPublished') {
                      query = query.eq(dbKey, strVal);
                  } else {
-                     // For other text fields, ILIKE is safer for user input, 
-                     // though standard indexes might not optimize it as well as GIN.
-                     // Prefix search is a safe bet for general columns.
+                     // Prefix search is best for general columns.
                      query = query.ilike(dbKey, `${strVal}%`);
                  }
             }
