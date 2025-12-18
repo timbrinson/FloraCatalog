@@ -1,4 +1,3 @@
-
 # Database Automation & Build Plan
 
 ## 1. Overview
@@ -36,13 +35,14 @@ The project is organized to separate application code from raw data and build to
 If running this on a fresh computer (e.g., an Admin's laptop), follow these steps to set up the environment.
 
 ### A. Get the Code
-1.  **Choose a location:** Open your terminal and navigate to the directory where you want to store your projects (e.g., `cd ~/Documents/Projects`).
+1.  **Choose a location:** Open your terminal (Terminal on Mac/Linux, PowerShell on Windows). Use `cd` to navigate to the folder where you want the project to live. 
+    *Example:* `cd ~/Documents/Projects` or `cd C:\Users\Admin\Source`
 2.  **Clone the Repository:**
     ```bash
     git clone https://github.com/timbrinson/flora-catalog.git
     cd flora-catalog
     ```
-    *This creates the `flora-catalog` folder and downloads the complete source structure.*
+    *This creates the `flora-catalog` folder and downloads the complete source structure from the timbrinson repository.*
 
 ### B. Install Runtimes
 The automation relies on **Node.js** (for database orchestration) and **Python** (for CSV processing).
