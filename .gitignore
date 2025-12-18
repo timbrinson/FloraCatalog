@@ -1,4 +1,3 @@
-
 # Dependencies
 node_modules
 .pnp
@@ -13,7 +12,10 @@ dist
 
 # Data & Secrets (Important!)
 .env
-data/
+data/*
+!data/input/README.md
+!data/temp/README.md
+!data/logs/README.md
 *.csv
 *.zip
 
