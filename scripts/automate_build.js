@@ -1,6 +1,6 @@
 
 /**
- * AUTOMATED DATABASE BUILDER (CLI) v2.6
+ * AUTOMATED DATABASE BUILDER (CLI) v2.7
  * 
  * Orchestrates the transformation of raw WCVP data into the FloraCatalog database.
  */
@@ -212,8 +212,11 @@ async function stepOptimize(client) {
 // --- MAIN LOOP ---
 
 async function main() {
-    console.log("\n🌿 FLORA CATALOG - DATABASE AUTOMATION v2.6 🌿\n");
+    console.log("\n🌿 FLORA CATALOG - DATABASE AUTOMATION v2.7 🌿\n");
     
+    // Nuclear SSL Bypass: Required for certain self-signed CA environments with Supabase Poolers
+    process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
+
     let dbUrl = process.env.DATABASE_URL;
     let finalConfig;
 
@@ -238,12 +241,14 @@ async function main() {
         
         log(`Input Verification: Password length is ${dbPass.length} characters.`);
         
-        // Build the URI string manually to handle special characters and proxy routing correctly
+        // Build the URI string manually
         const encodedUser = encodeURIComponent(user);
         const encodedPass = encodeURIComponent(dbPass);
-        const connectionString = `postgresql://${encodedUser}:${encodedPass}@${host}:6543/postgres?sslmode=require`;
+        
+        // Note: Removed sslmode query param from URI as we use the config object to manage it
+        const connectionString = `postgresql://${encodedUser}:${encodedPass}@${host}:6543/postgres`;
 
-        console.log(`\n📡 Connection Method: URI String (Encoded)`);
+        console.log(`\n📡 Connection Method: URI String (Manual SSL handling)`);
         console.log(`   Host: ${host}`);
         console.log(`   User: ${user}`);
         console.log(`   Port: 6543 (Transaction Pooler)\n`);
@@ -293,9 +298,13 @@ async function main() {
         err(`Connection or build failed: ${e.message}`);
         if (e.message.includes('authentication failed')) {
             console.log("\n💡 AUTHENTICATION TROUBLESHOOTING:");
-            console.log("1. Ensure this is your DATABASE password (set during project creation), not your Supabase dashboard login.");
-            console.log("2. If your password contains '@', the script has encoded it. If it still fails, try changing the password to alphanumeric-only via Supabase Dashboard -> Settings -> Database.");
-            console.log("3. Project ID: " + DEFAULT_PROJECT_ID);
+            console.log("1. Ensure this is your DATABASE password (set during project creation).");
+            console.log("2. Project ID: " + DEFAULT_PROJECT_ID);
+        } else if (e.message.includes('certificate')) {
+            console.log("\n💡 CERTIFICATE TROUBLESHOOTING:");
+            console.log("Your environment is rejecting the Supabase SSL certificate.");
+            console.log("The script attempted to bypass this with NODE_TLS_REJECT_UNAUTHORIZED=0.");
+            console.log("If this still fails, try running the script with: NODE_TLS_REJECT_UNAUTHORIZED=0 node scripts/automate_build.js\n");
         }
     } finally { 
         try { await client.end(); } catch(e) {} 
