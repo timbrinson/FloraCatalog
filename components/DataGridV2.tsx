@@ -1,10 +1,9 @@
-
 import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { Taxon, UserPreferences, ColorTheme } from '../types';
 import { 
   ArrowUpDown, Settings, Check, ChevronDown, GripVertical, Maximize, Monitor, 
-  Pickaxe, Info, Wand2, LayoutList, ChevronRight, Network, AlignJustify,
-  ChevronsDown, ChevronsUp, ChevronUp, Loader2
+  Pickaxe, Info, Wand2, Network, ChevronRight,
+  ChevronsDown, ChevronsUp, ChevronUp, Loader2, Search, List
 } from 'lucide-react';
 import { formatFullScientificName } from '../utils/formatters';
 import DetailsPanel from './DetailsPanel';
@@ -21,6 +20,10 @@ interface DataGridProps {
   onLoadMore: () => void;
   sortConfig: { key: string; direction: 'asc' | 'desc' };
   onSortChange: (key: string, direction: 'asc' | 'desc') => void;
+  
+  // Server-side Filtering Props
+  filters: Record<string, any>;
+  onFilterChange: (key: string, value: any) => void;
 }
 
 const RANK_HIERARCHY: Record<string, number> = {
@@ -40,29 +43,12 @@ const COLUMN_RANK_MAP: Record<string, number> = {
 type ThemeMap = Record<string, string>;
 
 const THEMES: Record<ColorTheme, ThemeMap> = {
-    'option1a': { // Orange -> Amber -> Green -> Sky
-        'family': 'red', 'genus': 'orange', 'species': 'amber', 
-        'subspecies': 'green', 'variety': 'green', 'form': 'green', 'hybrid': 'amber',
-        'cultivar': 'sky', 'grex': 'sky'
-    },
-    'option1b': { // Sky -> Green -> Amber -> Orange
-        'family': 'red', 'genus': 'sky', 'species': 'green', 
-        'subspecies': 'amber', 'variety': 'amber', 'form': 'amber', 'hybrid': 'green',
-        'cultivar': 'orange', 'grex': 'orange'
-    },
-    'option2a': { // Green -> Amber -> Orange -> Sky
-        'family': 'red', 'genus': 'green', 'species': 'amber', 
-        'subspecies': 'orange', 'variety': 'orange', 'form': 'orange', 'hybrid': 'amber',
-        'cultivar': 'sky', 'grex': 'sky'
-    },
-    'option2b': { // Sky -> Orange -> Amber -> Green
-        'family': 'red', 'genus': 'sky', 'species': 'orange', 
-        'subspecies': 'amber', 'variety': 'amber', 'form': 'amber', 'hybrid': 'orange',
-        'cultivar': 'green', 'grex': 'green'
-    }
+    'option1a': { 'family': 'red', 'genus': 'orange', 'species': 'amber', 'subspecies': 'green', 'variety': 'green', 'form': 'green', 'hybrid': 'amber', 'cultivar': 'sky', 'grex': 'sky' },
+    'option1b': { 'family': 'red', 'genus': 'sky', 'species': 'green', 'subspecies': 'amber', 'variety': 'amber', 'form': 'amber', 'hybrid': 'green', 'cultivar': 'orange', 'grex': 'orange' },
+    'option2a': { 'family': 'red', 'genus': 'green', 'species': 'amber', 'subspecies': 'orange', 'variety': 'orange', 'form': 'orange', 'hybrid': 'amber', 'cultivar': 'sky', 'grex': 'sky' },
+    'option2b': { 'family': 'red', 'genus': 'sky', 'species': 'orange', 'subspecies': 'amber', 'variety': 'amber', 'form': 'amber', 'hybrid': 'orange', 'cultivar': 'green', 'grex': 'green' }
 };
 
-// Helper to get text color class based on base color
 const getTextClass = (color: string) => {
     if (color === 'slate') return 'text-slate-600';
     return `text-${color}-700`;
@@ -91,7 +77,20 @@ const MultiSelectFilter = ({ options, selected, onChange, label }: { options: st
     );
 };
 
-// Changed from interface extends to type intersection to ensure properties are picked up correctly
+// Simple debounce hook for text inputs
+const useDebounce = <T,>(value: T, delay: number): T => {
+  const [debouncedValue, setDebouncedValue] = useState(value);
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedValue(value);
+    }, delay);
+    return () => {
+      clearTimeout(handler);
+    };
+  }, [value, delay]);
+  return debouncedValue;
+};
+
 type TreeRow = Taxon & {
     isTreeHeader?: boolean;
     treeExpanded?: boolean;
@@ -101,7 +100,6 @@ type TreeRow = Taxon & {
     isVirtual?: boolean; 
 };
 
-// OPTIMIZED: Use DB field instead of recursive calculation
 const getDescendantCount = (taxon: Taxon): number => {
     return taxon.descendantCount || 0;
 };
@@ -109,7 +107,8 @@ const getDescendantCount = (taxon: Taxon): number => {
 const DataGridV2: React.FC<DataGridProps> = ({ 
     taxa, onAction, onUpdate, preferences, 
     totalRecords, isLoadingMore, onLoadMore, 
-    sortConfig, onSortChange 
+    sortConfig, onSortChange,
+    filters, onFilterChange
 }) => {
   type ColumnId = string; 
   interface ColumnConfig { 
@@ -122,7 +121,7 @@ const DataGridV2: React.FC<DataGridProps> = ({
       disableDrag?: boolean;
       hideHeaderIcons?: boolean; 
       headerAlign?: 'left' | 'center' | 'right';
-      lockWidth?: boolean; // If true, auto-fit and fit-to-screen won't resize this column
+      lockWidth?: boolean;
   }
 
   const allColumns: ColumnConfig[] = [
@@ -131,9 +130,9 @@ const DataGridV2: React.FC<DataGridProps> = ({
       { id: 'childCount', label: '#', defaultWidth: 50, filterType: 'text', hideHeaderIcons: true, headerAlign: 'center', lockWidth: true }, 
       
       { id: 'family', label: 'Family', defaultWidth: 120, filterType: 'text' },
-      { id: 'genusHybrid', label: 'GH', defaultWidth: 40, filterType: 'text', disableSorting: true, hideHeaderIcons: true, headerAlign: 'center', lockWidth: true }, 
+      { id: 'genusHybrid', label: 'GH', defaultWidth: 40, filterType: 'multi-select', filterOptions: ['×', '+', 'NULL'], disableSorting: true, hideHeaderIcons: true, headerAlign: 'center', lockWidth: true }, 
       { id: 'genus', label: 'Genus', defaultWidth: 120, filterType: 'text' }, 
-      { id: 'speciesHybrid', label: 'SH', defaultWidth: 40, filterType: 'text', disableSorting: true, hideHeaderIcons: true, headerAlign: 'center', lockWidth: true }, 
+      { id: 'speciesHybrid', label: 'SH', defaultWidth: 40, filterType: 'multi-select', filterOptions: ['×', '+', 'NULL'], disableSorting: true, hideHeaderIcons: true, headerAlign: 'center', lockWidth: true }, 
       { id: 'species', label: 'Species', defaultWidth: 120, filterType: 'text' }, 
       
       { id: 'infraspecificRank', label: 'I Rank', defaultWidth: 60, filterType: 'text', hideHeaderIcons: true, headerAlign: 'center', lockWidth: true },
@@ -142,36 +141,27 @@ const DataGridV2: React.FC<DataGridProps> = ({
       
       { id: 'taxonName', label: 'Taxon Name', defaultWidth: 220, filterType: 'text' }, 
       
-      { id: 'taxonRank', label: 'Rank', defaultWidth: 110, filterType: 'multi-select', filterOptions: ['family', 'genus', 'species', 'subspecies', 'variety', 'form', 'hybrid', 'cultivar', 'grex', 'Unranked'], lockWidth: true }, 
-      { id: 'taxonStatus', label: 'Status', defaultWidth: 110, filterType: 'multi-select', filterOptions: ['Accepted', 'Synonym', 'Unresolved', 'Artificial'] },
+      { id: 'taxonRank', label: 'Rank', defaultWidth: 110, filterType: 'multi-select', 
+        filterOptions: [
+            'Family', 'Genus', 'Species', 'Subspecies', 'Variety', 'Form', 'Hybrid', 'Cultivar', 'Grex', 'Unranked', 
+            'Convariety', 'Subform', 'Subvariety', 
+            'agamosp.', 'ecas.', 'group', 'lusus', 'microf.', 'microgène', 'micromorphe', 'modif.', 'monstr.', 'mut.', 
+            'nid', 'nothof.', 'nothosubsp.', 'nothovar.', 'positio', 'proles', 'provar.', 'psp.', 'stirps', 'subap.', 
+            'sublusus', 'subproles', 'subspecioid', 'subsubsp.'
+        ], lockWidth: true 
+      }, 
+      { id: 'taxonStatus', label: 'Status', defaultWidth: 110, filterType: 'multi-select', 
+        filterOptions: ['Accepted', 'Synonym', 'Unplaced', 'Artificial Hybrid', 'Illegitimate', 'Invalid', 'Misapplied', 'Orthographic', 'Provisionally Accepted', 'Unresolved', 'Local Biotype'] 
+      },
       { id: 'commonName', label: 'Common Name', defaultWidth: 150, filterType: 'text' },
-      
       { id: 'plantNameId', label: 'WCVP ID', defaultWidth: 100, filterType: 'text' }, 
       { id: 'ipniId', label: 'IPNI ID', defaultWidth: 100, filterType: 'text' },
       { id: 'powoId', label: 'POWO ID', defaultWidth: 100, filterType: 'text' },
-      { id: 'acceptedPlantNameId', label: 'Accepted ID', defaultWidth: 100, filterType: 'text' }, 
-      { id: 'parentId', label: 'Parent ID', defaultWidth: 100, filterType: 'text' },
-      { id: 'parentPlantNameId', label: 'Parent Plant ID', defaultWidth: 100, filterType: 'text' }, 
-      { id: 'basionymPlantNameId', label: 'Basionym ID', defaultWidth: 100, filterType: 'text' }, 
-      { id: 'homotypicSynonym', label: 'Homotypic Syn.', defaultWidth: 100, filterType: 'text' }, 
       { id: 'id', label: 'Internal ID', defaultWidth: 100, filterType: 'text' },
-
       { id: 'taxonAuthors', label: 'Authorship', defaultWidth: 150, filterType: 'text' }, 
-      { id: 'primaryAuthor', label: 'Primary Author', defaultWidth: 150, filterType: 'text' }, 
-      { id: 'parentheticalAuthor', label: 'Parenthetical Author', defaultWidth: 140, filterType: 'text' },
-      { id: 'publicationAuthor', label: 'Pub. Author', defaultWidth: 120, filterType: 'text' },
-      { id: 'replacedSynonymAuthor', label: 'Replaced Syn. Author', defaultWidth: 150, filterType: 'text' }, 
-      
       { id: 'placeOfPublication', label: 'Publication', defaultWidth: 200, filterType: 'text' },
-      { id: 'volumeAndPage', label: 'Vol/Page', defaultWidth: 100, filterType: 'text' },
       { id: 'firstPublished', label: 'First Published', defaultWidth: 120, filterType: 'text' },
-      { id: 'nomenclaturalRemarks', label: 'Nom. Remarks', defaultWidth: 150, filterType: 'text' },
-      { id: 'reviewed', label: 'Reviewed', defaultWidth: 90, filterType: 'multi-select', filterOptions: ['Y', 'N'] },
-      
-      { id: 'hybridFormula', label: 'Hybrid Formula', defaultWidth: 150, filterType: 'text' },
       { id: 'geographicArea', label: 'Geography', defaultWidth: 180, filterType: 'text' },
-      { id: 'lifeformDescription', label: 'Lifeform', defaultWidth: 120, filterType: 'text' },
-      { id: 'climateDescription', label: 'Climate', defaultWidth: 120, filterType: 'text' },
       { id: 'description', label: 'Description', defaultWidth: 250, filterType: 'text' },
   ];
 
@@ -189,18 +179,11 @@ const DataGridV2: React.FC<DataGridProps> = ({
   const [columnOrder, setColumnOrder] = useState<ColumnId[]>(() => loadState('grid_v2_col_order_rev7', allColumns.map(c => c.id)));
   const [colWidths, setColWidths] = useState<Record<ColumnId, number>>(() => loadState('grid_v2_col_widths', Object.fromEntries(allColumns.map(c => [c.id, c.defaultWidth]))));
   
-  // Note: sortConfig is now passed as prop
-  
-  const [textFilters, setTextFilters] = useState<Record<string, string>>(() => loadState('grid_v2_text_filters', {}));
-  const [multiFilters, setMultiFilters] = useState<Record<string, string[]>>(() => loadState('grid_v2_multi_filters', {}));
-
   const [isHierarchyMode, setIsHierarchyMode] = useState<boolean>(false);
   const [groupBy, setGroupBy] = useState<string[]>([]);
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
-  
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
 
-  // Disable Hierarchy Mode persistence for now as it conflicts with pagination
   useEffect(() => {
       if (isHierarchyMode) setGroupBy(['genus', 'species', 'infraspecies']);
       else setGroupBy([]);
@@ -209,8 +192,6 @@ const DataGridV2: React.FC<DataGridProps> = ({
   useEffect(() => localStorage.setItem('grid_v2_visible_cols', JSON.stringify(Array.from(visibleColumns))), [visibleColumns]);
   useEffect(() => localStorage.setItem('grid_v2_col_order_rev7', JSON.stringify(columnOrder)), [columnOrder]);
   useEffect(() => localStorage.setItem('grid_v2_col_widths', JSON.stringify(colWidths)), [colWidths]);
-  useEffect(() => localStorage.setItem('grid_v2_text_filters', JSON.stringify(textFilters)), [textFilters]);
-  useEffect(() => localStorage.setItem('grid_v2_multi_filters', JSON.stringify(multiFilters)), [multiFilters]);
 
   const [draggedColumn, setDraggedColumn] = useState<ColumnId | null>(null);
   const [showColPicker, setShowColPicker] = useState(false);
@@ -236,7 +217,6 @@ const DataGridV2: React.FC<DataGridProps> = ({
       return activeColumns.reduce((sum, col) => sum + (colWidths[col.id] || col.defaultWidth), 0);
   }, [activeColumns, colWidths]);
 
-  // Determine current color map
   const activeColorMap = useMemo(() => THEMES[preferences.colorTheme] || THEMES['option1a'], [preferences.colorTheme]);
 
   const getRowValue = (row: Taxon, colId: string) => {
@@ -249,40 +229,49 @@ const DataGridV2: React.FC<DataGridProps> = ({
        return row[colId];
   };
 
-  // CLIENT-SIDE Filtering logic - kept for filtering within the LOADED batch
-  // Note: For global filtering, use the Search Bar in App.tsx
-  const filteredData = useMemo(() => {
-    return taxa.filter(item => {
-        for (const [key, value] of Object.entries(textFilters)) {
-            if (!value) continue;
-            const strValue = value as string;
-            const itemVal = String(getRowValue(item, key) || '').toLowerCase();
-            if (!itemVal.includes(strValue.toLowerCase())) return false;
-        }
-        for (const [key, values] of Object.entries(multiFilters)) {
-            const arrValues = values as string[];
-            if (arrValues.length === 0) continue;
-            // @ts-ignore
-            if (!arrValues.includes(item[key])) return false;
-        }
-        return true;
-    });
-  }, [taxa, textFilters, multiFilters]);
+  // --- FILTER DEBOUNCE LOGIC ---
+  const [localTextFilters, setLocalTextFilters] = useState<Record<string, string>>({});
+  
+  // Sync prop filters to local state only on mount/reset, otherwise let local state drive input
+  useEffect(() => {
+      // Intentionally empty: We only want one-way binding from Input -> State -> Debounce -> Prop
+      // unless filters are cleared externally.
+      // But we need to initialize if filters exist
+      const initial: Record<string, string> = {};
+      Object.keys(filters).forEach(k => {
+          if (typeof filters[k] === 'string') initial[k] = filters[k];
+      });
+      setLocalTextFilters(initial);
+  }, []);
+
+  const handleTextFilterChange = (key: string, val: string) => {
+      setLocalTextFilters(prev => ({ ...prev, [key]: val }));
+      
+      // Debounce logic handled via setTimeout
+      if ((window as any).filterTimeout) clearTimeout((window as any).filterTimeout);
+      (window as any).filterTimeout = setTimeout(() => {
+          onFilterChange(key, val);
+      }, 600);
+  };
+
+  const handleMultiFilterChange = (key: string, vals: string[]) => {
+      onFilterChange(key, vals);
+  };
 
   // Infinite Scroll Handler
   const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
       const { scrollTop, clientHeight, scrollHeight } = e.currentTarget;
-      // Look Ahead: Reduced buffer to 300px (since batch is 100 rows, approx 4000px height)
       if (!isLoadingMore && scrollHeight - scrollTop - clientHeight < 300) {
           onLoadMore();
       }
   };
 
-  // --- TREE GRID LOGIC ---
-  const gridRows = useMemo(() => {
-      if (groupBy.length === 0) return filteredData;
+  // --- TREE GRID LOGIC (Virtual Grouping) ---
+  const gridRows = useMemo((): TreeRow[] => {
+      // NOTE: With server-side filtering, we render 'taxa' directly.
+      // Virtual grouping is applied to the *fetched* records.
+      if (groupBy.length === 0) return taxa as TreeRow[];
 
-      // Grouping logic builds on current loaded data.
       const outputRows: TreeRow[] = [];
       const bucketKey = (row: Taxon, depth: number) => {
           const field = groupBy[depth];
@@ -293,18 +282,15 @@ const DataGridV2: React.FC<DataGridProps> = ({
           return candidates.find(t => {
              const valMatches = String(getRowValue(t, field)) === value;
              if (!valMatches) return false;
-             
              if (field === 'genus') return t.taxonRank === 'genus';
              if (field === 'species') return t.taxonRank === 'species';
              if (field === 'infraspecies') return ['variety', 'subspecies', 'form'].includes(t.taxonRank);
-             
              return t.taxonRank.toLowerCase() === field.toLowerCase();
           });
       };
 
       const processLevel = (subset: Taxon[], depth: number, parentPath: string) => {
           if (depth >= groupBy.length) {
-              // Usually sorts locally, but here data is presumed pre-sorted by server
               subset.forEach(t => outputRows.push({ ...t, depth, treePath: `${parentPath}/${t.id}` }));
               return;
           }
@@ -328,7 +314,6 @@ const DataGridV2: React.FC<DataGridProps> = ({
 
               const headerTaxon = findHeaderTaxon(groupItems, field, key);
               const itemsWithoutHeader = headerTaxon ? groupItems.filter(i => i.id !== headerTaxon.id) : groupItems;
-              
               const firstChild = groupItems[0];
               const headerRow: TreeRow = headerTaxon ? { ...headerTaxon } : {
                   id: `virtual-${path}`,
@@ -361,9 +346,9 @@ const DataGridV2: React.FC<DataGridProps> = ({
           });
       };
 
-      processLevel(filteredData, 0, 'root');
+      processLevel(taxa, 0, 'root');
       return outputRows;
-  }, [filteredData, groupBy, collapsedGroups]);
+  }, [taxa, groupBy, collapsedGroups]);
 
   const toggleGroup = (path: string) => {
       const next = new Set(collapsedGroups);
@@ -371,10 +356,27 @@ const DataGridV2: React.FC<DataGridProps> = ({
       setCollapsedGroups(next);
   };
   
-  const toggleRowExpanded = (id: string) => {
-      const next = new Set(expandedRows);
-      if (next.has(id)) next.delete(id); else next.add(id);
-      setExpandedRows(next);
+  const expandTreeLevel = (targetDepth: number) => {
+      // Logic: Iterate over visible groups in gridRows.
+      // If a group's depth < targetDepth, ensure it is expanded (removed from collapsedGroups).
+      // If a group's depth >= targetDepth, collapse it (add to collapsedGroups).
+      const newCollapsed = new Set<string>();
+      
+      // Since we don't have all possible paths without walking the whole list,
+      // we iterate the current virtual rows to decide.
+      // Note: This only affects loaded rows.
+      gridRows.forEach(row => {
+          if (row.isTreeHeader && row.treePath) {
+              const rowDepth = row.depth || 0;
+              // E.g. targetDepth 1 (Show Genus children). 
+              // Genus is depth 0. We want Genus expanded. 
+              // Species is depth 1. We want Species collapsed (so we see species headers but not their children).
+              if (rowDepth >= targetDepth) {
+                  newCollapsed.add(row.treePath);
+              }
+          }
+      });
+      setCollapsedGroups(newCollapsed);
   };
 
   const handleResizeStart = (e: React.MouseEvent, colId: ColumnId) => { e.preventDefault(); e.stopPropagation(); resizingRef.current = { colId, startX: e.clientX, startWidth: colWidths[colId] || 100 }; document.addEventListener('mousemove', handleResizeMove); document.addEventListener('mouseup', handleResizeEnd); document.body.style.cursor = 'col-resize'; };
@@ -382,72 +384,10 @@ const DataGridV2: React.FC<DataGridProps> = ({
   const handleResizeEnd = useCallback(() => { resizingRef.current = null; document.removeEventListener('mousemove', handleResizeMove); document.removeEventListener('mouseup', handleResizeEnd); document.body.style.cursor = ''; }, [handleResizeMove]);
   
   const getIdealWidths = () => { const canvas = document.createElement('canvas'); const context = canvas.getContext('2d'); if (!context) return {}; context.font = '14px Inter, sans-serif'; const idealWidths: Record<ColumnId, number> = {}; const sampleSize = 100; activeColumns.forEach(col => { let maxWidth = context.measureText(col.label).width + 24; const rowsToCheck = taxa.slice(0, sampleSize); rowsToCheck.forEach(row => { const val = String(getRowValue(row, String(col.id)) || ''); const width = context.measureText(val).width + 16; maxWidth = Math.max(maxWidth, width); }); maxWidth = Math.max(maxWidth, 50); idealWidths[col.id] = Math.ceil(maxWidth); }); return idealWidths; };
+  const autoFitContent = () => { const ideals = getIdealWidths(); const limit = preferences.autoFitMaxWidth || 400; const updates: Record<ColumnId, number> = {}; Object.keys(ideals).forEach(k => { const colDef = allColumns.find(c => c.id === k); if (colDef?.lockWidth) return; if (k === 'taxonName') updates[k] = Math.max(ideals[k], 180); else updates[k] = Math.min(ideals[k], limit); }); setColWidths(prev => ({...prev, ...updates})); };
+  const fitToScreen = () => { if (!containerRef.current) return; const ideals = getIdealWidths(); const availableWidth = containerRef.current.clientWidth - 2; const lockedCols = activeColumns.filter(c => c.lockWidth); const flexCols = activeColumns.filter(c => !c.lockWidth); let lockedWidth = 0; lockedCols.forEach(col => { lockedWidth += (colWidths[col.id] || col.defaultWidth); }); const flexAvailable = Math.max(0, availableWidth - lockedWidth); if (flexCols.length === 0) return; let minIdeal = 9999; flexCols.forEach(col => { const w = ideals[col.id] || 50; if(w < minIdeal) minIdeal = w; }); const ratio = preferences.fitScreenMaxRatio || 4.0; const maxAllowed = minIdeal * ratio; const cappedIdeals: Record<ColumnId, number> = {}; let totalCappedWidth = 0; flexCols.forEach(col => { let w = ideals[col.id]; if (['taxonRank', 'taxonStatus', 'reviewed'].includes(String(col.id))) w = Math.max(w, 110); if (col.id === 'taxonName') w = Math.max(w, 180); else w = Math.min(w, maxAllowed); cappedIdeals[col.id] = w; totalCappedWidth += w; }); const newWidths: Record<ColumnId, number> = {}; if (totalCappedWidth < flexAvailable) { const extraSpace = flexAvailable - totalCappedWidth; flexCols.forEach(col => { const share = cappedIdeals[col.id] / totalCappedWidth; newWidths[col.id] = Math.floor(cappedIdeals[col.id] + (extraSpace * share)); }); } else { const scale = flexAvailable / totalCappedWidth; flexCols.forEach(col => { let w = cappedIdeals[col.id] * scale; if (col.id === 'taxonName') w = Math.max(w, 150); if (['taxonRank', 'taxonStatus', 'reviewed'].includes(String(col.id))) w = Math.max(w, 80); newWidths[col.id] = Math.max(40, Math.floor(w)); }); } setColWidths(prev => ({...prev, ...newWidths})); };
   
-  const autoFitContent = () => { 
-      const ideals = getIdealWidths(); 
-      const limit = preferences.autoFitMaxWidth || 400; 
-      const updates: Record<ColumnId, number> = {};
-      Object.keys(ideals).forEach(k => { 
-          const colDef = allColumns.find(c => c.id === k);
-          if (colDef?.lockWidth) return; 
-          if (k === 'taxonName') updates[k] = Math.max(ideals[k], 180); 
-          else updates[k] = Math.min(ideals[k], limit); 
-      }); 
-      setColWidths(prev => ({...prev, ...updates})); 
-  };
-  
-  const fitToScreen = () => { 
-      if (!containerRef.current) return; 
-      const ideals = getIdealWidths(); 
-      const availableWidth = containerRef.current.clientWidth - 2; 
-
-      const lockedCols = activeColumns.filter(c => c.lockWidth);
-      const flexCols = activeColumns.filter(c => !c.lockWidth);
-
-      let lockedWidth = 0;
-      lockedCols.forEach(col => { lockedWidth += (colWidths[col.id] || col.defaultWidth); });
-
-      const flexAvailable = Math.max(0, availableWidth - lockedWidth);
-
-      if (flexCols.length === 0) return;
-
-      let minIdeal = 9999; 
-      flexCols.forEach(col => { const w = ideals[col.id] || 50; if(w < minIdeal) minIdeal = w; }); 
-      
-      const ratio = preferences.fitScreenMaxRatio || 4.0; 
-      const maxAllowed = minIdeal * ratio; 
-      const cappedIdeals: Record<ColumnId, number> = {}; 
-      let totalCappedWidth = 0; 
-      
-      flexCols.forEach(col => { 
-          let w = ideals[col.id]; 
-          if (['taxonRank', 'taxonStatus', 'reviewed'].includes(String(col.id))) w = Math.max(w, 110); 
-          if (col.id === 'taxonName') w = Math.max(w, 180); 
-          else w = Math.min(w, maxAllowed); 
-          cappedIdeals[col.id] = w; 
-          totalCappedWidth += w; 
-      }); 
-      
-      const newWidths: Record<ColumnId, number> = {}; 
-      if (totalCappedWidth < flexAvailable) { 
-          const extraSpace = flexAvailable - totalCappedWidth; 
-          flexCols.forEach(col => { const share = cappedIdeals[col.id] / totalCappedWidth; newWidths[col.id] = Math.floor(cappedIdeals[col.id] + (extraSpace * share)); }); 
-      } else { 
-          const scale = flexAvailable / totalCappedWidth; 
-          flexCols.forEach(col => { let w = cappedIdeals[col.id] * scale; if (col.id === 'taxonName') w = Math.max(w, 150); if (['taxonRank', 'taxonStatus', 'reviewed'].includes(String(col.id))) w = Math.max(w, 80); newWidths[col.id] = Math.max(40, Math.floor(w)); }); 
-      } 
-      setColWidths(prev => ({...prev, ...newWidths})); 
-  };
-  
-  // Delegated Sort Handler
-  const handleSort = (key: ColumnId) => { 
-      let direction: 'asc' | 'desc' = 'asc'; 
-      if (sortConfig.key === key && sortConfig.direction === 'asc') direction = 'desc'; 
-      onSortChange(key, direction);
-  };
-
-  const handleTextFilterChange = (key: string, val: string) => setTextFilters(p => ({ ...p, [key]: val }));
-  const handleMultiFilterChange = (key: string, vals: string[]) => setMultiFilters(p => ({ ...p, [key]: vals }));
+  const handleSort = (key: ColumnId) => { let direction: 'asc' | 'desc' = 'asc'; if (sortConfig.key === key && sortConfig.direction === 'asc') direction = 'desc'; onSortChange(key, direction); };
   const toggleColumn = (id: ColumnId) => { const next = new Set(visibleColumns); if (next.has(id)) next.delete(id); else next.add(id); setVisibleColumns(next); };
   const handleDragStart = (e: React.DragEvent, id: ColumnId) => { if (allColumns.find(c=>c.id===id)?.disableDrag) return; setDraggedColumn(id); e.dataTransfer.effectAllowed = "move"; };
   const handleDragOver = (e: React.DragEvent) => { e.preventDefault(); e.dataTransfer.dropEffect = "move"; };
@@ -456,9 +396,17 @@ const DataGridV2: React.FC<DataGridProps> = ({
   return (
     <div className="bg-white rounded-xl shadow border border-slate-200 overflow-hidden flex flex-col h-full relative">
       <div className="p-2 border-b border-slate-200 bg-slate-50 flex justify-between items-center z-20 relative flex-shrink-0">
-         <div className="text-xs text-slate-500 font-medium px-2 flex gap-4">
+         <div className="text-xs text-slate-500 font-medium px-2 flex items-center gap-4">
              <span>{totalRecords.toLocaleString()} records</span>
              {isLoadingMore && <span className="flex items-center gap-1 text-leaf-600"><Loader2 size={12} className="animate-spin"/> Loading more...</span>}
+             {isHierarchyMode && (
+                 <div className="flex items-center gap-1 bg-white border border-slate-200 rounded p-0.5 ml-2">
+                     <button onClick={() => expandTreeLevel(1)} className="px-2 py-0.5 text-[10px] text-slate-600 hover:bg-slate-100 rounded" title="Show Genera">1</button>
+                     <button onClick={() => expandTreeLevel(2)} className="px-2 py-0.5 text-[10px] text-slate-600 hover:bg-slate-100 rounded" title="Show Species">2</button>
+                     <button onClick={() => expandTreeLevel(3)} className="px-2 py-0.5 text-[10px] text-slate-600 hover:bg-slate-100 rounded" title="Show Infraspecies">3</button>
+                     <button onClick={() => setCollapsedGroups(new Set())} className="px-2 py-0.5 text-[10px] text-slate-600 hover:bg-slate-100 rounded" title="Expand All">All</button>
+                 </div>
+             )}
          </div>
          <div className="flex items-center gap-2">
              <div className="relative" ref={legendRef}>
@@ -526,7 +474,7 @@ const DataGridV2: React.FC<DataGridProps> = ({
                                     className={`p-1 rounded hover:bg-slate-200 transition-colors ${isHierarchyMode ? 'text-indigo-600 bg-indigo-50 ring-1 ring-indigo-200 shadow-inner' : 'text-slate-400'}`}
                                     title={isHierarchyMode ? "Switch to Flat View" : "Switch to Tree View"}
                                 >
-                                    <Network size={16} />
+                                    {isHierarchyMode ? <Network size={16} /> : <List size={16} />}
                                 </button>
                              ) : (
                                  <>
@@ -545,7 +493,23 @@ const DataGridV2: React.FC<DataGridProps> = ({
               <tr>
                   {activeColumns.map(col => (
                       <th key={`${String(col.id)}-filter`} className="p-1 border-b border-slate-200 border-r border-slate-100 bg-slate-50/80">
-                          {col.id === 'actions' || col.id === 'treeControl' ? null : col.filterType === 'multi-select' ? (<MultiSelectFilter label={col.label} options={col.filterOptions || []} selected={multiFilters[String(col.id)] || []} onChange={(vals) => handleMultiFilterChange(String(col.id), vals)}/>) : (<input className="w-full text-xs px-2 py-1.5 bg-white border border-slate-200 rounded outline-none focus:border-leaf-300 focus:ring-1 focus:ring-leaf-200 placeholder:text-slate-300 font-normal" placeholder={`Filter...`} value={textFilters[String(col.id)] || ''} onChange={e => handleTextFilterChange(String(col.id), e.target.value)}/>)}
+                          {col.id === 'actions' || col.id === 'treeControl' ? null 
+                           : col.filterType === 'multi-select' 
+                             ? (<MultiSelectFilter label={col.label} options={col.filterOptions || []} selected={filters[String(col.id)] || []} onChange={(vals) => handleMultiFilterChange(String(col.id), vals)}/>) 
+                             : (
+                                <div className="relative">
+                                    <input 
+                                        className={`w-full text-xs px-2 py-1.5 bg-white border border-slate-200 rounded outline-none focus:border-leaf-300 focus:ring-1 focus:ring-leaf-200 font-normal ${col.id === 'taxonName' ? 'pl-7 border-leaf-300 ring-1 ring-leaf-100' : ''}`} 
+                                        placeholder={col.id === 'taxonName' ? 'Search DB...' : 'Filter...'}
+                                        value={localTextFilters[String(col.id)] || ''} 
+                                        onChange={e => handleTextFilterChange(String(col.id), e.target.value)}
+                                    />
+                                    {col.id === 'taxonName' && (
+                                        <Search size={12} className="absolute left-2 top-2 text-leaf-500" />
+                                    )}
+                                </div>
+                             )
+                          }
                       </th>
                   ))}
               </tr>
@@ -609,12 +573,20 @@ const DataGridV2: React.FC<DataGridProps> = ({
                                } else if (col.id === 'taxonName') {
                                    displayVal = formatFullScientificName(tr, preferences);
                                } else if (col.id === 'taxonStatus') {
-                                    displayVal = <span className={`px-2 py-0.5 text-[10px] rounded uppercase font-bold ${val === 'Accepted' ? 'bg-green-50 text-green-600' : ''} ${val === 'Synonym' ? 'bg-slate-100 text-slate-500' : ''} ${val === 'Artificial' ? 'bg-yellow-50 text-yellow-600' : ''}`}>{val as string || '-'}</span>;
+                                    const s = val as string;
+                                    let badgeColor = 'bg-slate-100 text-slate-500'; // Default (Synonym, etc)
+                                    if (s === 'Accepted') badgeColor = 'bg-green-50 text-green-700 border-green-200 border';
+                                    else if (s === 'Artificial Hybrid') badgeColor = 'bg-amber-50 text-amber-700 border-amber-200 border';
+                                    else if (['Illegitimate', 'Invalid', 'Misapplied'].includes(s)) badgeColor = 'bg-red-50 text-red-700 border-red-200 border';
+                                    else if (s === 'Unplaced' || s === 'Unresolved') badgeColor = 'bg-orange-50 text-orange-700 border-orange-200 border';
+                                    else if (s === 'Local Biotype') badgeColor = 'bg-blue-50 text-blue-700 border-blue-200 border';
+                                    
+                                    displayVal = <span className={`px-2 py-0.5 text-[10px] rounded uppercase font-bold ${badgeColor}`}>{s || '-'}</span>;
                                } else if (col.id === 'actions') {
                                    const isMineable = ['genus', 'species', 'subspecies', 'variety', 'form', 'hybrid', 'grex'].includes(r);
                                    displayVal = (
                                        <div className="flex items-center justify-center gap-1">
-                                           <button type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); toggleRowExpanded(tr.id); }} className={`p-1.5 rounded transition-colors cursor-pointer relative z-50 shadow-sm ${isExpanded ? 'bg-slate-800 text-white' : 'bg-white border border-slate-200 text-slate-500 hover:text-slate-800 hover:bg-slate-50'}`} title={isExpanded ? "Collapse Details" : "Show Details"}>{isExpanded ? <ChevronUp size={14}/> : <ChevronDown size={14}/>}</button>
+                                           <button type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); setExpandedRows(prev => { const n = new Set(prev); if(n.has(tr.id)) n.delete(tr.id); else n.add(tr.id); return n; }); }} className={`p-1.5 rounded transition-colors cursor-pointer relative z-50 shadow-sm ${isExpanded ? 'bg-slate-800 text-white' : 'bg-white border border-slate-200 text-slate-500 hover:text-slate-800 hover:bg-slate-50'}`} title={isExpanded ? "Collapse Details" : "Show Details"}>{isExpanded ? <ChevronUp size={14}/> : <ChevronDown size={14}/>}</button>
                                            {isMineable ? (
                                                <button type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); onAction && onAction('mine', tr); }} className="p-1.5 bg-indigo-50 border border-indigo-200 rounded text-indigo-600 hover:text-indigo-800 hover:bg-indigo-100 transition-colors cursor-pointer relative z-50 active:scale-95 shadow-sm" title={`Deep Mine Cultivars`}><Pickaxe size={14} className="pointer-events-none" /></button>
                                            ) : (<div className="p-1.5 bg-slate-50 border border-slate-100 rounded text-slate-300 cursor-not-allowed"><Pickaxe size={14} /></div>)}

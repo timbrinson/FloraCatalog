@@ -19,8 +19,8 @@ The application requires specific tables (`app_taxa`, `app_taxon_details`, etc.)
 **Manual Steps:**
 1.  In your Supabase Dashboard, go to the **SQL Editor** (icon on the left sidebar).
 2.  Click **"New Query"**.
-3.  Open the file `wcvp_schema.txt` from this project's root directory.
-4.  Copy the entire content of `wcvp_schema.txt`.
+3.  Open the file `scripts/wcvp_schema.sql.txt` from the `scripts` folder.
+4.  Copy the entire content of the file.
 5.  Paste it into the Supabase SQL Editor.
 6.  Click **"Run"** (bottom right).
 7.  Verify that tables (`app_taxa`, etc.) have been created by looking at the **Table Editor**.

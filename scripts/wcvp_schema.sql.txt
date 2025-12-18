@@ -1,0 +1,220 @@
+
+-- Enable required extensions
+CREATE EXTENSION IF NOT EXISTS ltree;
+CREATE EXTENSION IF NOT EXISTS pg_trgm;
+
+-- =============================================================================
+-- RESET (DROP TABLES)
+-- =============================================================================
+
+DROP TABLE IF EXISTS app_audit_log CASCADE;
+DROP TABLE IF EXISTS app_taxon_source_records CASCADE;
+DROP TABLE IF EXISTS app_taxon_details CASCADE;
+DROP TABLE IF EXISTS app_taxa CASCADE;
+DROP TABLE IF EXISTS app_attribute_definitions CASCADE;
+DROP TABLE IF EXISTS app_data_sources CASCADE;
+DROP TABLE IF EXISTS wcvp_import CASCADE;
+
+-- =============================================================================
+-- WCVP Import Schema (Staging Table)
+-- =============================================================================
+
+CREATE TABLE wcvp_import (
+    plant_name_id text PRIMARY KEY,
+    ipni_id text,
+    powo_id text,
+    accepted_plant_name_id text,
+    parent_plant_name_id text,
+    basionym_plant_name_id text,
+    homotypic_synonym text,
+    taxon_name text,
+    taxon_authors text,
+    family text,
+    genus text,
+    genus_hybrid text,
+    species text,
+    species_hybrid text,
+    infraspecies text,
+    infraspecific_rank text,
+    taxon_rank text,
+    taxon_status text,
+    hybrid_formula text,
+    parenthetical_author text,
+    primary_author text,
+    publication_author text,
+    replaced_synonym_author text,
+    place_of_publication text,
+    volume_and_page text,
+    first_published text,
+    nomenclatural_remarks text,
+    reviewed text,
+    geographic_area text,
+    lifeform_description text,
+    climate_description text
+);
+
+-- =============================================================================
+-- APPLICATION LAYER (FloraCatalog Core)
+-- =============================================================================
+
+-- 1. DATA SOURCES
+CREATE TABLE app_data_sources (
+    id serial PRIMARY KEY,
+    name text NOT NULL,
+    version text,
+    citation_text text,
+    url text,
+    trust_level int DEFAULT 1,
+    last_accessed_at timestamptz DEFAULT NOW()
+);
+
+-- 2. ATTRIBUTE REGISTRY
+CREATE TABLE app_attribute_definitions (
+    key_name text PRIMARY KEY,
+    category text NOT NULL,
+    label text NOT NULL,
+    description text,
+    data_type text NOT NULL,
+    unit text,
+    options jsonb DEFAULT '[]',
+    is_active boolean DEFAULT true,
+    display_order int DEFAULT 0
+);
+
+-- 3. TAXA (Core Table)
+CREATE TABLE app_taxa (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    parent_id uuid REFERENCES app_taxa(id),
+    hierarchy_path ltree,
+    
+    wcvp_id text,
+    ipni_id text,
+    powo_id text,
+    accepted_plant_name_id text,
+    parent_plant_name_id text,
+    basionym_plant_name_id text,
+    homotypic_synonym text,
+
+    taxon_rank text,
+    taxon_name text NOT NULL COLLATE "C",
+    taxon_status text,
+    family text COLLATE "C",
+    common_name text,
+    
+    genus text COLLATE "C",
+    genus_hybrid char(1),
+    species text COLLATE "C",
+    species_hybrid char(1),
+    infraspecies text COLLATE "C",
+    infraspecific_rank text,
+    cultivar text COLLATE "C",
+    
+    hybrid_formula text,
+
+    taxon_authors text,
+    parenthetical_author text,
+    primary_author text,
+    publication_author text,
+    replaced_synonym_author text,
+
+    place_of_publication text,
+    volume_and_page text,
+    first_published text,
+    nomenclatural_remarks text,
+    reviewed text,
+
+    geographic_area text,
+    lifeform_description text,
+    climate_description text,
+    
+    source_id int REFERENCES app_data_sources(id),
+    verification_level text,
+    created_at timestamptz DEFAULT NOW(),
+    updated_at timestamptz DEFAULT NOW(),
+    descendant_count int DEFAULT 0
+);
+
+-- 4. GOLDEN RECORD (Details)
+CREATE TABLE app_taxon_details (
+    taxon_id uuid PRIMARY KEY REFERENCES app_taxa(id) ON DELETE CASCADE,
+    description_text text,
+    description_source_id int REFERENCES app_data_sources(id),
+    hardiness_zone_min int,
+    hardiness_zone_max int,
+    height_min_cm int,
+    height_max_cm int,
+    width_min_cm int,
+    width_max_cm int,
+    origin_year int,
+    morphology jsonb DEFAULT '{}',
+    ecology jsonb DEFAULT '{}',
+    history_metadata jsonb DEFAULT '{}',
+    field_sources jsonb DEFAULT '{}',
+    alternative_names jsonb DEFAULT '[]',
+    reference_links jsonb DEFAULT '[]'
+);
+
+-- 5. SOURCE ARCHIVE
+CREATE TABLE app_taxon_source_records (
+    id bigserial PRIMARY KEY,
+    taxon_id uuid NOT NULL REFERENCES app_taxa(id) ON DELETE CASCADE,
+    source_id int NOT NULL REFERENCES app_data_sources(id),
+    raw_data jsonb NOT NULL,
+    created_at timestamptz DEFAULT NOW(),
+    import_batch_id text 
+);
+
+-- 6. AUDIT LOG
+CREATE TABLE app_audit_log (
+    id bigserial PRIMARY KEY,
+    entity_id uuid NOT NULL,
+    table_name text NOT NULL,
+    operation text NOT NULL,
+    changed_by_process text,
+    user_id text,
+    app_name text,
+    app_version text,
+    changed_at timestamptz DEFAULT NOW(),
+    changes jsonb
+);
+
+-- =============================================================================
+-- OPTIMIZED INDICES (Standardized)
+-- =============================================================================
+
+-- 1. Search & Sort
+CREATE INDEX IF NOT EXISTS idx_app_taxa_name_trgm ON app_taxa USING GIN (taxon_name gin_trgm_ops);
+CREATE INDEX IF NOT EXISTS idx_app_taxa_name_sort ON app_taxa (taxon_name COLLATE "C");
+
+-- 2. Hierarchy & Grouping
+CREATE INDEX IF NOT EXISTS idx_app_taxa_parent ON app_taxa(parent_id);
+CREATE INDEX IF NOT EXISTS idx_app_taxa_path_gist ON app_taxa USING GIST (hierarchy_path);
+CREATE INDEX IF NOT EXISTS idx_app_taxa_genus_species ON app_taxa (genus, species);
+CREATE INDEX IF NOT EXISTS idx_app_taxa_species_alone ON app_taxa (species);
+
+-- 3. Common Filter Columns
+CREATE INDEX IF NOT EXISTS idx_app_taxa_family ON app_taxa(family);
+CREATE INDEX IF NOT EXISTS idx_app_taxa_rank ON app_taxa(taxon_rank);
+CREATE INDEX IF NOT EXISTS idx_app_taxa_status ON app_taxa(taxon_status);
+CREATE INDEX IF NOT EXISTS idx_app_taxa_cultivar ON app_taxa(cultivar);
+CREATE INDEX IF NOT EXISTS idx_app_taxa_gh ON app_taxa(genus_hybrid);
+CREATE INDEX IF NOT EXISTS idx_app_taxa_sh ON app_taxa(species_hybrid);
+
+-- 4. Identifiers (WCVP / IPNI / POWO)
+CREATE INDEX IF NOT EXISTS idx_app_taxa_wcvp ON app_taxa(wcvp_id);
+CREATE INDEX IF NOT EXISTS idx_app_taxa_ipni ON app_taxa(ipni_id);
+CREATE INDEX IF NOT EXISTS idx_app_taxa_powo ON app_taxa(powo_id);
+CREATE INDEX IF NOT EXISTS idx_app_taxa_accepted_wcvp ON app_taxa(accepted_plant_name_id);
+CREATE INDEX IF NOT EXISTS idx_app_taxa_parent_wcvp ON app_taxa(parent_plant_name_id);
+CREATE INDEX IF NOT EXISTS idx_app_taxa_basionym_wcvp ON app_taxa(basionym_plant_name_id);
+
+-- permissions
+ALTER TABLE wcvp_import DISABLE ROW LEVEL SECURITY;
+ALTER TABLE app_data_sources DISABLE ROW LEVEL SECURITY;
+ALTER TABLE app_attribute_definitions DISABLE ROW LEVEL SECURITY;
+ALTER TABLE app_taxa DISABLE ROW LEVEL SECURITY;
+ALTER TABLE app_taxon_details DISABLE ROW LEVEL SECURITY;
+ALTER TABLE app_taxon_source_records DISABLE ROW LEVEL SECURITY;
+ALTER TABLE app_audit_log DISABLE ROW LEVEL SECURITY;
+
+NOTIFY pgrst, 'reload schema';

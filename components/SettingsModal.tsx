@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { X, Settings, Layout, Zap, Palette, Database, Save } from 'lucide-react';
 import { UserPreferences, ColorTheme } from '../types';
-import { reloadClient } from '../services/supabaseClient';
+import { reloadClient, MANUAL_URL, MANUAL_KEY } from '../services/supabaseClient';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -14,8 +14,9 @@ interface SettingsModalProps {
 const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, preferences, onUpdate }) => {
   if (!isOpen) return null;
 
-  const [dbUrl, setDbUrl] = useState(localStorage.getItem('supabase_url') || '');
-  const [dbKey, setDbKey] = useState(localStorage.getItem('supabase_anon_key') || '');
+  // Default to LocalStorage, fallback to constants from file
+  const [dbUrl, setDbUrl] = useState(localStorage.getItem('supabase_url') || MANUAL_URL);
+  const [dbKey, setDbKey] = useState(localStorage.getItem('supabase_anon_key') || MANUAL_KEY);
 
   // Pattern for preview: Genus -> Species -> Infraspecies -> Cultivar -> Repeat
   const PREVIEW_SEQUENCE = [

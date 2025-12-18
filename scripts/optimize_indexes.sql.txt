@@ -1,0 +1,79 @@
+
+-- =============================================================================
+-- PERFORMANCE OVERHAUL V2: Standardized Trigram, Composite, and ID Indices
+-- Fixes 57014 Timeouts and synchronizes indices with master schema.
+-- =============================================================================
+
+-- 1. Enable Trigram Extension
+CREATE EXTENSION IF NOT EXISTS pg_trgm;
+
+-- 2. CLEANUP: Remove ALL known legacy/duplicate/test indices
+DROP INDEX IF EXISTS idx_app_taxa_name;
+DROP INDEX IF EXISTS idx_app_taxa_name_search;
+DROP INDEX IF EXISTS idx_app_taxa_name_sort;
+DROP INDEX IF EXISTS idx_app_taxa_name_sort_c;
+DROP INDEX IF EXISTS trgm_idx_app_taxa_name;
+DROP INDEX IF EXISTS idx_app_taxa_name_trgm;
+DROP INDEX IF EXISTS idx_app_taxa_genus;
+DROP INDEX IF EXISTS idx_app_taxa_species;
+DROP INDEX IF EXISTS idx_app_taxa_species_standalone;
+DROP INDEX IF EXISTS idx_app_taxa_species_alone;
+DROP INDEX IF EXISTS idx_app_taxa_family;
+DROP INDEX IF EXISTS idx_app_taxa_rank;
+DROP INDEX IF EXISTS idx_app_taxa_status;
+DROP INDEX IF EXISTS idx_app_taxa_cultivar;
+DROP INDEX IF EXISTS idx_app_taxa_gh;
+DROP INDEX IF EXISTS idx_app_taxa_sh;
+DROP INDEX IF EXISTS idx_app_taxa_wcvp_id;
+DROP INDEX IF EXISTS idx_app_taxa_wcvp;
+DROP INDEX IF EXISTS idx_app_taxa_ipni;
+DROP INDEX IF EXISTS idx_app_taxa_powo;
+DROP INDEX IF EXISTS idx_app_taxa_parent_id;
+DROP INDEX IF EXISTS idx_app_taxa_parent;
+DROP INDEX IF EXISTS idx_app_taxa_accepted_id;
+DROP INDEX IF EXISTS idx_app_taxa_accepted_wcvp;
+DROP INDEX IF EXISTS idx_app_taxa_parent_wcvp_id;
+DROP INDEX IF EXISTS idx_app_taxa_parent_wcvp;
+DROP INDEX IF EXISTS idx_app_taxa_basionym_id;
+DROP INDEX IF EXISTS idx_app_taxa_basionym_wcvp;
+DROP INDEX IF EXISTS idx_app_taxa_geo;
+DROP INDEX IF EXISTS idx_app_taxa_path_gist;
+
+-- 3. NOMENCLATURE SEARCH & SORT
+-- GIN Index: Fast case-insensitive wildcard search (ILIKE '%term%')
+CREATE INDEX IF NOT EXISTS idx_app_taxa_name_trgm ON app_taxa USING GIN (taxon_name gin_trgm_ops);
+
+-- B-Tree Index: Optimized for ORDER BY and Prefix Match.
+CREATE INDEX IF NOT EXISTS idx_app_taxa_name_sort ON app_taxa (taxon_name COLLATE "C");
+
+-- 4. HIERARCHY & COMBINATION FILTERS
+-- Composite: Optimized for Genus + Species searches
+CREATE INDEX IF NOT EXISTS idx_app_taxa_genus_species ON app_taxa (genus, species);
+
+-- Standalone Species: For users filtering ONLY by species epithet
+CREATE INDEX IF NOT EXISTS idx_app_taxa_species_alone ON app_taxa (species);
+
+-- Other Grid Columns
+CREATE INDEX IF NOT EXISTS idx_app_taxa_family ON app_taxa(family);
+CREATE INDEX IF NOT EXISTS idx_app_taxa_rank ON app_taxa(taxon_rank);
+CREATE INDEX IF NOT EXISTS idx_app_taxa_status ON app_taxa(taxon_status);
+CREATE INDEX IF NOT EXISTS idx_app_taxa_cultivar ON app_taxa(cultivar);
+CREATE INDEX IF NOT EXISTS idx_app_taxa_gh ON app_taxa(genus_hybrid);
+CREATE INDEX IF NOT EXISTS idx_app_taxa_sh ON app_taxa(species_hybrid);
+
+-- 5. IDENTIFIER LOOKUPS (WCVP / IPNI / POWO)
+CREATE INDEX IF NOT EXISTS idx_app_taxa_wcvp ON app_taxa(wcvp_id);
+CREATE INDEX IF NOT EXISTS idx_app_taxa_ipni ON app_taxa(ipni_id);
+CREATE INDEX IF NOT EXISTS idx_app_taxa_powo ON app_taxa(powo_id);
+CREATE INDEX IF NOT EXISTS idx_app_taxa_parent ON app_taxa(parent_id);
+CREATE INDEX IF NOT EXISTS idx_app_taxa_accepted_wcvp ON app_taxa(accepted_plant_name_id);
+CREATE INDEX IF NOT EXISTS idx_app_taxa_parent_wcvp ON app_taxa(parent_plant_name_id);
+CREATE INDEX IF NOT EXISTS idx_app_taxa_basionym_wcvp ON app_taxa(basionym_plant_name_id);
+
+-- 6. PATHS
+CREATE INDEX IF NOT EXISTS idx_app_taxa_path_gist ON app_taxa USING GIST (hierarchy_path);
+
+-- 7. Refresh Statistics for the Query Planner
+ANALYZE app_taxa;
+
+SELECT 'Optimization Complete: Indices synchronized.' as status;

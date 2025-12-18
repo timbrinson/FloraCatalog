@@ -20,21 +20,6 @@ Current code fixes to work on:
 
 ------------------------------------------------
 
-Feedback on AI Studio to the developers
-
-2025-12-11
-
-The application state keeps being reset to older point in time. what was just updated was based on at least some files from 2 days ago. The functionality provided n DataGridV2.tsx has been reverted to old functionality. I spent all day yesterday tryig to fix this and the AI even admitted what it is doing wrong.
-
-There is a serious bug/issue/problem in the Gemini model used in AI Studio which causes repeated errors when attempting to make changes to an application. After long conversations with AI Studio it has explained where this problem is coming from. This is serious and took a day to figure out what is happening. However the fix proposed by the AI is not working and I can not get it to work correctly. I am stuck and can not go forward.
-
-The problem is that AI Studio can get in a state where uses it's memory of what a file's state is (from the past) which is outweighing using the actual file of the application which gets passed to the AI. Because of this it keeps reverting to an old state of the application and loosing many improvements that had been made.
-
-This reverting to use old file state is usually associated with errors during the generation of the new files. I am not sure which is the cause and which is the affect or if both are at play. At least sometimes the errors are the affect since the old file being used is referencing things that are no longer valid in some other files. The opposite may also be at play where an error is causing the AI to use an older file in it analysis of the error, instead of the file provided to the prompt that came from the current applications files.
-
-The AI said the fix is to tell it to look at the files provided in the prompt but I have found that once it gets into the state of using the wrong file it always fails when it needs to update a the file. If it is only doing a read operation (no updates) have been ale to get it to see the current files at times, when emphasizing it has bad behaviour and needs to figure out why. However with updates it is not clear if is looking at the correct files initially and later switch to the older files at some point like generation or if it is using the older files from it's memory from the beginning of the task on.
-
-Please fix this.
 
 
 ------------------------------------------------
@@ -120,6 +105,11 @@ Data Managment:
 -Handle adding Genus, Species, Infraspecies that are not in WCVP.
 
 -Since lower level taxons are a specialization of the parent can they inherit certain attributes (descriptive) if those attributes are not set an the child? This would not include things like status or authorship but would include climtae, geography and lifeform. May want to make it clear to the user when a description is inherited (generalized) vs specific (specialized) to that taxon.
+
+-Need to figure out how to handle if someone searches/filters on a synonym, how to best direct them to the accepted taxa. Would be nice if it was done automatically. Would need to explain to the user since there would be a context shift. Might want to have synonyms (and other related taxa) show up as another level in the tree, below the accepted taxa. Or this could just be on the details panel.
+
+-Need to work through what should be expected in the tree view based on limitations of the server side filter or if there needs to be more client work to make it meet the user's expectations.
+
 
 Plant info:
 

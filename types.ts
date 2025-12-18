@@ -1,6 +1,4 @@
 
-
-
 /**
  * DATA SOURCE CITATION:
  * Govaerts R (ed.). 2025. WCVP: World Checklist of Vascular Plants. 
@@ -21,7 +19,12 @@ export interface Synonym {
   type: SynonymType;
 }
 
-export type TaxonRank = 'family' | 'genus' | 'species' | 'subspecies' | 'variety' | 'form' | 'hybrid' | 'cultivar' | 'grex' | 'unranked' | 'Unranked';
+export type TaxonRank = 
+  // Standard Ranks (Usually Capitalized in DB)
+  'Family' | 'Genus' | 'Species' | 'Subspecies' | 'Variety' | 'Form' | 'Hybrid' | 'Cultivar' | 'Grex' | 'Unranked' |
+  // Legacy/Lowercase/Specific Ranks from WCVP
+  'family' | 'genus' | 'species' | 'subspecies' | 'variety' | 'form' | 'hybrid' | 'cultivar' | 'grex' | 'unranked' |
+  'agamosp.' | 'Convariety' | 'ecas.' | 'group' | 'lusus' | 'microf.' | 'microgène' | 'micromorphe' | 'modif.' | 'monstr.' | 'mut.' | 'nid' | 'nothof.' | 'nothosubsp.' | 'nothovar.' | 'positio' | 'proles' | 'provar.' | 'psp.' | 'stirps' | 'subap.' | 'Subform' | 'sublusus' | 'subproles' | 'subspecioid' | 'subsubsp.' | 'Subvariety';
 
 export type TaxonomicStatus = 'Accepted' | 'Synonym' | 'Unresolved' | 'Artificial';
 

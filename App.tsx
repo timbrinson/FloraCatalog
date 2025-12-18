@@ -1,10 +1,10 @@
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { Loader2, Leaf, Plus, RotateCcw, Table, Network, Upload, X, Settings as SettingsIcon, Wrench, Search } from 'lucide-react';
+import { Loader2, Leaf, Plus, RotateCcw, Table, Network, Upload, X, Settings as SettingsIcon, Wrench, Activity, AlertCircle } from 'lucide-react';
 import { Taxon, LoadingState, TaxonomicStatus, UserPreferences, BackgroundProcess, ActivityItem, SearchCandidate } from './types';
 import { identifyTaxonomy, enrichTaxon, deepScanTaxon, parseBulkText, searchTaxonCandidates } from './services/geminiService';
-import { dataService } from './services/dataService'; // IMPORT DATA SERVICE
-import { getIsOffline } from './services/supabaseClient'; // IMPORT DYNAMIC OFFLINE STATUS
+import { dataService } from './services/dataService';
+import { getIsOffline } from './services/supabaseClient';
 import TaxonRow from './components/PlantCard';
 import EmptyState from './components/EmptyState';
 import DataGridV2 from './components/DataGridV2';
@@ -12,40 +12,37 @@ import ConfirmDialog from './components/ConfirmDialog';
 import SettingsModal from './components/SettingsModal';
 import ActivityPanel from './components/ActivityPanel';
 import { formatScientificName } from './utils/formatters';
-import { DEFAULT_TAXA } from './defaultData';
 
 function App() {
   const [query, setQuery] = useState('');
-  const [dbSearchTerm, setDbSearchTerm] = useState('');
   const [loadingState, setLoadingState] = useState<LoadingState>(LoadingState.IDLE);
+  const [errorDetails, setErrorDetails] = useState<string | null>(null);
   
-  // DEFAULT: Grid View (Tree Grid V2)
   const [viewMode, setViewMode] = useState<'tree' | 'grid'>('grid');
   
-  // UI States
   const [showImportModal, setShowImportModal] = useState(false);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [showToolsMenu, setShowToolsMenu] = useState(false);
+  const [showActivityPanel, setShowActivityPanel] = useState(false);
   const [importText, setImportText] = useState('');
   
-  // Refs
   const toolsMenuRef = useRef<HTMLDivElement>(null);
+  const activityButtonRef = useRef<HTMLDivElement>(null);
   
-  // Data State - Infinite Scroll
   const [taxa, setTaxa] = useState<Taxon[]>([]);
   const [offset, setOffset] = useState(0);
   const [hasMore, setHasMore] = useState(true);
   const [totalRecords, setTotalRecords] = useState(0);
   const [isFetchingMore, setIsFetchingMore] = useState(false);
+  const isFetchingRef = useRef(false);
+
   const [sortConfig, setSortConfig] = useState<{ key: string, direction: 'asc' | 'desc' }>({ key: 'taxon_name', direction: 'asc' });
+  const [gridFilters, setGridFilters] = useState<Record<string, any>>({});
 
-  // Add state to track offline status dynamically
   const [isOffline, setIsOffline] = useState(getIsOffline());
-
   const [enrichmentQueue, setEnrichmentQueue] = useState<Taxon[]>([]);
   const activeEnrichmentCount = useRef(0); 
   
-  // Preferences
   const [preferences, setPreferences] = useState<UserPreferences>({ 
       hybridSpacing: 'space',
       autoEnrichment: false,
@@ -54,7 +51,6 @@ function App() {
       colorTheme: 'option2a'
   });
   
-  // ACTIVITY MANAGEMENT
   const [activities, setActivities] = useState<ActivityItem[]>([]);
   const cancelledActivityIds = useRef<Set<string>>(new Set());
 
@@ -62,34 +58,32 @@ function App() {
     isOpen: boolean; title: string; message: string; confirmLabel?: string; isDestructive?: boolean; onConfirm: () => void;
   }>({ isOpen: false, title: '', message: '', onConfirm: () => {} });
 
-  // ------------------------------------------------------------------
-  // INIT & STORAGE
-  // ------------------------------------------------------------------
-  
-  // Core Fetcher Logic
   const fetchBatch = async (currentOffset: number, isNewSearch: boolean) => {
-      // Check offline status immediately before fetching
       const currentOfflineStatus = getIsOffline();
       setIsOffline(currentOfflineStatus);
 
       if (currentOfflineStatus) {
-          console.log("Skipping fetch: Offline");
           setLoadingState(LoadingState.IDLE);
           return;
       }
 
+      if (isFetchingRef.current) return;
+
       try {
+          isFetchingRef.current = true;
+          setErrorDetails(null);
+
           if (isNewSearch) {
               setLoadingState(LoadingState.LOADING);
           } else {
               setIsFetchingMore(true);
           }
 
-          const limit = 100; // REDUCED BATCH SIZE FOR PERFORMANCE (was 1000)
+          const limit = 100;
           const { data, count } = await dataService.getTaxa({ 
               offset: currentOffset, 
               limit, 
-              search: dbSearchTerm,
+              filters: gridFilters,
               sortBy: sortConfig.key,
               sortDirection: sortConfig.direction
           });
@@ -98,42 +92,43 @@ function App() {
               setTaxa(data);
               setTotalRecords(count);
           } else {
-              // Append for infinite scroll
               setTaxa(prev => [...prev, ...data]);
           }
 
           setHasMore(data.length === limit);
-          setLoadingState(LoadingState.IDLE);
+          setLoadingState(LoadingState.SUCCESS);
           setIsFetchingMore(false);
 
-      } catch (e) {
+      } catch (e: any) {
           console.error("Failed to load data", e);
+          setErrorDetails(e.message || "Unknown database error. Check your table schema.");
           setLoadingState(LoadingState.ERROR);
           setIsFetchingMore(false);
+      } finally {
+          isFetchingRef.current = false;
       }
   };
 
-  // 1. Initial Load & Search & Sort Changes
   useEffect(() => {
       setOffset(0);
       fetchBatch(0, true);
-  }, [dbSearchTerm, sortConfig]);
+  }, [gridFilters, sortConfig]);
 
-  // Handler for closing Settings Modal - Check if we came online
+  const handleFilterChange = (key: string, value: any) => {
+      setGridFilters(prev => ({ ...prev, [key]: value }));
+  };
+
   const handleSettingsClose = () => {
       setShowSettingsModal(false);
       const newStatus = getIsOffline();
       setIsOffline(newStatus);
       if (!newStatus) {
-          // If we came online, reload data
           fetchBatch(0, true);
       }
   };
 
-  // 2. Load More Handler
   const handleLoadMore = () => {
-      if (!hasMore || isFetchingMore || loadingState === LoadingState.LOADING) return;
-      // Step by 100 now
+      if (!hasMore || isFetchingRef.current || loadingState === LoadingState.LOADING) return;
       const nextOffset = offset + 100;
       setOffset(nextOffset);
       fetchBatch(nextOffset, false);
@@ -154,49 +149,6 @@ function App() {
       return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [showToolsMenu]);
 
-  // ------------------------------------------------------------------
-  // CORE LOGIC: Taxon Manipulation
-  // ------------------------------------------------------------------
-  const normalizeNode = (node: any) => {
-      let cleanName = (node.name || '').trim();
-      let genusHybrid = node.genusHybrid;
-      let speciesHybrid = node.speciesHybrid;
-      let rank = (node.rank || '').toLowerCase(); // Reads raw 'rank' from AI
-
-      if (rank === 'hybrid genus' || rank === 'nothogenus') { rank = 'genus'; genusHybrid = '×'; }
-      if (rank === 'hybrid species' || rank === 'nothospecies') { rank = 'species'; speciesHybrid = '×'; }
-
-      const hybridStartRegex = /^(?:×|[xX]\s)/;
-      
-      if (hybridStartRegex.test(cleanName)) {
-          cleanName = cleanName.replace(hybridStartRegex, '');
-          if (rank === 'genus' && !genusHybrid) genusHybrid = '×';
-          if (rank === 'species' && !speciesHybrid) speciesHybrid = '×';
-      }
-      return { ...node, name: cleanName, rank: rank, genusHybrid, speciesHybrid };
-  };
-
-  const mergeChainIntoTaxa = async (chain: any[]) => {
-      let newTaxaToAdd: Taxon[] = [];
-      let parentId: string | undefined = undefined;
-      let parentPath: string = 'root'; 
-
-      // Note: With pagination, we can't reliably check `existing` in the frontend `taxa` array
-      // because the parent might be on another page.
-      // Ideally, the backend handles deduplication or returns the existing ID.
-      // For this prototype, we rely on the `dataService` to handle UPSERT or we might create dupes if we don't query first.
-      
-      // FIX: For huge dataset, 'mergeChainIntoTaxa' logic needs to be server-side or we accept
-      // that this specific AI import feature is limited to current view context unless improved.
-      // For now, we will optimistically add to current view if not found.
-      
-      // ... (Implementation detail: This part remains client-side logic for new imports, but real DB checking would require new endpoints)
-      // Leaving existing logic as is for now, acknowledging limitation with pagination.
-  };
-  
-  // ------------------------------------------------------------------
-  // ACTIVITY & PROCESS MANAGER
-  // ------------------------------------------------------------------
   const addActivity = (name: string, type: 'mining' | 'import' | 'enrichment' | 'search', payload?: any, existingId?: string) => {
       const id = existingId || crypto.randomUUID();
       cancelledActivityIds.current.delete(id);
@@ -231,6 +183,7 @@ function App() {
       setActivities(prev => prev.map(a => a.id === id ? { 
           ...a, status: 'needs_input', message, resolution, timestamp: Date.now()
       } : a));
+      setShowActivityPanel(true);
   };
 
   const cancelActivity = (id: string) => {
@@ -264,18 +217,13 @@ function App() {
           updateActivity(id, `Adding ${candidate.taxonName}...`, { status: 'running', resolution: undefined });
           try {
               const chain = await identifyTaxonomy(candidate.taxonName);
-              // await mergeChainIntoTaxa(chain); 
               completeActivity(id, `Added ${candidate.taxonName}`);
-              fetchBatch(0, true); // Refresh grid
+              fetchBatch(0, true);
           } catch(e) {
               failActivity(id, "Failed to add plant", true);
           }
       }
   };
-
-  // ------------------------------------------------------------------
-  // EXECUTORS
-  // ------------------------------------------------------------------
 
   const executeMining = async (taxon: Taxon, existingId?: string) => {
       setConfirmState(prev => ({ ...prev, isOpen: false }));
@@ -289,8 +237,7 @@ function App() {
               for (const name of names) {
                   try {
                       if (cancelledActivityIds.current.has(actId)) break;
-                      const chain = await identifyTaxonomy(name);
-                      // await mergeChainIntoTaxa(chain);
+                      await identifyTaxonomy(name);
                   } catch(e) {}
               }
               return true;
@@ -299,7 +246,7 @@ function App() {
               failActivity(actId, "Cancelled by user");
           } else {
               completeActivity(actId, "Mining complete");
-              fetchBatch(0, true); // Refresh
+              fetchBatch(0, true);
           }
       } catch (err: any) {
           console.error("Mining failed:", err);
@@ -312,7 +259,6 @@ function App() {
       
       try {
           const candidates = await searchTaxonCandidates(queryTerm);
-          
           if (candidates.length === 0) {
               failActivity(actId, "No matches found.", true);
               return;
@@ -328,7 +274,6 @@ function App() {
           }
 
           const topMatch = candidates[0];
-          // Simple check on current page only (limitation)
           const existing = taxa.find(t => t.taxonName.toLowerCase() === topMatch.taxonName.toLowerCase());
 
           if (existing) {
@@ -351,10 +296,9 @@ function App() {
           }
 
           updateActivity(actId, `Found ${topMatch.taxonName}. Adding...`);
-          const chain = await identifyTaxonomy(topMatch.taxonName);
-          // await mergeChainIntoTaxa(chain); 
+          await identifyTaxonomy(topMatch.taxonName);
           completeActivity(actId, `Added ${topMatch.taxonName}`);
-          fetchBatch(0, true); // Refresh
+          fetchBatch(0, true);
 
       } catch (err: any) {
           failActivity(actId, "Search failed: " + err.message, true);
@@ -394,12 +338,8 @@ function App() {
   const handleEnrichmentTools = (mode: 'missing' | 'all_add' | 'all_replace') => {
       setShowToolsMenu(false);
       let targetTaxa: Taxon[] = [];
-
-      if (mode === 'missing') {
-          targetTaxa = taxa.filter(t => !t.isDetailsLoaded);
-      } else {
-          targetTaxa = [...taxa];
-      }
+      if (mode === 'missing') targetTaxa = taxa.filter(t => !t.isDetailsLoaded);
+      else targetTaxa = [...taxa];
 
       if (targetTaxa.length === 0) {
           alert("No matching plants found on current page to enrich.");
@@ -407,9 +347,7 @@ function App() {
       }
 
       if (confirm(`Start enrichment for ${targetTaxa.length} plants?`)) {
-          if (mode === 'all_replace') {
-              setTaxa(prev => prev.map(t => ({ ...t, isDetailsLoaded: false })));
-          }
+          if (mode === 'all_replace') setTaxa(prev => prev.map(t => ({ ...t, isDetailsLoaded: false })));
           setEnrichmentQueue(targetTaxa);
       }
   };
@@ -434,9 +372,8 @@ function App() {
           let count = 0;
           for (const chain of chains) { 
               if (cancelledActivityIds.current.has(actId)) break;
-              // await mergeChainIntoTaxa(chain); 
               count++; 
-              updateActivity(actId, `Importing ${count}/${chains.length}...`, { details: { parsedCount: chains.length, current: count, lastChain: chain }}); 
+              updateActivity(actId, `Importing ${count}/${chains.length}...`); 
           }
           if (cancelledActivityIds.current.has(actId)) failActivity(actId, "Cancelled");
           else completeActivity(actId, `Imported ${count} plants`);
@@ -458,7 +395,6 @@ function App() {
   const handleDelete = async (id: string) => {
       if (!confirm('Are you sure? This will delete the plant and its descendants from the database.')) return;
       try {
-          // Optimistic UI update
           const idsToDelete = new Set<string>();
           const collectIds = (targetId: string) => {
               idsToDelete.add(targetId);
@@ -466,10 +402,8 @@ function App() {
           };
           collectIds(id);
           setTaxa(prev => prev.filter(t => !idsToDelete.has(t.id)));
-          
-          // DB Update
           await dataService.deleteTaxon(id);
-          fetchBatch(0, true); // Refresh to be sure
+          fetchBatch(0, true);
       } catch (e) {
           console.error("Delete failed", e);
           alert("Failed to delete from database");
@@ -493,34 +427,24 @@ function App() {
       if (action === 'enrich') handleEnrichSingleTaxon(taxon);
   };
 
-  // Background Enrichment Effect (Consolidated)
   useEffect(() => {
       if (enrichmentQueue.length === 0) return;
-
       const processQueue = async () => {
           const items = [...enrichmentQueue];
-          setEnrichmentQueue([]); // Clear immediately
-          
+          setEnrichmentQueue([]);
           activeEnrichmentCount.current += items.length;
-          
           const actId = 'enrichment-global';
           addActivity(`Enriching details...`, 'enrichment', items, actId);
-          updateActivity(actId, `Processing ${activeEnrichmentCount.current} plants...`, { status: 'running' });
-
-          // Process Loop
           for (const item of items) {
               if (cancelledActivityIds.current.has(actId)) {
                   activeEnrichmentCount.current = 0;
                   failActivity(actId, "Cancelled by user");
                   return;
               }
-
               try {
                   const details = await enrichTaxon(item);
                   await handleUpdate(item.id, { ...details, isDetailsLoaded: true });
-              } catch(e) {
-                  // Ignore
-              } finally {
+              } catch(e) {} finally {
                   activeEnrichmentCount.current -= 1;
                   if (activeEnrichmentCount.current <= 0) {
                       completeActivity(actId, "All details fetched");
@@ -534,28 +458,18 @@ function App() {
       processQueue();
   }, [enrichmentQueue]);
 
-
-  // -------------------------------------------------------
-  // Renderers
-  // -------------------------------------------------------
   const renderTree = (parentId?: string, depth = 0) => {
       const children = taxa.filter(t => t.parentId === parentId).sort((a,b) => a.name.localeCompare(b.name));
-      // NOTE: With pagination, this recursive tree is broken because children might be on different pages.
       if (children.length === 0) return null;
-
       return children.map(node => (
           <React.Fragment key={node.id}>
-              <TaxonRow 
-                  taxon={node} 
-                  depth={depth} 
-                  onDelete={handleDelete}
-                  onUpdate={handleUpdate}
-                  preferences={preferences}
-              />
+              <TaxonRow taxon={node} depth={depth} onDelete={handleDelete} onUpdate={handleUpdate} preferences={preferences} />
               {renderTree(node.id, depth + 1)}
           </React.Fragment>
       ));
   };
+
+  const showEmpty = (taxa.length === 0 && loadingState !== LoadingState.LOADING && Object.keys(gridFilters).length === 0) || loadingState === LoadingState.ERROR;
 
   return (
     <div className="min-h-screen font-sans text-slate-600 bg-slate-50 flex flex-col">
@@ -568,18 +482,6 @@ function App() {
             </div>
             
             <div className="flex gap-4 w-full max-w-2xl mx-4">
-                {/* DB Search */}
-                <div className="relative flex-1">
-                    <Search className="absolute left-3 top-2.5 text-slate-400" size={16} />
-                    <input 
-                        className="w-full bg-slate-50 border border-slate-200 rounded-lg pl-10 pr-4 py-2 outline-none focus:ring-2 ring-leaf-200 text-sm"
-                        placeholder="Search database..."
-                        value={dbSearchTerm}
-                        onChange={e => setDbSearchTerm(e.target.value)}
-                    />
-                </div>
-
-                {/* AI Add Input */}
                 <form onSubmit={handleAddPlant} className="flex gap-2 flex-1">
                     <input 
                         className="flex-1 bg-slate-100 rounded-lg px-4 py-2 outline-none focus:ring-2 ring-leaf-200 text-sm"
@@ -599,38 +501,12 @@ function App() {
 
             <div className="flex items-center gap-2">
                  <div className="bg-slate-100 p-1 rounded-lg flex">
-                    <button 
-                        onClick={() => setViewMode('tree')}
-                        className={`p-1.5 rounded ${viewMode === 'tree' ? 'bg-white shadow text-leaf-600' : 'text-slate-400 hover:text-slate-600'}`}
-                        title="Tree View"
-                    >
-                        <Network size={18} />
-                    </button>
-                    <button 
-                        onClick={() => setViewMode('grid')}
-                        className={`p-1.5 rounded ${viewMode === 'grid' ? 'bg-white shadow text-leaf-600' : 'text-slate-400 hover:text-slate-600'}`}
-                         title="Spreadsheet View"
-                    >
-                        <Table size={18} />
-                    </button>
+                    <button onClick={() => setViewMode('tree')} className={`p-1.5 rounded ${viewMode === 'tree' ? 'bg-white shadow text-leaf-600' : 'text-slate-400 hover:text-slate-600'}`} title="Tree View"><Network size={18} /></button>
+                    <button onClick={() => setViewMode('grid')} className={`p-1.5 rounded ${viewMode === 'grid' ? 'bg-white shadow text-leaf-600' : 'text-slate-400 hover:text-slate-600'}`} title="Spreadsheet View"><Table size={18} /></button>
                  </div>
-                 
-                 <button 
-                    onClick={() => setShowImportModal(true)}
-                    className="text-slate-400 hover:text-leaf-600 p-2" 
-                    title="Smart Import (Text/CSV)"
-                 >
-                     <Upload size={20}/>
-                 </button>
-
+                 <button onClick={() => setShowImportModal(true)} className="text-slate-400 hover:text-leaf-600 p-2" title="Smart Import (Text/CSV)"><Upload size={20}/></button>
                  <div className="relative" ref={toolsMenuRef}>
-                     <button 
-                        onClick={() => setShowToolsMenu(!showToolsMenu)}
-                        className="text-slate-400 hover:text-slate-600 p-2" 
-                        title="Tools / Enrichment"
-                     >
-                         <Wrench size={20}/>
-                     </button>
+                     <button onClick={() => setShowToolsMenu(!showToolsMenu)} className="text-slate-400 hover:text-slate-600 p-2" title="Tools / Enrichment"><Wrench size={20}/></button>
                      {showToolsMenu && (
                          <div className="absolute right-0 top-full mt-2 w-48 bg-white border border-slate-200 rounded-lg shadow-xl z-50 p-1">
                              <div className="px-3 py-2 text-[10px] font-bold text-slate-400 uppercase">Enrichment Tools</div>
@@ -640,31 +516,28 @@ function App() {
                          </div>
                      )}
                  </div>
-                 
-                 <button 
-                    onClick={() => setShowSettingsModal(true)}
-                    className="text-slate-400 hover:text-slate-600 p-2" 
-                    title="Settings"
-                 >
-                     <SettingsIcon size={20}/>
-                 </button>
-                 
+                 <div className="relative" ref={activityButtonRef}>
+                     <button onClick={() => setShowActivityPanel(!showActivityPanel)} className={`p-2 rounded transition-colors ${showActivityPanel ? 'bg-slate-100 text-leaf-600' : 'text-slate-400 hover:text-slate-600'}`} title="Activity Monitor">
+                         <div className="relative">
+                             <Activity size={20}/>
+                             {activities.some(a => a.status === 'running') && (<span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-leaf-500 rounded-full border-2 border-white animate-pulse"></span>)}
+                             {activities.some(a => a.status === 'needs_input') && (<span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-amber-500 rounded-full border-2 border-white animate-bounce"></span>)}
+                         </div>
+                     </button>
+                     <ActivityPanel isOpen={showActivityPanel} onClose={() => setShowActivityPanel(false)} activities={activities} onCancel={cancelActivity} onDismiss={dismissActivity} onRetry={handleRetryActivity} onResolve={handleResolveActivity} />
+                 </div>
+                 <button onClick={() => setShowSettingsModal(true)} className="text-slate-400 hover:text-slate-600 p-2" title="Settings"><SettingsIcon size={20}/></button>
                  <button type="button" onClick={handleReset} className="text-slate-300 hover:text-red-400 p-2" title="Reset Database"><RotateCcw size={20}/></button>
             </div>
         </div>
       </header>
       
-      {/* MODALS */}
       {showImportModal && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
              <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl p-6 relative">
                 <button onClick={() => setShowImportModal(false)} className="absolute top-4 right-4 text-slate-400 hover:text-slate-600"><X size={20}/></button>
                 <h3 className="text-lg font-bold text-slate-800 mb-2">Smart Text Import</h3>
-                <textarea 
-                    className="w-full h-64 border border-slate-200 rounded-lg p-4 text-sm font-mono focus:ring-2 ring-leaf-200 outline-none mb-4"
-                    value={importText}
-                    onChange={e => setImportText(e.target.value)}
-                />
+                <textarea className="w-full h-64 border border-slate-200 rounded-lg p-4 text-sm font-mono focus:ring-2 ring-leaf-200 outline-none mb-4" value={importText} onChange={e => setImportText(e.target.value)} />
                 <div className="flex justify-between items-center">
                     <input type="file" onChange={handleFileUpload} className="text-xs text-slate-500" />
                     <div className="flex gap-2">
@@ -676,41 +549,20 @@ function App() {
         </div>
       )}
 
-      <SettingsModal 
-          isOpen={showSettingsModal}
-          onClose={handleSettingsClose}
-          preferences={preferences}
-          onUpdate={setPreferences}
-      />
-
-      <ConfirmDialog 
-          isOpen={confirmState.isOpen}
-          title={confirmState.title}
-          message={confirmState.message}
-          confirmLabel={confirmState.confirmLabel}
-          isDestructive={confirmState.isDestructive}
-          onConfirm={confirmState.onConfirm}
-          onCancel={() => setConfirmState(prev => ({...prev, isOpen: false}))}
-      />
+      <SettingsModal isOpen={showSettingsModal} onClose={handleSettingsClose} preferences={preferences} onUpdate={setPreferences} />
+      <ConfirmDialog isOpen={confirmState.isOpen} title={confirmState.title} message={confirmState.message} confirmLabel={confirmState.confirmLabel} isDestructive={confirmState.isDestructive} onConfirm={confirmState.onConfirm} onCancel={() => setConfirmState(prev => ({...prev, isOpen: false}))} />
       
-      <ActivityPanel 
-          activities={activities} 
-          onCancel={cancelActivity}
-          onDismiss={dismissActivity}
-          onRetry={handleRetryActivity}
-          onResolve={handleResolveActivity}
-      />
-
       <main className={`mx-auto px-4 py-8 flex-1 w-full transition-all duration-300 ${viewMode === 'grid' ? 'max-w-[98vw]' : 'max-w-6xl'}`}>
-         {/* If Taxa is empty, show Empty State (Handles both Offline mode and truly empty db) */}
-         {taxa.length === 0 && loadingState !== LoadingState.LOADING ? (
+         {showEmpty ? (
              <EmptyState 
                 isOffline={isOffline} 
+                loadingState={loadingState}
+                errorDetails={errorDetails}
                 onOpenSettings={() => setShowSettingsModal(true)} 
+                onRetry={() => fetchBatch(0, true)}
              />
          ) : (
              <>
-                {/* PERSISTENT VIEWS */}
                 <div className={viewMode === 'grid' ? 'block' : 'hidden'}>
                     <div className="h-[calc(100vh-140px)]">
                         <DataGridV2 
@@ -718,17 +570,16 @@ function App() {
                             preferences={preferences} 
                             onAction={handleGridAction}
                             onUpdate={handleUpdate} 
-                            
-                            // Infinite Scroll Props
                             totalRecords={totalRecords}
                             isLoadingMore={isFetchingMore}
                             onLoadMore={handleLoadMore}
                             sortConfig={sortConfig}
                             onSortChange={(key, direction) => setSortConfig({ key, direction })}
+                            filters={gridFilters}
+                            onFilterChange={handleFilterChange}
                         />
                     </div>
                 </div>
-                 {/* Tree View temporarily hidden/disabled logic maintained but likely broken for deep trees in pagination */}
                  <div className={viewMode === 'tree' ? 'block' : 'hidden'}>
                      <div className="bg-white rounded-xl shadow border border-slate-200 overflow-hidden">
                          <div className="p-4 bg-amber-50 border-b border-amber-100 text-xs text-amber-700">
@@ -736,16 +587,9 @@ function App() {
                          </div>
                          <table className="w-full text-left">
                              <thead className="bg-slate-50 text-xs font-bold text-slate-400 uppercase tracking-wider border-b border-slate-200">
-                                 <tr>
-                                     <th className="p-3 pl-8 w-1/2">Taxon Name</th>
-                                     <th className="p-3 w-1/4">Common Name</th>
-                                     <th className="p-3">Family / Notes</th>
-                                     <th className="p-3 text-right">Actions</th>
-                                 </tr>
+                                 <tr><th className="p-3 pl-8 w-1/2">Taxon Name</th><th className="p-3 w-1/4">Common Name</th><th className="p-3">Family / Notes</th><th className="p-3 text-right">Actions</th></tr>
                              </thead>
-                             <tbody>
-                                 {renderTree(undefined, 0)}
-                             </tbody>
+                             <tbody>{renderTree(undefined, 0)}</tbody>
                          </table>
                      </div>
                  </div>

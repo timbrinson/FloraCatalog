@@ -138,7 +138,7 @@ const mapToDB = (taxon: Taxon) => {
 export interface FetchOptions {
     offset?: number;
     limit?: number;
-    search?: string;
+    filters?: Record<string, any>; 
     sortBy?: string;
     sortDirection?: 'asc' | 'desc';
 }
@@ -148,8 +148,8 @@ export const dataService = {
   async getTaxa(options: FetchOptions = {}): Promise<{ data: Taxon[], count: number }> {
     const { 
         offset = 0, 
-        limit = 100, // REDUCED LIMIT from 1000 to 100 to prevent 57014 Timeout
-        search = '',
+        limit = 100,
+        filters = {},
         sortBy = 'taxon_name',
         sortDirection = 'asc'
     } = options;
@@ -159,40 +159,85 @@ export const dataService = {
         return { data: [], count: 0 };
     }
 
-    // PERFORMANCE FIX: Removed the `details:app_taxon_details(*)` join.
-    // Joining 1.4M rows causes massive overhead. We fetch only core columns now.
     let query = getSupabase()
       .from(DB_TABLE)
       .select('*', { count: 'estimated' });
 
-    // Server-side search
-    if (search && search.trim().length > 0) {
-        // Use a simpler filter to start
-        query = query.or(`taxon_name.ilike.%${search}%,common_name.ilike.%${search}%`);
-    }
+    // --- Dynamic Filtering ---
+    Object.entries(filters).forEach(([key, value]) => {
+        if (value === undefined || value === null || value === '') return;
+        
+        // Map camelCase UI keys to snake_case DB columns
+        let dbKey = key.replace(/([A-Z])/g, "_$1").toLowerCase();
+        if (key === 'plantNameId') dbKey = 'wcvp_id'; 
+        
+        if (key === 'taxonName') {
+            // SEARCH UPGRADE: GIN Index Enabled
+            // We can now use ILIKE with wildcards at both ends.
+            // The GIN index (trgm_idx_app_taxa_name) makes this fast.
+            const cleanSearch = (value as string).trim();
+            query = query.ilike('taxon_name', `%${cleanSearch}%`);
+        } else if (Array.isArray(value)) {
+            // Multi-select handling
+            if (value.length > 0) {
+                 const hasNull = value.includes('NULL');
+                 const realValues = value.filter(v => v !== 'NULL');
+                 
+                 // If filtering hybrid markers (x, +) which can be NULL
+                 if (hasNull && realValues.length > 0) {
+                     query = query.or(`${dbKey}.in.(${realValues.join(',')}),${dbKey}.is.null`);
+                 } else if (hasNull) {
+                     query = query.is(dbKey, null);
+                 } else {
+                     query = query.in(dbKey, value);
+                 }
+            }
+        } else {
+            // Standard Text Filter
+            const strVal = String(value).trim();
+            if(strVal) {
+                 if (key.endsWith('Id') || key === 'firstPublished') {
+                     query = query.eq(dbKey, strVal);
+                 } else {
+                     // For other text fields, ILIKE is safer for user input, 
+                     // though standard indexes might not optimize it as well as GIN.
+                     // Prefix search is a safe bet for general columns.
+                     query = query.ilike(dbKey, `${strVal}%`);
+                 }
+            }
+        }
+    });
 
-    // Server-side Sort
+    // Server-side Sort Mapping
     const dbSortKey = sortBy === 'taxonName' ? 'taxon_name' 
                     : sortBy === 'taxonRank' ? 'taxon_rank'
                     : sortBy === 'family' ? 'family'
                     : sortBy === 'genus' ? 'genus'
+                    : sortBy === 'genusHybrid' ? 'genus_hybrid'
                     : sortBy === 'species' ? 'species'
-                    : 'taxon_name'; // Default fallback
+                    : sortBy === 'speciesHybrid' ? 'species_hybrid'
+                    : sortBy === 'cultivar' ? 'cultivar'
+                    : sortBy === 'taxonStatus' ? 'taxon_status'
+                    : sortBy.replace(/([A-Z])/g, "_$1").toLowerCase(); 
 
     query = query.order(dbSortKey, { ascending: sortDirection === 'asc' });
 
     const to = offset + limit - 1;
 
-    const { data, error, count } = await query
-      .range(offset, to);
+    const { data, error, count } = await query.range(offset, to);
 
     if (error) {
       console.error("Error fetching taxa:", JSON.stringify(error, null, 2));
-      // Swallow 57014 timeout gracefully by returning empty
+      
       if (error.code === '57014') {
-          console.warn("Query timed out. Reducing load...");
+          console.warn("Query timed out (57014). Returning empty result set.");
           return { data: [], count: 0 };
       }
+      if (error.code === 'PGRST103') {
+          console.warn("Requested range not satisfiable (PGRST103). Reached end of data.");
+          return { data: [], count: 0 };
+      }
+      
       throw error;
     }
 

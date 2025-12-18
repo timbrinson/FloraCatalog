@@ -6,8 +6,8 @@ import { createClient, SupabaseClient } from '@supabase/supabase-js';
 // If you are running this locally, create a .env file.
 // If you are in a cloud editor, set the secrets in the environment settings.
 
-const MANUAL_URL = 'https://uzzayfueabppzpwunvlf.supabase.co'; 
-const MANUAL_KEY = ''; // Leave empty for GitHub commit
+export const MANUAL_URL = 'https://uzzayfueabppzpwunvlf.supabase.co'; 
+export const MANUAL_KEY = ''; // Leave empty for GitHub commit
 
 let supabaseInstance: SupabaseClient | null = null;
 let isOfflineMode = true;

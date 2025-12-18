@@ -5,16 +5,26 @@
 This document defines the standard operating procedure (SOP) for rebuilding the FloraCatalog database from scratch. This process transforms the raw data from Kew Gardens (WCVP) into the optimized hierarchical structure used by the application.
 
 ## 2. Folder Structure
-To keep the project clean, we use a dedicated `data/` directory.
+The project is organized to separate application code from raw data and build tools.
 
 ```text
 /flora-catalog
   ├── .env                  # Secrets (git-ignored)
-  ├── package.json
-  ├── scripts/              # Build scripts
-  │   ├── automate_build.js # The Master Controller
+  ├── package.json          # Dependency manifest
+  ├── App.tsx               # Main application logic
+  ├── ...react components
+  ├── docs/                 # Documentation
+  │   ├── AUTOMATION_PLAN.md
+  │   ├── DATA_MODEL.md
+  │   └── ...guides
+  ├── scripts/              # Build & Database Scripts
+  │   ├── automate_build.js # The Master Controller (v2)
   │   ├── convert_wcvp.py   # Data cleaner
-  │   └── ...sql files
+  │   ├── split_csv.py      # CSV splitter for browser uploads
+  │   ├── wcvp_schema.sql.txt     # Core table definitions
+  │   ├── wcvp_populate.sql.txt   # Data transformation logic
+  │   ├── optimize_indexes.sql.txt # Performance tuning
+  │   └── ...segmented build scripts
   └── data/                 # Data storage (git-ignored)
       ├── input/            # Place downloaded zip here
       ├── temp/             # Extracted & Converted files
@@ -26,13 +36,13 @@ To keep the project clean, we use a dedicated `data/` directory.
 If running this on a fresh computer (e.g., an Admin's laptop), follow these steps to set up the environment.
 
 ### A. Get the Code
-The project structure comes from the source code repository.
-1.  **Clone the Repository:**
+1.  **Choose a location:** Open your terminal and navigate to the directory where you want to store your projects (e.g., `cd ~/Documents/Projects`).
+2.  **Clone the Repository:**
     ```bash
-    git clone https://github.com/YourOrg/flora-catalog.git
+    git clone https://github.com/timbrinson/flora-catalog.git
     cd flora-catalog
     ```
-    *This creates the folders and downloads the `scripts/` mentioned above.*
+    *This creates the `flora-catalog` folder and downloads the complete source structure.*
 
 ### B. Install Runtimes
 The automation relies on **Node.js** (for database orchestration) and **Python** (for CSV processing).
@@ -51,7 +61,7 @@ The automation relies on **Node.js** (for database orchestration) and **Python**
 2.  `sudo apt install nodejs npm python3`
 
 ### C. Install Project Dependencies
-Open your terminal (Terminal.app, PowerShell, or Command Prompt) inside the `flora-catalog` folder.
+Open your terminal inside the `flora-catalog` folder.
 ```bash
 npm install
 # This installs 'pg', 'pg-copy-streams' and other build tools defined in package.json.
@@ -87,13 +97,14 @@ The `scripts/automate_build.js` is an interactive CLI that guides the Admin thro
 | :--- | :--- | :--- | :--- | :--- |
 | **0** | **Download Data** | **Manual** | Web | Download WCVP Zip from [Kew Gardens](https://powo.science.kew.org/about-wcvp). Place in `data/input/`. |
 | **1** | **Prepare Data** | Auto | Python | Unzips and converts pipes (`|`) to commas (`,`). |
-| **2** | **Build Schema** | Auto | SQL | Drops existing tables and recreates the empty schema. |
+| **2** | **Build Schema** | Auto | SQL | Runs `scripts/wcvp_schema.sql.txt`. Drops existing tables and recreates the empty schema. |
 | **3** | **Stream Import** | Auto | `COPY` | Streams `wcvp_names_clean.csv` to `wcvp_import` via TCP. |
 | **4** | **Populate** | Auto | SQL | Inserts data from staging to `app_taxa` (UUID generation). |
-| **5** | **Indexes** | Auto | SQL | Creates performance indexes for linking. |
+| **5** | **Indexes** | Auto | SQL | Creates basic structural indexes for linking. |
 | **6** | **Link Parents** | Auto | SQL | Updates `parent_id` based on WCVP IDs (Adjacency List). |
-| **7** | **Hierarchy** | Auto | SQL | Calculates Ltree paths (Materialized Path). |
-| **8** | **Counts** | Auto | SQL | Calculates descendant counts. |
+| **7** | **Hierarchy** | Auto | SQL | Calculates Ltree paths. Includes `SET statement_timeout = 0` for 1.4M row processing. |
+| **8** | **Counts** | Auto | SQL | Calculates descendant counts for the UI grid. |
+| **9** | **Performance** | Auto | SQL | Runs `scripts/optimize_indexes.sql.txt`. Fast search/sort. |
 
 ## 6. Execution
 
@@ -106,8 +117,10 @@ The `scripts/automate_build.js` is an interactive CLI that guides the Admin thro
 2.  **Granular Resume Menu:**
     The script offers granular control. If Step 3 (Import) fails due to internet issues, fix the connection and choose "Resume from Step 3". If Step 6 (Link) fails, choose "Resume from Step 6". Previous successful steps do not need to be re-run.
 
-## 7. Troubleshooting
+## 7. Technical Notes & Safety
 
+*   **Idempotency:** Every SQL statement in the pipeline uses `IF NOT EXISTS` or `DROP ... IF EXISTS`. You can safely stop and restart the script at any step.
+*   **Timeout Protection:** Step 7 (Ltree calculation) and Step 9 (Indexing) are heavy operations. The builder explicitly disables session timeouts to prevent Supabase from killing the connection during these long-running tasks.
 *   **Import Fails (Streaming Error):**
     *   Ensure your internet connection is stable.
     *   Ensure `wcvp_names_clean.csv` was generated correctly in Step 1.

@@ -1,6 +1,15 @@
 
 # Version History
 
+## v2.13.0 - Timeout & Performance Fix
+**Date:** May 30, 2025
+
+### Critical Fixes
+- **Error 57014 Resolution:** Fixed `statement timeout` errors during database search. 
+  - **Change:** Switched from `Contains` (`%term%`) to **Prefix Match** (`term%`) for the search filter. 
+  - **Reason:** Leading wildcards prevented the database from using the B-Tree index on `taxon_name`, forcing a full table scan on 1.4 million rows.
+  - **Impact:** Search is now near-instantaneous and stable. Note: Search now matches the *beginning* of the name (e.g. "Agave") rather than the middle.
+
 ## v2.12.0 - Database Automation CLI
 **Date:** May 30, 2025
 
