@@ -91,6 +91,8 @@ npm install
 
 The `scripts/automate_build.js` is an interactive CLI that guides the Admin through the process.
 
+> **CRITICAL EXECUTION PATH:** Always run the build commands from the **Project Root** (the `FloraCatalog/` folder). Do NOT `cd` into the `scripts/` directory. The automation logic expects to find `.env`, `data/`, and other script files relative to the current working directory of the root project.
+
 ### Step-by-Step Flow
 
 | # | Action | Automated? | Method | Description |
@@ -108,22 +110,40 @@ The `scripts/automate_build.js` is an interactive CLI that guides the Admin thro
 
 ## 6. Execution
 
-1.  **Start the Process:**
+1.  **Open your terminal** and ensure you are in the `FloraCatalog` root directory.
+2.  **Start the Process:**
     ```bash
+    # Option 1: Using the direct node command
     node scripts/automate_build.js
+
+    # Option 2: Using the NPM shortcut
+    npm run db:build
     ```
     *The script will create the `data/input` and `data/temp` folders if they don't exist.*
 
-2.  **Granular Resume Menu:**
+3.  **Granular Resume Menu:**
     The script offers granular control. If Step 3 (Import) fails due to internet issues, fix the connection and choose "Resume from Step 3". If Step 6 (Link) fails, choose "Resume from Step 6". Previous successful steps do not need to be re-run.
 
-## 7. Technical Notes & Safety
+## 7. Troubleshooting Common Errors
 
-*   **Idempotency:** Every SQL statement in the pipeline uses `IF NOT EXISTS` or `DROP ... IF EXISTS`. You can safely stop and restart the script at any step.
-*   **Timeout Protection:** Step 7 (Ltree calculation) and Step 9 (Indexing) are heavy operations. The builder explicitly disables session timeouts to prevent Supabase from killing the connection during these long-running tasks.
-*   **Import Fails (Streaming Error):**
-    *   Ensure your internet connection is stable.
-    *   Ensure `wcvp_names_clean.csv` was generated correctly in Step 1.
-    *   You can retry Step 3 from the menu.
-*   **Python Error:**
-    *   If the script fails to find python, ensure `python` or `python3` is in your system PATH.
+### A. Error: `connect EHOSTUNREACH [IPv6 Address]`
+This occurs when your computer or network is unable to reach the Supabase server via IPv6. Supabase defaults to IPv6 for direct connections.
+
+**The Fix:** Use the **Supabase IPv4 Pooler Connection String**.
+1. Log in to your Supabase Dashboard.
+2. Go to **Settings -> Database**.
+3. Under **Connection String**, select **"Transaction"** or **"Session"** mode.
+4. Check the box for **"Use IPv4"** (if available) or copy the string that uses the pooler host (e.g., `aws-0-us-west-2.pooler.supabase.com`).
+5. Update your `.env` file with this new `DATABASE_URL`.
+
+### B. Error: `Terminated due to timeout`
+Step 7 (Ltree) and Step 9 (Indexes) are very heavy.
+*   **Action:** The script already sets `statement_timeout = 0`. If it still fails, ensure your internet connection is stable. These steps can take up to 10 minutes on the free tier.
+
+### C. Import Fails (Streaming Error)
+*   Ensure your internet connection is stable.
+*   Ensure `wcvp_names_clean.csv` was generated correctly in Step 1.
+*   You can retry Step 3 from the menu.
+
+### D. Python Error
+*   If the script fails to find python, ensure `python` or `python3` is in your system PATH.

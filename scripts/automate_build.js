@@ -260,6 +260,15 @@ async function main() {
             await step.fn();
         }
         log("\n✅ Automation Complete!");
-    } catch (e) { err(e.message); } finally { await client.end(); }
+    } catch (e) { 
+        err(`Connection or build failed: ${e.message}`);
+        if (e.message.includes('EHOSTUNREACH')) {
+            console.log("\n💡 TROUBLESHOOTING TIP:");
+            console.log("Your network or ISP may be blocking IPv6 connections to Supabase.");
+            console.log("1. Use the IPv4 Connection Pooler string from your Supabase Dashboard (Settings -> Database).");
+            console.log("2. It looks like: 'postgresql://postgres:[pass]@aws-0-us-west-2.pooler.supabase.com:5432/postgres'");
+            console.log("3. Update DATABASE_URL in your .env file and try again.\n");
+        }
+    } finally { await client.end(); }
 }
 main();
