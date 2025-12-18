@@ -17,7 +17,7 @@ The project is organized to separate application code from raw data and build to
   │   ├── DATA_MODEL.md
   │   └── ...guides
   ├── scripts/              # Build & Database Scripts
-  │   ├── automate_build.js # The Master Controller (v2.3)
+  │   ├── automate_build.js # The Master Controller (v2.5)
   │   ├── convert_wcvp.py   # Data cleaner
   │   ├── split_csv.py      # CSV splitter for browser uploads
   │   ├── wcvp_schema.sql.txt     # Core table definitions
@@ -43,7 +43,7 @@ Supabase recently moved to **IPv6 by default** for direct database connections. 
 6.  Copy the **URI** string.
 7.  Update your local `.env` file's `DATABASE_URL` with this new string.
 
-**Automation Script Default:** As of v2.3, the automation script defaults to using the **Transaction Pooler (Port 6543)** and explicitly forces the connection over **IPv4** to bypass broken network configurations.
+**Automation Script Default:** As of v2.5, the automation script defaults to using the **Transaction Pooler (Port 6543)**, explicitly forces the connection over **IPv4**, and enables **SSL** (which is mandatory for Supabase poolers).
 
 ---
 
@@ -86,15 +86,19 @@ The script needs to know where your database is and how to log in.
     ```env
     DATABASE_URL="postgresql://postgres.[PROJ-ID]:[PASSWORD]@aws-0-us-west-2.pooler.supabase.com:6543/postgres"
     ```
-3.  If you only provide the URL without the password, the script will interactively prompt you for the password and attempt to connect via the pooler automatically using the IPv4 protocol.
+3.  If you only provide the URL without the password, the script will interactively prompt you for the password.
+
+### 🛑 Authentication Issues?
+If you receive a `password authentication failed` error:
+*   **The Database Password** is NOT your Supabase login password. It is the one you set when you first created the project.
+*   If you forgot it, go to **Settings -> Database -> Reset Database Password** in the Supabase Dashboard.
+*   Wait 60 seconds after resetting for the pooler to sync.
 
 ---
 
 ## 6. The Build Workflow
 
 The `scripts/automate_build.js` is an interactive CLI that guides the Admin through the process.
-
-> **CRITICAL EXECUTION PATH:** Always run the build commands from the **Project Root** (the `FloraCatalog/` folder). Do NOT `cd` into the `scripts/` directory. The automation logic expects to find `.env`, `data/`, and other script files relative to the current working directory of the root project.
 
 ### Step-by-Step Flow
 
@@ -133,7 +137,7 @@ The `scripts/automate_build.js` is an interactive CLI that guides the Admin thro
 
 ### A. Error: `connect EHOSTUNREACH [IPv6 Address]`
 *   **Cause:** Local network or computer doesn't support IPv6.
-*   **Fix:** The script v2.3+ explicitly forces the connection to use the **IPv4** protocol. Ensure your `.env` uses the IPv4 pooler host (`...pooler.supabase.com`) on port **6543**.
+*   **Fix:** The script v2.5+ explicitly forces the connection to use the **IPv4** protocol. Ensure your `.env` uses the IPv4 pooler host (`...pooler.supabase.com`) on port **6543**.
 
 ### B. Error: `Terminated due to timeout`
 *   **Fix:** Ensure you are using the **"Transaction"** mode pooler on port **6543**. The script sets `statement_timeout = 0`, but the pooler is much more stable for multi-minute operations like hierarchy calculation.

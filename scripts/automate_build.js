@@ -1,6 +1,6 @@
 
 /**
- * AUTOMATED DATABASE BUILDER (CLI) v2.4
+ * AUTOMATED DATABASE BUILDER (CLI) v2.5
  * 
  * Orchestrates the transformation of raw WCVP data into the FloraCatalog database.
  */
@@ -120,21 +120,6 @@ const getPythonCommand = () => {
     catch (e) { return 'python'; }
 };
 
-/**
- * Checks if the database host resolves to IPv6 and warns the user.
- */
-async function connectionDoctor(config) {
-    const host = config.host || '';
-    if (host.includes('pooler.supabase.com')) {
-        log("Connection Doctor: IPv4 Pooler detected. Standard reliability checks passed.");
-        return;
-    }
-    if (host.startsWith('db.')) {
-        warn("Connection Doctor: You are using a direct connection (db.xxx.supabase.co).");
-        warn("This defaults to IPv6 which may cause 'EHOSTUNREACH' on standard networks.");
-    }
-}
-
 // --- STEPS ---
 
 async function stepPrepareData() {
@@ -227,42 +212,55 @@ async function stepOptimize(client) {
 // --- MAIN LOOP ---
 
 async function main() {
-    console.log("\n🌿 FLORA CATALOG - DATABASE AUTOMATION v2.4 🌿\n");
+    console.log("\n🌿 FLORA CATALOG - DATABASE AUTOMATION v2.5 🌿\n");
     
-    let config;
-    const dbUrl = process.env.DATABASE_URL;
+    let dbUrl = process.env.DATABASE_URL;
+    let finalConfig;
 
     if (dbUrl) {
-        log("Using DATABASE_URL from environment.");
-        config = { connectionString: dbUrl, family: 4 };
+        log("Using DATABASE_URL from .env");
+        finalConfig = { 
+            connectionString: dbUrl,
+            ssl: { rejectUnauthorized: false },
+            family: 4 
+        };
     } else {
         let dbPass = process.env.DATABASE_PASSWORD;
         if (!dbPass) {
             console.log(`ℹ️ DATABASE_URL not found in .env.`);
-            console.log(`Defaulting to project: ${DEFAULT_PROJECT_ID}`);
+            console.log(`Defaulting to project ID: ${DEFAULT_PROJECT_ID}`);
             dbPass = (await askQuestion("🔑 Enter Database Password: ")).trim();
         }
         
         if (!dbPass) { err("Password required."); process.exit(1); }
 
-        // Use Object-based configuration to avoid URI encoding issues with special characters
-        config = {
-            user: `postgres.${DEFAULT_PROJECT_ID}`,
-            host: 'aws-0-us-west-2.pooler.supabase.com',
+        // Construct parameters explicitly
+        const host = 'aws-0-us-west-2.pooler.supabase.com';
+        const user = `postgres.${DEFAULT_PROJECT_ID}`;
+        
+        console.log(`\n📡 Connection Parameters:`);
+        console.log(`   Host: ${host}`);
+        console.log(`   User: ${user}`);
+        console.log(`   Port: 6543 (Transaction Pooler)`);
+        console.log(`   SSL: Enabled (Required)\n`);
+
+        finalConfig = {
+            user: user,
+            host: host,
             database: 'postgres',
             password: dbPass,
             port: 6543,
-            family: 4 // Force IPv4
+            ssl: { rejectUnauthorized: false }, // CRITICAL for Supabase
+            family: 4 
         };
     }
 
-    await connectionDoctor(config);
-
-    const client = new pg.Client(config);
+    const client = new pg.Client(finalConfig);
 
     try {
         await client.connect();
-        log("Connected to Database.");
+        log("✅ Connected Successfully to Supabase.");
+        
         const steps = [
             { id: '1', name: "Prepare Data (Python)", fn: () => stepPrepareData() },
             { id: '2', name: "Build Schema (Reset DB)", fn: () => stepBuildSchema(client) },
@@ -298,11 +296,11 @@ async function main() {
             console.log("\n💡 TROUBLESHOOTING TIP:");
             console.log("1. Ensure you are using your DATABASE password, not your Supabase dashboard login password.");
             console.log("2. Check that your project ID matches: " + DEFAULT_PROJECT_ID);
-            console.log("3. If you just changed your password, wait 60 seconds for the pooler to sync.\n");
+            console.log("3. Reset your Database Password in Supabase Dashboard -> Settings -> Database.\n");
         } else if (e.message.includes('EHOSTUNREACH') || e.message.includes('ETIMEDOUT')) {
             console.log("\n💡 TROUBLESHOOTING TIP:");
-            console.log("Network or ISP blocking IPv6. The script is forcing IPv4.");
-            console.log("Ensure you are NOT connected via a VPN that blocks database traffic.\n");
+            console.log("Connection timed out. You might be behind a firewall that blocks port 6543.");
+            console.log("Current host: aws-0-us-west-2.pooler.supabase.com.\n");
         }
     } finally { 
         try { await client.end(); } catch(e) {} 
