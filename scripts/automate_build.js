@@ -1,6 +1,6 @@
 
 /**
- * AUTOMATED DATABASE BUILDER (CLI) v2.8
+ * AUTOMATED DATABASE BUILDER (CLI) v2.9
  * 
  * Orchestrates the transformation of raw WCVP data into the FloraCatalog database.
  */
@@ -141,21 +141,16 @@ async function stepPrepareData() {
     }
 
     const pyCmd = getPythonCommand();
-    const sourcePath = zipFile ? path.join(DIR_INPUT, zipFile) : path.join(DIR_INPUT, csvFile);
-    
-    log(`Source detected: ${sourcePath}`);
     log(`Running conversion script (using ${pyCmd})...`);
 
     try {
-        // We pass the path to the python script via env or argument if we want, 
-        // but our python script is designed to look in data/input.
+        // Python script now handles writing directly to data/temp/wcvp_names_clean.csv
         execSync(`${pyCmd} scripts/convert_wcvp.py.txt`, { stdio: 'inherit' });
         
-        if (fs.existsSync('wcvp_names_clean.csv')) {
-            fs.renameSync('wcvp_names_clean.csv', FILE_CLEAN_CSV);
-            log("✅ Clean CSV moved to temp storage.");
-        } else if (!fs.existsSync(FILE_CLEAN_CSV)) {
-            throw new Error("Python script did not generate 'wcvp_names_clean.csv'");
+        if (fs.existsSync(FILE_CLEAN_CSV)) {
+            log("✅ Clean CSV verified in temp storage.");
+        } else {
+            throw new Error(`Python script did not generate '${FILE_CLEAN_CSV}'`);
         }
     } catch (e) { 
         throw new Error(`Python conversion failed: ${e.message}`); 
@@ -222,7 +217,7 @@ async function stepOptimize(client) {
 // --- MAIN LOOP ---
 
 async function main() {
-    console.log("\n🌿 FLORA CATALOG - DATABASE AUTOMATION v2.8 🌿\n");
+    console.log("\n🌿 FLORA CATALOG - DATABASE AUTOMATION v2.9 🌿\n");
     
     // Nuclear SSL Bypass: Required for certain self-signed CA environments with Supabase Poolers
     process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';

@@ -7,9 +7,10 @@ import io
 
 def convert_wcvp():
     # Configuration
-    # Note: These paths are relative to the project root when run via automate_build.js
+    # We write directly to data/temp to avoid permission issues in the project root
     INPUT_DIR = 'data/input'
-    OUTPUT_FILENAME = 'wcvp_names_clean.csv'
+    TEMP_DIR = 'data/temp'
+    OUTPUT_FILENAME = os.path.join(TEMP_DIR, 'wcvp_names_clean.csv')
     
     # Filenames typically found inside the Kew ZIP or provided directly
     CANDIDATE_NAMES = ['wcvp_names.csv', 'wcvp_names.txt', 'checklist_names.txt']
@@ -17,6 +18,10 @@ def convert_wcvp():
     source_file = None
     is_zip = False
     zip_archive = None
+
+    # Ensure directories exist
+    if not os.path.exists(TEMP_DIR):
+        os.makedirs(TEMP_DIR, exist_ok=True)
 
     print(f"Searching for data in '{INPUT_DIR}'...")
 
@@ -64,6 +69,13 @@ def convert_wcvp():
 
     print(f"Processing source: {source_file} {'(from ZIP)' if is_zip else ''}")
     print(f"Generating '{OUTPUT_FILENAME}'...")
+
+    # PRE-CLEAN: Remove existing file to release any OS locks/permissions
+    if os.path.exists(OUTPUT_FILENAME):
+        try:
+            os.remove(OUTPUT_FILENAME)
+        except Exception as e:
+            print(f"Warning: Could not remove existing {OUTPUT_FILENAME}: {e}")
 
     try:
         # Increase field size limit for safety with large text fields
