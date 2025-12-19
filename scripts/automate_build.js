@@ -1,6 +1,6 @@
 
 /**
- * AUTOMATED DATABASE BUILDER (CLI) v2.9
+ * AUTOMATED DATABASE BUILDER (CLI) v2.10
  * 
  * Orchestrates the transformation of raw WCVP data into the FloraCatalog database.
  */
@@ -44,6 +44,9 @@ const FILE_OPTIMIZE = 'scripts/optimize_indexes.sql.txt';
 // --- SQL QUERIES ---
 
 const Q_POPULATE = `
+    -- Disable timeout for the move
+    SET statement_timeout = 0;
+
     INSERT INTO app_taxa (
         wcvp_id, ipni_id, powo_id, accepted_plant_name_id, parent_plant_name_id, 
         basionym_plant_name_id, homotypic_synonym, taxon_name, taxon_authors, family, 
@@ -66,6 +69,7 @@ const Q_POPULATE = `
 `;
 
 const Q_LINK_PARENTS = `
+    SET statement_timeout = 0;
     UPDATE app_taxa child
     SET parent_id = parent.id
     FROM app_taxa parent
@@ -74,6 +78,7 @@ const Q_LINK_PARENTS = `
 `;
 
 const Q_HIERARCHY = `
+    SET statement_timeout = 0;
     WITH RECURSIVE tax_tree AS (
         SELECT id, parent_id, text2ltree('root') || text2ltree(replace(id::text, '-', '_')) as path
         FROM app_taxa WHERE parent_id IS NULL
@@ -89,6 +94,7 @@ const Q_HIERARCHY = `
 `;
 
 const Q_COUNTS = `
+    SET statement_timeout = 0;
     WITH counts AS (
        SELECT parent_id, COUNT(*) as cnt
        FROM app_taxa WHERE parent_id IS NOT NULL GROUP BY parent_id
@@ -195,7 +201,6 @@ async function stepLink(client) {
 
 async function stepHierarchy(client) {
     log("Calculating Hierarchy Paths (Ltree)... this can take 2-5 minutes...");
-    await client.query('SET statement_timeout = 0');
     await client.query(Q_HIERARCHY);
 }
 
@@ -217,7 +222,7 @@ async function stepOptimize(client) {
 // --- MAIN LOOP ---
 
 async function main() {
-    console.log("\n🌿 FLORA CATALOG - DATABASE AUTOMATION v2.9 🌿\n");
+    console.log("\n🌿 FLORA CATALOG - DATABASE AUTOMATION v2.10 🌿\n");
     
     // Nuclear SSL Bypass: Required for certain self-signed CA environments with Supabase Poolers
     process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';

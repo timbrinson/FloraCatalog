@@ -87,7 +87,7 @@ CREATE TABLE app_taxa (
     parent_id uuid REFERENCES app_taxa(id),
     hierarchy_path ltree,
     
-    wcvp_id text,
+    wcvp_id text UNIQUE, -- REQUIRED for ON CONFLICT logic in build script
     ipni_id text,
     powo_id text,
     accepted_plant_name_id text,
@@ -201,7 +201,7 @@ CREATE INDEX IF NOT EXISTS idx_app_taxa_gh ON app_taxa(genus_hybrid);
 CREATE INDEX IF NOT EXISTS idx_app_taxa_sh ON app_taxa(species_hybrid);
 
 -- 4. Identifiers (WCVP / IPNI / POWO)
-CREATE INDEX IF NOT EXISTS idx_app_taxa_wcvp ON app_taxa(wcvp_id);
+-- UNIQUE index on wcvp_id is handled by the table definition above
 CREATE INDEX IF NOT EXISTS idx_app_taxa_ipni ON app_taxa(ipni_id);
 CREATE INDEX IF NOT EXISTS idx_app_taxa_powo ON app_taxa(powo_id);
 CREATE INDEX IF NOT EXISTS idx_app_taxa_accepted_wcvp ON app_taxa(accepted_plant_name_id);
