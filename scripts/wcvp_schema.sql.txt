@@ -102,9 +102,9 @@ CREATE TABLE app_taxa (
     common_name text,
     
     genus text COLLATE "C",
-    genus_hybrid char(1),
+    genus_hybrid text, -- Changed from char(1) to text
     species text COLLATE "C",
-    species_hybrid char(1),
+    species_hybrid text, -- Changed from char(1) to text
     infraspecies text COLLATE "C",
     infraspecific_rank text,
     cultivar text COLLATE "C",
