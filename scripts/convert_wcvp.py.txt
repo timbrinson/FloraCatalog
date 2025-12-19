@@ -7,6 +7,7 @@ import io
 
 def convert_wcvp():
     # Configuration
+    # Note: These paths are relative to the project root when run via automate_build.js
     INPUT_DIR = 'data/input'
     OUTPUT_FILENAME = 'wcvp_names_clean.csv'
     
@@ -28,30 +29,33 @@ def convert_wcvp():
     
     # 2. Look for ZIP archive if no direct file found
     if not source_file:
-        files = os.listdir(INPUT_DIR)
-        zip_files = [f for f in files if f.lower().endsWith('.zip')]
-        if zip_files:
-            zip_path = os.path.join(INPUT_DIR, zip_files[0])
-            print(f"ZIP detected: {zip_path}")
-            try:
-                zip_archive = zipfile.ZipFile(zip_path, 'r')
-                # Find the largest text/csv file inside (usually the nomenclature list)
-                # or match against known patterns
-                zip_contents = zip_archive.namelist()
-                for name in CANDIDATE_NAMES:
-                    if name in zip_contents:
-                        source_file = name
-                        is_zip = True
-                        break
-                
-                if not source_file:
-                    # Fallback: Find largest file with nomenclature-like name
-                    potential = [f for f in zip_contents if 'names' in f.lower() or 'checklist' in f.lower()]
-                    if potential:
-                        source_file = sorted(potential, key=lambda x: zip_archive.getinfo(x).file_size, reverse=True)[0]
-                        is_zip = True
-            except Exception as e:
-                print(f"Error reading ZIP: {e}")
+        try:
+            if os.path.exists(INPUT_DIR):
+                files = os.listdir(INPUT_DIR)
+                zip_files = [f for f in files if f.lower().endswith('.zip')]
+                if zip_files:
+                    zip_path = os.path.join(INPUT_DIR, zip_files[0])
+                    print(f"ZIP detected: {zip_path}")
+                    zip_archive = zipfile.ZipFile(zip_path, 'r')
+                    
+                    # Find the largest text/csv file inside or match against known patterns
+                    zip_contents = zip_archive.namelist()
+                    for name in CANDIDATE_NAMES:
+                        if name in zip_contents:
+                            source_file = name
+                            is_zip = True
+                            break
+                    
+                    if not source_file:
+                        # Fallback: Find largest file with nomenclature-like name
+                        potential = [f for f in zip_contents if 'names' in f.lower() or 'checklist' in f.lower()]
+                        if potential:
+                            source_file = sorted(potential, key=lambda x: zip_archive.getinfo(x).file_size, reverse=True)[0]
+                            is_zip = True
+            else:
+                print(f"Warning: Directory '{INPUT_DIR}' does not exist.")
+        except Exception as e:
+            print(f"Error reading ZIP: {e}")
 
     if not source_file:
         print(f"Error: No WCVP data found in '{INPUT_DIR}'.")
