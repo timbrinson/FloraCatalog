@@ -1,8 +1,9 @@
 
 /**
- * AUTOMATED DATABASE BUILDER (CLI) v2.10
+ * AUTOMATED DATABASE BUILDER (CLI) v2.15
  * 
  * Orchestrates the transformation of raw WCVP data into the FloraCatalog database.
+ * Optimized for free-tier environments using segmented batching.
  */
 
 import pg from 'pg';
@@ -41,47 +42,50 @@ const FILE_CLEAN_CSV = path.join(DIR_TEMP, 'wcvp_names_clean.csv');
 const FILE_SCHEMA = 'scripts/wcvp_schema.sql.txt';
 const FILE_OPTIMIZE = 'scripts/optimize_indexes.sql.txt';
 
-// --- SQL QUERIES ---
+// Alphabet segments for batching
+const SEGMENTS = [
+    { label: "A - C", start: "", end: "D" },
+    { label: "D - G", start: "D", end: "H" },
+    { label: "H - L", start: "H", end: "M" },
+    { label: "M - P", start: "M", end: "Q" },
+    { label: "Q - S", start: "Q", end: "T" },
+    { label: "T - Z", start: "T", end: "{" } // '{' is char after 'Z'
+];
 
-const Q_POPULATE = `
-    -- Disable timeout for the move
-    SET statement_timeout = 0;
+// --- SQL TEMPLATES ---
 
+const buildPopulateQuery = (start, end) => `
     INSERT INTO app_taxa (
-        wcvp_id, ipni_id, powo_id, accepted_plant_name_id, parent_plant_name_id, 
-        basionym_plant_name_id, homotypic_synonym, taxon_name, taxon_authors, family, 
-        genus, genus_hybrid, species, species_hybrid, infraspecies, infraspecific_rank, 
-        taxon_rank, taxon_status, hybrid_formula, parenthetical_author, primary_author, 
-        publication_author, replaced_synonym_author, place_of_publication, volume_and_page, 
-        first_published, nomenclatural_remarks, reviewed, geographic_area, lifeform_description, 
-        climate_description, source_id
+        wcvp_id, ipni_id, taxon_rank, taxon_status, family, genus_hybrid, 
+        genus, species_hybrid, species, infraspecific_rank, infraspecies, 
+        parenthetical_author, primary_author, publication_author, 
+        place_of_publication, volume_and_page, first_published, 
+        nomenclatural_remarks, geographic_area, lifeform_description, 
+        climate_description, taxon_name, taxon_authors, 
+        accepted_plant_name_id, basionym_plant_name_id, 
+        replaced_synonym_author, homotypic_synonym, 
+        parent_plant_name_id, powo_id, hybrid_formula, reviewed, source_id
     )
     SELECT 
-        plant_name_id, ipni_id, powo_id, accepted_plant_name_id, parent_plant_name_id, 
-        basionym_plant_name_id, homotypic_synonym, taxon_name, taxon_authors, family, 
-        genus, genus_hybrid, species, species_hybrid, infraspecies, infraspecific_rank, 
-        COALESCE(taxon_rank, 'Unranked'), taxon_status, hybrid_formula, parenthetical_author, primary_author, 
-        publication_author, replaced_synonym_author, place_of_publication, volume_and_page, 
-        first_published, nomenclatural_remarks, reviewed, geographic_area, lifeform_description, 
-        climate_description, 1
+        plant_name_id, ipni_id, COALESCE(taxon_rank, 'Unranked'), taxon_status, family, genus_hybrid, 
+        genus, species_hybrid, species, infraspecific_rank, infraspecies, 
+        parenthetical_author, primary_author, publication_author, 
+        place_of_publication, volume_and_page, first_published, 
+        nomenclatural_remarks, geographic_area, lifeform_description, 
+        climate_description, taxon_name, taxon_authors, 
+        accepted_plant_name_id, basionym_plant_name_id, 
+        replaced_synonym_author, homotypic_synonym, 
+        parent_plant_name_id, powo_id, hybrid_formula, reviewed, 1
     FROM wcvp_import
+    WHERE taxon_name >= '${start}' AND taxon_name < '${end}'
     ON CONFLICT (wcvp_id) DO NOTHING;
 `;
 
-const Q_LINK_PARENTS = `
-    SET statement_timeout = 0;
-    UPDATE app_taxa child
-    SET parent_id = parent.id
-    FROM app_taxa parent
-    WHERE child.parent_plant_name_id = parent.wcvp_id
-      AND child.parent_id IS NULL;
-`;
-
-const Q_HIERARCHY = `
-    SET statement_timeout = 0;
+const buildHierarchyQuery = (start, end) => `
     WITH RECURSIVE tax_tree AS (
         SELECT id, parent_id, text2ltree('root') || text2ltree(replace(id::text, '-', '_')) as path
-        FROM app_taxa WHERE parent_id IS NULL
+        FROM app_taxa 
+        WHERE parent_id IS NULL AND taxon_name >= '${start}' AND taxon_name < '${end}'
         UNION ALL
         SELECT c.id, c.parent_id, p.path || text2ltree(replace(c.id::text, '-', '_'))
         FROM app_taxa c JOIN tax_tree p ON c.parent_id = p.id
@@ -93,14 +97,17 @@ const Q_HIERARCHY = `
       AND app_taxa.hierarchy_path IS NULL;
 `;
 
-const Q_COUNTS = `
-    SET statement_timeout = 0;
+const buildCountsQuery = (start, end) => `
     WITH counts AS (
        SELECT parent_id, COUNT(*) as cnt
-       FROM app_taxa WHERE parent_id IS NOT NULL GROUP BY parent_id
+       FROM app_taxa 
+       WHERE parent_id IS NOT NULL 
+       GROUP BY parent_id
     )
     UPDATE app_taxa SET descendant_count = counts.cnt
-    FROM counts WHERE app_taxa.id = counts.parent_id;
+    FROM counts 
+    WHERE app_taxa.id = counts.parent_id
+      AND app_taxa.taxon_name >= '${start}' AND app_taxa.taxon_name < '${end}';
 `;
 
 // --- UTILS ---
@@ -131,58 +138,54 @@ const getPythonCommand = () => {
 async function stepPrepareData() {
     log("Checking input data...");
     ensureDirs();
-    
     if (fs.existsSync(FILE_CLEAN_CSV)) {
         log("Found existing cleaned CSV in temp. Skipping conversion.");
         return;
     }
-
-    // Look for raw data sources
     const inputFiles = fs.readdirSync(DIR_INPUT);
     const csvFile = inputFiles.find(f => f.toLowerCase().endsWith('.csv') || f.toLowerCase().endsWith('.txt'));
     const zipFile = inputFiles.find(f => f.toLowerCase().endsWith('.zip'));
-
-    if (!csvFile && !zipFile) {
-        throw new Error(`Could not find WCVP data in '${DIR_INPUT}'. Please place the Kew Gardens ZIP file there.`);
-    }
-
+    if (!csvFile && !zipFile) throw new Error(`Could not find WCVP data in '${DIR_INPUT}'.`);
     const pyCmd = getPythonCommand();
     log(`Running conversion script (using ${pyCmd})...`);
-
     try {
-        // Python script now handles writing directly to data/temp/wcvp_names_clean.csv
         execSync(`${pyCmd} scripts/convert_wcvp.py.txt`, { stdio: 'inherit' });
-        
-        if (fs.existsSync(FILE_CLEAN_CSV)) {
-            log("✅ Clean CSV verified in temp storage.");
-        } else {
-            throw new Error(`Python script did not generate '${FILE_CLEAN_CSV}'`);
-        }
-    } catch (e) { 
-        throw new Error(`Python conversion failed: ${e.message}`); 
-    }
+        if (fs.existsSync(FILE_CLEAN_CSV)) log("✅ Clean CSV verified.");
+        else throw new Error("Conversion failed.");
+    } catch (e) { throw new Error(`Python conversion failed: ${e.message}`); }
 }
 
 async function stepBuildSchema(client) {
-    log(`Applying Schema (${FILE_SCHEMA})...`);
-    if (!fs.existsSync(FILE_SCHEMA)) throw new Error(`Schema file not found at ${FILE_SCHEMA}`);
+    log(`Applying Schema...`);
     const sql = fs.readFileSync(FILE_SCHEMA, 'utf-8');
     await client.query(sql);
 }
 
 async function stepImportStream(client) {
     log("Streaming CSV to 'wcvp_import'...");
-    if (!fs.existsSync(FILE_CLEAN_CSV)) throw new Error("Clean CSV not found.");
     const copyQuery = `COPY wcvp_import FROM STDIN WITH (FORMAT csv, HEADER true)`;
     const stream = client.query(copyFrom(copyQuery));
     const fileStream = fs.createReadStream(FILE_CLEAN_CSV);
-    try { await pipeline(fileStream, stream); log("Stream complete."); } 
+    try { await pipeline(fileStream, stream); log("Import complete."); } 
     catch (e) { throw new Error(`Streaming failed: ${e.message}`); }
 }
 
 async function stepPopulate(client) {
-    log("Populating 'app_taxa'...");
-    await client.query(Q_POPULATE);
+    log("Populating 'app_taxa' in segments...");
+    await client.query("SET statement_timeout = 0;");
+    
+    // Ensure data source 1 exists
+    await client.query(`
+        INSERT INTO app_data_sources (id, name, version, citation_text, url, trust_level)
+        VALUES (1, 'WCVP', '14', 'Kew Gardens WCVP', 'https://powo.science.kew.org/', 5)
+        ON CONFLICT (id) DO NOTHING;
+    `);
+
+    for (const seg of SEGMENTS) {
+        log(`Processing Segment: ${seg.label}...`);
+        await client.query(buildPopulateQuery(seg.start, seg.end));
+    }
+    log("Population complete.");
 }
 
 async function stepIndexes(client) {
@@ -195,26 +198,43 @@ async function stepIndexes(client) {
 }
 
 async function stepLink(client) {
-    log("Linking Parents...");
-    await client.query(Q_LINK_PARENTS);
+    log("Linking Parents (Segmented)...");
+    await client.query("SET statement_timeout = 0;");
+    for (const seg of SEGMENTS) {
+        log(`Linking Segment: ${seg.label}...`);
+        const q = `
+            UPDATE app_taxa child
+            SET parent_id = parent.id
+            FROM app_taxa parent
+            WHERE child.parent_plant_name_id = parent.wcvp_id
+              AND child.parent_id IS NULL
+              AND child.taxon_name >= '${seg.start}' AND child.taxon_name < '${seg.end}';
+        `;
+        await client.query(q);
+    }
 }
 
 async function stepHierarchy(client) {
-    log("Calculating Hierarchy Paths (Ltree)... this can take 2-5 minutes...");
-    await client.query(Q_HIERARCHY);
+    log("Calculating Hierarchy Paths (Ltree - Segmented)...");
+    await client.query("SET statement_timeout = 0;");
+    for (const seg of SEGMENTS) {
+        log(`Calculating Segment: ${seg.label}...`);
+        await client.query(buildHierarchyQuery(seg.start, seg.end));
+    }
 }
 
 async function stepCounts(client) {
-    log("Calculating Descendant Counts...");
-    await client.query(Q_COUNTS);
+    log("Calculating Descendant Counts (Segmented)...");
+    await client.query("SET statement_timeout = 0;");
+    for (const seg of SEGMENTS) {
+        log(`Counting Segment: ${seg.label}...`);
+        await client.query(buildCountsQuery(seg.start, seg.end));
+    }
 }
 
 async function stepOptimize(client) {
-    log(`Applying Performance Tuning (${FILE_OPTIMIZE})...`);
-    if (!fs.existsSync(FILE_OPTIMIZE)) {
-        log("Optimization file not found, skipping performance tuning.");
-        return;
-    }
+    log(`Applying Performance Tuning...`);
+    if (!fs.existsSync(FILE_OPTIMIZE)) return;
     const sql = fs.readFileSync(FILE_OPTIMIZE, 'utf-8');
     await client.query(sql);
 }
@@ -222,102 +242,50 @@ async function stepOptimize(client) {
 // --- MAIN LOOP ---
 
 async function main() {
-    console.log("\n🌿 FLORA CATALOG - DATABASE AUTOMATION v2.10 🌿\n");
-    
-    // Nuclear SSL Bypass: Required for certain self-signed CA environments with Supabase Poolers
+    console.log("\n🌿 FLORA CATALOG - DATABASE AUTOMATION v2.15 🌿\n");
     process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
-
     let dbUrl = process.env.DATABASE_URL;
     let finalConfig;
 
     if (dbUrl) {
         log("Using DATABASE_URL from .env");
-        finalConfig = { 
-            connectionString: dbUrl,
-            ssl: { rejectUnauthorized: false }
-        };
+        finalConfig = { connectionString: dbUrl, ssl: { rejectUnauthorized: false } };
     } else {
         let dbPass = process.env.DATABASE_PASSWORD;
-        if (!dbPass) {
-            console.log(`ℹ️ DATABASE_URL not found in .env.`);
-            console.log(`Defaulting to project ID: ${DEFAULT_PROJECT_ID}`);
-            dbPass = (await askQuestion("🔑 Enter Database Password: ")).trim();
-        }
-        
+        if (!dbPass) dbPass = (await askQuestion("🔑 Enter Database Password: ")).trim();
         if (!dbPass) { err("Password required."); process.exit(1); }
-
         const user = `postgres.${DEFAULT_PROJECT_ID}`;
         const host = 'aws-0-us-west-2.pooler.supabase.com';
-        
-        log(`Input Verification: Password length is ${dbPass.length} characters.`);
-        
-        // Build the URI string manually
-        const encodedUser = encodeURIComponent(user);
-        const encodedPass = encodeURIComponent(dbPass);
-        
-        // Note: Removed sslmode query param from URI as we use the config object to manage it
-        const connectionString = `postgresql://${encodedUser}:${encodedPass}@${host}:6543/postgres`;
-
-        console.log(`\n📡 Connection Method: URI String (Manual SSL handling)`);
-        console.log(`   Host: ${host}`);
-        console.log(`   User: ${user}`);
-        console.log(`   Port: 6543 (Transaction Pooler)\n`);
-
-        finalConfig = {
-            connectionString: connectionString,
-            ssl: { rejectUnauthorized: false }
-        };
+        const connectionString = `postgresql://${encodeURIComponent(user)}:${encodeURIComponent(dbPass)}@${host}:6543/postgres`;
+        finalConfig = { connectionString, ssl: { rejectUnauthorized: false } };
     }
 
     const client = new pg.Client(finalConfig);
-
     try {
         await client.connect();
         log("✅ Connection Successful!");
-        
         const steps = [
-            { id: '1', name: "Prepare Data (Python - Unzip & Clean)", fn: () => stepPrepareData() },
-            { id: '2', name: "Build Schema (Reset DB)", fn: () => stepBuildSchema(client) },
+            { id: '1', name: "Prepare Data (Python)", fn: () => stepPrepareData() },
+            { id: '2', name: "Build Schema (Reset)", fn: () => stepBuildSchema(client) },
             { id: '3', name: "Import CSV (Stream)", fn: () => stepImportStream(client) },
-            { id: '4', name: "Populate App Taxa", fn: () => stepPopulate(client) },
-            { id: '5', name: "Build Structural Indexes", fn: () => stepIndexes(client) },
-            { id: '6', name: "Link Parents", fn: () => stepLink(client) },
-            { id: '7', name: "Build Hierarchy (Ltree)", fn: () => stepHierarchy(client) },
-            { id: '8', name: "Calc Counts", fn: () => stepCounts(client) },
-            { id: '9', name: "Performance Tuning (Optimized Indices)", fn: () => stepOptimize(client) }
+            { id: '4', name: "Populate App Taxa (Segmented)", fn: () => stepPopulate(client) },
+            { id: '5', name: "Build Indexes", fn: () => stepIndexes(client) },
+            { id: '6', name: "Link Parents (Segmented)", fn: () => stepLink(client) },
+            { id: '7', name: "Build Hierarchy (Segmented)", fn: () => stepHierarchy(client) },
+            { id: '8', name: "Calc Counts (Segmented)", fn: () => stepCounts(client) },
+            { id: '9', name: "Optimize", fn: () => stepOptimize(client) }
         ];
-
         console.log("\n--- MENU ---");
-        console.log("A. Run ALL Steps (Fresh Build)");
-        steps.forEach(s => console.log(`${s.id}. Resume from Step ${s.id}: ${s.name}`));
-        console.log("Q. Quit");
-
+        steps.forEach(s => console.log(`${s.id}. Step ${s.id}: ${s.name}`));
         const choice = (await askQuestion("\nSelect option: ")).toUpperCase();
-        if (choice === 'Q') process.exit(0);
-
-        let startIndex = choice === 'A' ? 0 : steps.findIndex(s => s.id === choice);
+        const startIndex = steps.findIndex(s => s.id === choice);
         if (startIndex === -1) { err("Invalid selection"); process.exit(1); }
-
         for (let i = startIndex; i < steps.length; i++) {
             const step = steps[i];
             console.log(`\n--- [Step ${step.id}/${steps.length}] ${step.name} ---`);
             await step.fn();
         }
         log("\n✅ Automation Complete!");
-    } catch (e) { 
-        err(`Connection or build failed: ${e.message}`);
-        if (e.message.includes('authentication failed')) {
-            console.log("\n💡 AUTHENTICATION TROUBLESHOOTING:");
-            console.log("1. Ensure this is your DATABASE password (set during project creation).");
-            console.log("2. Project ID: " + DEFAULT_PROJECT_ID);
-        } else if (e.message.includes('certificate')) {
-            console.log("\n💡 CERTIFICATE TROUBLESHOOTING:");
-            console.log("Your environment is rejecting the Supabase SSL certificate.");
-            console.log("The script attempted to bypass this with NODE_TLS_REJECT_UNAUTHORIZED=0.");
-            console.log("If this still fails, try running the script with: NODE_TLS_REJECT_UNAUTHORIZED=0 node scripts/automate_build.js\n");
-        }
-    } finally { 
-        try { await client.end(); } catch(e) {} 
-    }
+    } catch (e) { err(`Build failed: ${e.message}`); } finally { try { await client.end(); } catch(e) {} }
 }
 main();
