@@ -4,6 +4,7 @@ import sys
 import os
 import zipfile
 import io
+import errno
 
 def convert_wcvp():
     # Detect Project Root (one level up from this script in /scripts)
@@ -11,6 +12,7 @@ def convert_wcvp():
     root_dir = os.path.dirname(script_dir)
     
     # Configuration using Absolute Paths
+    # macOS protects Documents, Desktop, and Downloads folders.
     INPUT_DIR = os.path.join(root_dir, 'data', 'input')
     TEMP_DIR = os.path.join(root_dir, 'data', 'temp')
     OUTPUT_FILENAME = os.path.join(TEMP_DIR, 'wcvp_names_clean.csv')
@@ -33,17 +35,35 @@ def convert_wcvp():
             print(f"Error creating temp directory: {e}")
 
     # Permission Test: Try to write a tiny file to verify OS access to the folder
+    test_path = os.path.join(TEMP_DIR, '.write_test')
     try:
-        test_path = os.path.join(TEMP_DIR, '.write_test')
+        # Create directory if missing before test
+        if not os.path.exists(TEMP_DIR):
+            os.makedirs(TEMP_DIR, exist_ok=True)
+            
         with open(test_path, 'w') as f:
             f.write('test')
         os.remove(test_path)
-    except Exception as e:
-        print(f"\nFATAL: Folder permission error in '{TEMP_DIR}'.")
-        print(f"macOS often restricts access to 'Documents' folders.")
-        print(f"Try granting your Terminal 'Full Disk Access' in System Settings.")
-        print(f"Original Error: {e}")
-        return
+    except OSError as e:
+        if e.errno == errno.EPERM:
+            print("\n" + "!"*65)
+            print(" CRITICAL: macOS PERMISSION ERROR DETECTED")
+            print("!"*65)
+            print(f" Location: {TEMP_DIR}")
+            print("\n Your project is located in a protected macOS folder (Documents).")
+            print(" macOS is blocking Python from writing to this directory.")
+            print("\n HOW TO FIX:")
+            print(" 1. Open 'System Settings' -> 'Privacy & Security'.")
+            print(" 2. Select 'Full Disk Access'.")
+            print(" 3. Click the '+' button.")
+            print(" 4. Add your Terminal app (Terminal, iTerm, or VS Code).")
+            print(" 5. Ensure the toggle for your Terminal is ON.")
+            print(" 6. Restart your Terminal window and run the script again.")
+            print("!"*65 + "\n")
+            sys.exit(1)
+        else:
+            print(f"\nFATAL: Unexpected folder error in '{TEMP_DIR}': {e}")
+            sys.exit(1)
 
     print(f"Searching for data in '{INPUT_DIR}'...")
 
@@ -84,7 +104,7 @@ def convert_wcvp():
 
     if not source_file:
         print(f"Error: No WCVP data found in '{INPUT_DIR}'.")
-        return
+        sys.exit(1)
 
     print(f"Processing source: {source_file} {'(from ZIP)' if is_zip else ''}")
     print(f"Generating: {OUTPUT_FILENAME}")
@@ -92,17 +112,14 @@ def convert_wcvp():
     # PRE-CLEAN: Remove existing file to release any OS locks
     if os.path.exists(OUTPUT_FILENAME):
         try:
-            # On macOS, sometimes files get the "uchg" (immutable) flag
             if sys.platform == 'darwin':
                 try: os.system(f'chflags nouchg "{OUTPUT_FILENAME}"')
                 except: pass
             os.remove(OUTPUT_FILENAME)
         except Exception as e:
             print(f"Warning: Could not remove existing output file: {e}")
-            # If we can't remove it, we try to overwrite it anyway, but likely to fail
 
     try:
-        # Increase field size limit for safety
         csv.field_size_limit(sys.maxsize)
         row_count = 0
         
@@ -111,7 +128,6 @@ def convert_wcvp():
         else:
             infile = open(source_file, mode='r', encoding='utf-8', errors='replace')
 
-        # We use a context manager to ensure handles are closed even on error
         with infile, open(OUTPUT_FILENAME, mode='w', encoding='utf-8', newline='') as outfile:
             reader = csv.reader(infile, delimiter='|', quoting=csv.QUOTE_NONE)
             writer = csv.writer(outfile, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
