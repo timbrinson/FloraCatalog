@@ -1,6 +1,6 @@
 
 /**
- * AUTOMATED DATABASE BUILDER (CLI) v2.7
+ * AUTOMATED DATABASE BUILDER (CLI) v2.8
  * 
  * Orchestrates the transformation of raw WCVP data into the FloraCatalog database.
  */
@@ -125,31 +125,41 @@ const getPythonCommand = () => {
 async function stepPrepareData() {
     log("Checking input data...");
     ensureDirs();
+    
     if (fs.existsSync(FILE_CLEAN_CSV)) {
-        log("Found existing cleaned CSV. Skipping conversion.");
+        log("Found existing cleaned CSV in temp. Skipping conversion.");
         return;
     }
-    const rawName = 'wcvp_names.csv'; 
-    let rawPath = path.join(DIR_INPUT, rawName);
-    if (!fs.existsSync(rawPath)) rawPath = rawName; 
 
-    if (!fs.existsSync(rawPath)) {
-        throw new Error(`Could not find '${rawName}'. Place in 'data/input/' or root.`);
+    // Look for raw data sources
+    const inputFiles = fs.readdirSync(DIR_INPUT);
+    const csvFile = inputFiles.find(f => f.toLowerCase().endsWith('.csv') || f.toLowerCase().endsWith('.txt'));
+    const zipFile = inputFiles.find(f => f.toLowerCase().endsWith('.zip'));
+
+    if (!csvFile && !zipFile) {
+        throw new Error(`Could not find WCVP data in '${DIR_INPUT}'. Please place the Kew Gardens ZIP file there.`);
     }
 
     const pyCmd = getPythonCommand();
-    log(`Converting '${rawPath}' to Clean CSV (using ${pyCmd})...`);
+    const sourcePath = zipFile ? path.join(DIR_INPUT, zipFile) : path.join(DIR_INPUT, csvFile);
+    
+    log(`Source detected: ${sourcePath}`);
+    log(`Running conversion script (using ${pyCmd})...`);
+
     try {
-        const tempRaw = 'wcvp_names.csv';
-        if (path.resolve(rawPath) !== path.resolve(tempRaw)) fs.copyFileSync(rawPath, tempRaw);
+        // We pass the path to the python script via env or argument if we want, 
+        // but our python script is designed to look in data/input.
         execSync(`${pyCmd} scripts/convert_wcvp.py.txt`, { stdio: 'inherit' });
+        
         if (fs.existsSync('wcvp_names_clean.csv')) {
             fs.renameSync('wcvp_names_clean.csv', FILE_CLEAN_CSV);
-            if (path.resolve(rawPath) !== path.resolve(tempRaw)) fs.unlinkSync(tempRaw);
-        } else {
-            throw new Error("Python script did not generate wcvp_names_clean.csv");
+            log("✅ Clean CSV moved to temp storage.");
+        } else if (!fs.existsSync(FILE_CLEAN_CSV)) {
+            throw new Error("Python script did not generate 'wcvp_names_clean.csv'");
         }
-    } catch (e) { throw new Error(`Python conversion failed: ${e.message}`); }
+    } catch (e) { 
+        throw new Error(`Python conversion failed: ${e.message}`); 
+    }
 }
 
 async function stepBuildSchema(client) {
@@ -212,7 +222,7 @@ async function stepOptimize(client) {
 // --- MAIN LOOP ---
 
 async function main() {
-    console.log("\n🌿 FLORA CATALOG - DATABASE AUTOMATION v2.7 🌿\n");
+    console.log("\n🌿 FLORA CATALOG - DATABASE AUTOMATION v2.8 🌿\n");
     
     // Nuclear SSL Bypass: Required for certain self-signed CA environments with Supabase Poolers
     process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
@@ -266,7 +276,7 @@ async function main() {
         log("✅ Connection Successful!");
         
         const steps = [
-            { id: '1', name: "Prepare Data (Python)", fn: () => stepPrepareData() },
+            { id: '1', name: "Prepare Data (Python - Unzip & Clean)", fn: () => stepPrepareData() },
             { id: '2', name: "Build Schema (Reset DB)", fn: () => stepBuildSchema(client) },
             { id: '3', name: "Import CSV (Stream)", fn: () => stepImportStream(client) },
             { id: '4', name: "Populate App Taxa", fn: () => stepPopulate(client) },

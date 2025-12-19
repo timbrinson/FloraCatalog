@@ -1,42 +1,88 @@
+
 import csv
 import sys
 import os
+import zipfile
+import io
 
 def convert_wcvp():
     # Configuration
-    INPUT_FILENAME = 'wcvp_names.csv'
+    INPUT_DIR = 'data/input'
     OUTPUT_FILENAME = 'wcvp_names_clean.csv'
     
-    # Check if input file exists
-    if not os.path.exists(INPUT_FILENAME):
-        print(f"Error: Input file '{INPUT_FILENAME}' not found.")
-        print("1. Download the WCVP zip from https://powo.science.kew.org/about-wcvp")
-        print("2. Extract 'wcvp_names.txt' (or rename the checklist_names.txt file)")
-        print(f"3. Place it in this directory as '{INPUT_FILENAME}'")
+    # Filenames typically found inside the Kew ZIP or provided directly
+    CANDIDATE_NAMES = ['wcvp_names.csv', 'wcvp_names.txt', 'checklist_names.txt']
+
+    source_file = None
+    is_zip = False
+    zip_archive = None
+
+    print(f"Searching for data in '{INPUT_DIR}'...")
+
+    # 1. Look for direct files first
+    for name in CANDIDATE_NAMES:
+        path = os.path.join(INPUT_DIR, name)
+        if os.path.exists(path):
+            source_file = path
+            break
+    
+    # 2. Look for ZIP archive if no direct file found
+    if not source_file:
+        files = os.listdir(INPUT_DIR)
+        zip_files = [f for f in files if f.lower().endsWith('.zip')]
+        if zip_files:
+            zip_path = os.path.join(INPUT_DIR, zip_files[0])
+            print(f"ZIP detected: {zip_path}")
+            try:
+                zip_archive = zipfile.ZipFile(zip_path, 'r')
+                # Find the largest text/csv file inside (usually the nomenclature list)
+                # or match against known patterns
+                zip_contents = zip_archive.namelist()
+                for name in CANDIDATE_NAMES:
+                    if name in zip_contents:
+                        source_file = name
+                        is_zip = True
+                        break
+                
+                if not source_file:
+                    # Fallback: Find largest file with nomenclature-like name
+                    potential = [f for f in zip_contents if 'names' in f.lower() or 'checklist' in f.lower()]
+                    if potential:
+                        source_file = sorted(potential, key=lambda x: zip_archive.getinfo(x).file_size, reverse=True)[0]
+                        is_zip = True
+            except Exception as e:
+                print(f"Error reading ZIP: {e}")
+
+    if not source_file:
+        print(f"Error: No WCVP data found in '{INPUT_DIR}'.")
+        print("Please place 'wcvp_names.csv' or the downloaded ZIP file in that directory.")
         return
 
-    print(f"Converting '{INPUT_FILENAME}' to '{OUTPUT_FILENAME}'...")
-    print("This may take a minute for large files (1.4M+ rows)...")
+    print(f"Processing source: {source_file} {'(from ZIP)' if is_zip else ''}")
+    print(f"Generating '{OUTPUT_FILENAME}'...")
 
     try:
         # Increase field size limit for safety with large text fields
         csv.field_size_limit(sys.maxsize)
-        
         row_count = 0
         
-        with open(INPUT_FILENAME, mode='r', encoding='utf-8', errors='replace') as infile, \
-             open(OUTPUT_FILENAME, mode='w', encoding='utf-8', newline='') as outfile:
-            
+        # Open the input stream
+        if is_zip:
+            # We use io.TextIOWrapper to treat the binary zip stream as text
+            infile = io.TextIOWrapper(zip_archive.open(source_file), encoding='utf-8', errors='replace')
+        else:
+            infile = open(source_file, mode='r', encoding='utf-8', errors='replace')
+
+        with infile, open(OUTPUT_FILENAME, mode='w', encoding='utf-8', newline='') as outfile:
             # WCVP Format: Pipe delimited '|', often no quotes
             reader = csv.reader(infile, delimiter='|', quoting=csv.QUOTE_NONE)
             
-            # Output Format: Standard CSV, comma delimited, quoting fields with commas/quotes
+            # Output Format: Standard CSV, comma delimited
             writer = csv.writer(outfile, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
             
             for row in reader:
                 writer.writerow(row)
                 row_count += 1
-                
                 if row_count % 100000 == 0:
                     print(f"  Processed {row_count:,} rows...")
 
@@ -45,6 +91,9 @@ def convert_wcvp():
 
     except Exception as e:
         print(f"\nFATAL ERROR: {str(e)}")
+    finally:
+        if zip_archive:
+            zip_archive.close()
 
 if __name__ == "__main__":
     convert_wcvp()
