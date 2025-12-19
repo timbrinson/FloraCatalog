@@ -1,9 +1,9 @@
 
 /**
- * AUTOMATED DATABASE BUILDER (CLI) v2.15
+ * AUTOMATED DATABASE BUILDER (CLI) v2.16
  * 
  * Orchestrates the transformation of raw WCVP data into the FloraCatalog database.
- * Optimized for free-tier environments using segmented batching.
+ * Optimized for free-tier environments using granular single-letter batching.
  */
 
 import pg from 'pg';
@@ -42,14 +42,29 @@ const FILE_CLEAN_CSV = path.join(DIR_TEMP, 'wcvp_names_clean.csv');
 const FILE_SCHEMA = 'scripts/wcvp_schema.sql.txt';
 const FILE_OPTIMIZE = 'scripts/optimize_indexes.sql.txt';
 
-// Alphabet segments for batching
+// Granular segments to prevent Supabase connection resets
 const SEGMENTS = [
-    { label: "A - C", start: "", end: "D" },
-    { label: "D - G", start: "D", end: "H" },
-    { label: "H - L", start: "H", end: "M" },
-    { label: "M - P", start: "M", end: "Q" },
-    { label: "Q - S", start: "Q", end: "T" },
-    { label: "T - Z", start: "T", end: "{" } // '{' is char after 'Z'
+    { label: "A", start: "A", end: "B" },
+    { label: "B", start: "B", end: "C" },
+    { label: "C", start: "C", end: "D" },
+    { label: "D", start: "D", end: "E" },
+    { label: "E", start: "E", end: "F" },
+    { label: "F", start: "F", end: "G" },
+    { label: "G", start: "G", end: "H" },
+    { label: "H", start: "H", end: "I" },
+    { label: "I", start: "I", end: "J" },
+    { label: "J - K", start: "J", end: "L" },
+    { label: "L", start: "L", end: "M" },
+    { label: "M", start: "M", end: "N" },
+    { label: "N", start: "N", end: "O" },
+    { label: "O", start: "O", end: "P" },
+    { label: "P", start: "P", end: "Q" },
+    { label: "Q", start: "Q", end: "R" },
+    { label: "R", start: "R", end: "S" },
+    { label: "S", start: "S", end: "T" },
+    { label: "T", start: "T", end: "U" },
+    { label: "U - V", start: "U", end: "W" },
+    { label: "W - Z", start: "W", end: "{" } 
 ];
 
 // --- SQL TEMPLATES ---
@@ -171,7 +186,7 @@ async function stepImportStream(client) {
 }
 
 async function stepPopulate(client) {
-    log("Populating 'app_taxa' in segments...");
+    log("Populating 'app_taxa' in granular segments...");
     await client.query("SET statement_timeout = 0;");
     
     // Ensure data source 1 exists
@@ -198,7 +213,7 @@ async function stepIndexes(client) {
 }
 
 async function stepLink(client) {
-    log("Linking Parents (Segmented)...");
+    log("Linking Parents (Granular Segmentation)...");
     await client.query("SET statement_timeout = 0;");
     for (const seg of SEGMENTS) {
         log(`Linking Segment: ${seg.label}...`);
@@ -215,7 +230,7 @@ async function stepLink(client) {
 }
 
 async function stepHierarchy(client) {
-    log("Calculating Hierarchy Paths (Ltree - Segmented)...");
+    log("Calculating Hierarchy Paths (Ltree - Granular)...");
     await client.query("SET statement_timeout = 0;");
     for (const seg of SEGMENTS) {
         log(`Calculating Segment: ${seg.label}...`);
@@ -224,7 +239,7 @@ async function stepHierarchy(client) {
 }
 
 async function stepCounts(client) {
-    log("Calculating Descendant Counts (Segmented)...");
+    log("Calculating Descendant Counts (Granular)...");
     await client.query("SET statement_timeout = 0;");
     for (const seg of SEGMENTS) {
         log(`Counting Segment: ${seg.label}...`);
@@ -242,7 +257,7 @@ async function stepOptimize(client) {
 // --- MAIN LOOP ---
 
 async function main() {
-    console.log("\n🌿 FLORA CATALOG - DATABASE AUTOMATION v2.15 🌿\n");
+    console.log("\n🌿 FLORA CATALOG - DATABASE AUTOMATION v2.16 🌿\n");
     process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
     let dbUrl = process.env.DATABASE_URL;
     let finalConfig;
@@ -261,6 +276,17 @@ async function main() {
     }
 
     const client = new pg.Client(finalConfig);
+    
+    // Catch socket errors like ECONNRESET before they crash the process
+    client.on('error', (e) => {
+        err(`Database Connection Error: ${e.message}`);
+        if (e.code === 'ECONNRESET') {
+            warn("The connection was reset by the server. This often happens on free-tier databases during long operations.");
+            warn("Please restart the script and select the failing step from the menu.");
+        }
+        process.exit(1);
+    });
+
     try {
         await client.connect();
         log("✅ Connection Successful!");
@@ -268,11 +294,11 @@ async function main() {
             { id: '1', name: "Prepare Data (Python)", fn: () => stepPrepareData() },
             { id: '2', name: "Build Schema (Reset)", fn: () => stepBuildSchema(client) },
             { id: '3', name: "Import CSV (Stream)", fn: () => stepImportStream(client) },
-            { id: '4', name: "Populate App Taxa (Segmented)", fn: () => stepPopulate(client) },
+            { id: '4', name: "Populate App Taxa (Granular)", fn: () => stepPopulate(client) },
             { id: '5', name: "Build Indexes", fn: () => stepIndexes(client) },
-            { id: '6', name: "Link Parents (Segmented)", fn: () => stepLink(client) },
-            { id: '7', name: "Build Hierarchy (Segmented)", fn: () => stepHierarchy(client) },
-            { id: '8', name: "Calc Counts (Segmented)", fn: () => stepCounts(client) },
+            { id: '6', name: "Link Parents (Granular)", fn: () => stepLink(client) },
+            { id: '7', name: "Build Hierarchy (Granular)", fn: () => stepHierarchy(client) },
+            { id: '8', name: "Calc Counts (Granular)", fn: () => stepCounts(client) },
             { id: '9', name: "Optimize", fn: () => stepOptimize(client) }
         ];
         console.log("\n--- MENU ---");
@@ -286,6 +312,10 @@ async function main() {
             await step.fn();
         }
         log("\n✅ Automation Complete!");
-    } catch (e) { err(`Build failed: ${e.message}`); } finally { try { await client.end(); } catch(e) {} }
+    } catch (e) { 
+        err(`Build failed: ${e.message}`); 
+    } finally { 
+        try { await client.end(); } catch(e) {} 
+    }
 }
 main();
