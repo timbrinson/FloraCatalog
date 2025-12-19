@@ -1,9 +1,9 @@
 
 /**
- * AUTOMATED DATABASE BUILDER (CLI) v2.17
+ * AUTOMATED DATABASE BUILDER (CLI) v2.18
  * 
  * Orchestrates the transformation of raw WCVP data into the FloraCatalog database.
- * Optimized for free-tier environments using granular batching and iterative hierarchy.
+ * Optimized for free-tier environments using granular segmented iterative hierarchy.
  */
 
 import pg from 'pg';
@@ -214,43 +214,53 @@ async function stepLink(client) {
 }
 
 async function stepHierarchy(client) {
-    log("Calculating Hierarchy Paths (Ltree - Iterative Level-by-Level)...");
+    log("Calculating Hierarchy Paths (Ltree - Granular Iterative)...");
     await client.query("SET statement_timeout = 0;");
     
-    // 1. Initialize Level 0 (Roots)
+    // 1. Initialize Level 0 (Roots) - Segmented
     log("Initializing Level 0 (Roots)...");
-    const rootRes = await client.query(`
-        UPDATE app_taxa 
-        SET hierarchy_path = text2ltree('root') || text2ltree(replace(id::text, '-', '_'))
-        WHERE parent_id IS NULL AND hierarchy_path IS NULL;
-    `);
-    log(`Level 0 complete: ${rootRes.rowCount} roots initialized.`);
+    for (const seg of SEGMENTS) {
+        log(`Level 0: Segment ${seg.label}...`);
+        await client.query(`
+            UPDATE app_taxa 
+            SET hierarchy_path = text2ltree('root') || text2ltree(replace(id::text, '-', '_'))
+            WHERE parent_id IS NULL 
+              AND hierarchy_path IS NULL
+              AND taxon_name >= '${seg.start}' AND taxon_name < '${seg.end}';
+        `);
+    }
 
-    // 2. Iteratively process Level 1..N
+    // 2. Iteratively process Level 1..N - Segmented
     let level = 1;
     let totalUpdated = 0;
     while (true) {
+        let levelUpdated = 0;
         log(`Processing Level ${level}...`);
-        const res = await client.query(`
-            UPDATE app_taxa child
-            SET hierarchy_path = parent.hierarchy_path || text2ltree(replace(child.id::text, '-', '_'))
-            FROM app_taxa parent
-            WHERE child.parent_id = parent.id
-              AND parent.hierarchy_path IS NOT NULL
-              AND child.hierarchy_path IS NULL;
-        `);
         
-        if (res.rowCount === 0) {
+        for (const seg of SEGMENTS) {
+            const res = await client.query(`
+                UPDATE app_taxa child
+                SET hierarchy_path = parent.hierarchy_path || text2ltree(replace(child.id::text, '-', '_'))
+                FROM app_taxa parent
+                WHERE child.parent_id = parent.id
+                  AND parent.hierarchy_path IS NOT NULL
+                  AND child.hierarchy_path IS NULL
+                  AND child.taxon_name >= '${seg.start}' AND child.taxon_name < '${seg.end}';
+            `);
+            levelUpdated += res.rowCount;
+        }
+        
+        if (levelUpdated === 0) {
             log("No more children to update. Hierarchy complete.");
             break;
         }
         
-        log(`Level ${level} complete: ${res.rowCount} rows updated.`);
-        totalUpdated += res.rowCount;
+        log(`Level ${level} complete: ${levelUpdated} rows updated.`);
+        totalUpdated += levelUpdated;
         level++;
         
         if (level > 20) {
-            warn("Safety cutoff reached (Level 20). Tree may have circular references or be unusually deep.");
+            warn("Safety cutoff reached (Level 20).");
             break;
         }
     }
@@ -276,7 +286,7 @@ async function stepOptimize(client) {
 // --- MAIN LOOP ---
 
 async function main() {
-    console.log("\n🌿 FLORA CATALOG - DATABASE AUTOMATION v2.17 🌿\n");
+    console.log("\n🌿 FLORA CATALOG - DATABASE AUTOMATION v2.18 🌿\n");
     process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
     let dbUrl = process.env.DATABASE_URL;
     let finalConfig;
@@ -296,12 +306,10 @@ async function main() {
 
     const client = new pg.Client(finalConfig);
     
-    // Catch socket errors like ECONNRESET before they crash the process
     client.on('error', (e) => {
         err(`Database Connection Error: ${e.message}`);
         if (e.code === 'ECONNRESET') {
-            warn("The connection was reset by the server. This often happens on free-tier databases during long operations.");
-            warn("Please restart the script and select the failing step from the menu.");
+            warn("Connection reset. Free tier limits reached. Please restart and resume.");
         }
         process.exit(1);
     });
@@ -316,7 +324,7 @@ async function main() {
             { id: '4', name: "Populate App Taxa (Granular)", fn: () => stepPopulate(client) },
             { id: '5', name: "Build Indexes", fn: () => stepIndexes(client) },
             { id: '6', name: "Link Parents (Granular)", fn: () => stepLink(client) },
-            { id: '7', name: "Build Hierarchy (Iterative)", fn: () => stepHierarchy(client) },
+            { id: '7', name: "Build Hierarchy (Granular Iterative)", fn: () => stepHierarchy(client) },
             { id: '8', name: "Calc Counts (Granular)", fn: () => stepCounts(client) },
             { id: '9', name: "Optimize", fn: () => stepOptimize(client) }
         ];
