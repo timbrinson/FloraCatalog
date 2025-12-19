@@ -1,9 +1,9 @@
 
 /**
- * AUTOMATED DATABASE BUILDER (CLI) v2.16
+ * AUTOMATED DATABASE BUILDER (CLI) v2.17
  * 
  * Orchestrates the transformation of raw WCVP data into the FloraCatalog database.
- * Optimized for free-tier environments using granular single-letter batching.
+ * Optimized for free-tier environments using granular batching and iterative hierarchy.
  */
 
 import pg from 'pg';
@@ -94,22 +94,6 @@ const buildPopulateQuery = (start, end) => `
     FROM wcvp_import
     WHERE taxon_name >= '${start}' AND taxon_name < '${end}'
     ON CONFLICT (wcvp_id) DO NOTHING;
-`;
-
-const buildHierarchyQuery = (start, end) => `
-    WITH RECURSIVE tax_tree AS (
-        SELECT id, parent_id, text2ltree('root') || text2ltree(replace(id::text, '-', '_')) as path
-        FROM app_taxa 
-        WHERE parent_id IS NULL AND taxon_name >= '${start}' AND taxon_name < '${end}'
-        UNION ALL
-        SELECT c.id, c.parent_id, p.path || text2ltree(replace(c.id::text, '-', '_'))
-        FROM app_taxa c JOIN tax_tree p ON c.parent_id = p.id
-    )
-    UPDATE app_taxa
-    SET hierarchy_path = tax_tree.path
-    FROM tax_tree
-    WHERE app_taxa.id = tax_tree.id
-      AND app_taxa.hierarchy_path IS NULL;
 `;
 
 const buildCountsQuery = (start, end) => `
@@ -230,12 +214,47 @@ async function stepLink(client) {
 }
 
 async function stepHierarchy(client) {
-    log("Calculating Hierarchy Paths (Ltree - Granular)...");
+    log("Calculating Hierarchy Paths (Ltree - Iterative Level-by-Level)...");
     await client.query("SET statement_timeout = 0;");
-    for (const seg of SEGMENTS) {
-        log(`Calculating Segment: ${seg.label}...`);
-        await client.query(buildHierarchyQuery(seg.start, seg.end));
+    
+    // 1. Initialize Level 0 (Roots)
+    log("Initializing Level 0 (Roots)...");
+    const rootRes = await client.query(`
+        UPDATE app_taxa 
+        SET hierarchy_path = text2ltree('root') || text2ltree(replace(id::text, '-', '_'))
+        WHERE parent_id IS NULL AND hierarchy_path IS NULL;
+    `);
+    log(`Level 0 complete: ${rootRes.rowCount} roots initialized.`);
+
+    // 2. Iteratively process Level 1..N
+    let level = 1;
+    let totalUpdated = 0;
+    while (true) {
+        log(`Processing Level ${level}...`);
+        const res = await client.query(`
+            UPDATE app_taxa child
+            SET hierarchy_path = parent.hierarchy_path || text2ltree(replace(child.id::text, '-', '_'))
+            FROM app_taxa parent
+            WHERE child.parent_id = parent.id
+              AND parent.hierarchy_path IS NOT NULL
+              AND child.hierarchy_path IS NULL;
+        `);
+        
+        if (res.rowCount === 0) {
+            log("No more children to update. Hierarchy complete.");
+            break;
+        }
+        
+        log(`Level ${level} complete: ${res.rowCount} rows updated.`);
+        totalUpdated += res.rowCount;
+        level++;
+        
+        if (level > 20) {
+            warn("Safety cutoff reached (Level 20). Tree may have circular references or be unusually deep.");
+            break;
+        }
     }
+    log(`Hierarchy built for ${totalUpdated} descendants.`);
 }
 
 async function stepCounts(client) {
@@ -257,7 +276,7 @@ async function stepOptimize(client) {
 // --- MAIN LOOP ---
 
 async function main() {
-    console.log("\n🌿 FLORA CATALOG - DATABASE AUTOMATION v2.16 🌿\n");
+    console.log("\n🌿 FLORA CATALOG - DATABASE AUTOMATION v2.17 🌿\n");
     process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
     let dbUrl = process.env.DATABASE_URL;
     let finalConfig;
@@ -297,7 +316,7 @@ async function main() {
             { id: '4', name: "Populate App Taxa (Granular)", fn: () => stepPopulate(client) },
             { id: '5', name: "Build Indexes", fn: () => stepIndexes(client) },
             { id: '6', name: "Link Parents (Granular)", fn: () => stepLink(client) },
-            { id: '7', name: "Build Hierarchy (Granular)", fn: () => stepHierarchy(client) },
+            { id: '7', name: "Build Hierarchy (Iterative)", fn: () => stepHierarchy(client) },
             { id: '8', name: "Calc Counts (Granular)", fn: () => stepCounts(client) },
             { id: '9', name: "Optimize", fn: () => stepOptimize(client) }
         ];
