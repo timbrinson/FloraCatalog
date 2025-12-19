@@ -6,10 +6,13 @@ import zipfile
 import io
 
 def convert_wcvp():
-    # Configuration
-    # We write directly to data/temp to avoid permission issues in the project root
-    INPUT_DIR = 'data/input'
-    TEMP_DIR = 'data/temp'
+    # Detect Project Root (one level up from this script in /scripts)
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    root_dir = os.path.dirname(script_dir)
+    
+    # Configuration using Absolute Paths
+    INPUT_DIR = os.path.join(root_dir, 'data', 'input')
+    TEMP_DIR = os.path.join(root_dir, 'data', 'temp')
     OUTPUT_FILENAME = os.path.join(TEMP_DIR, 'wcvp_names_clean.csv')
     
     # Filenames typically found inside the Kew ZIP or provided directly
@@ -19,9 +22,28 @@ def convert_wcvp():
     is_zip = False
     zip_archive = None
 
-    # Ensure directories exist
+    print(f"Project Root: {root_dir}")
+
+    # Ensure temp directory exists
     if not os.path.exists(TEMP_DIR):
-        os.makedirs(TEMP_DIR, exist_ok=True)
+        try:
+            os.makedirs(TEMP_DIR, exist_ok=True)
+            print(f"Created directory: {TEMP_DIR}")
+        except Exception as e:
+            print(f"Error creating temp directory: {e}")
+
+    # Permission Test: Try to write a tiny file to verify OS access to the folder
+    try:
+        test_path = os.path.join(TEMP_DIR, '.write_test')
+        with open(test_path, 'w') as f:
+            f.write('test')
+        os.remove(test_path)
+    except Exception as e:
+        print(f"\nFATAL: Folder permission error in '{TEMP_DIR}'.")
+        print(f"macOS often restricts access to 'Documents' folders.")
+        print(f"Try granting your Terminal 'Full Disk Access' in System Settings.")
+        print(f"Original Error: {e}")
+        return
 
     print(f"Searching for data in '{INPUT_DIR}'...")
 
@@ -43,7 +65,6 @@ def convert_wcvp():
                     print(f"ZIP detected: {zip_path}")
                     zip_archive = zipfile.ZipFile(zip_path, 'r')
                     
-                    # Find the largest text/csv file inside or match against known patterns
                     zip_contents = zip_archive.namelist()
                     for name in CANDIDATE_NAMES:
                         if name in zip_contents:
@@ -52,7 +73,6 @@ def convert_wcvp():
                             break
                     
                     if not source_file:
-                        # Fallback: Find largest file with nomenclature-like name
                         potential = [f for f in zip_contents if 'names' in f.lower() or 'checklist' in f.lower()]
                         if potential:
                             source_file = sorted(potential, key=lambda x: zip_archive.getinfo(x).file_size, reverse=True)[0]
@@ -64,36 +84,36 @@ def convert_wcvp():
 
     if not source_file:
         print(f"Error: No WCVP data found in '{INPUT_DIR}'.")
-        print("Please place 'wcvp_names.csv' or the downloaded ZIP file in that directory.")
         return
 
     print(f"Processing source: {source_file} {'(from ZIP)' if is_zip else ''}")
-    print(f"Generating '{OUTPUT_FILENAME}'...")
+    print(f"Generating: {OUTPUT_FILENAME}")
 
-    # PRE-CLEAN: Remove existing file to release any OS locks/permissions
+    # PRE-CLEAN: Remove existing file to release any OS locks
     if os.path.exists(OUTPUT_FILENAME):
         try:
+            # On macOS, sometimes files get the "uchg" (immutable) flag
+            if sys.platform == 'darwin':
+                try: os.system(f'chflags nouchg "{OUTPUT_FILENAME}"')
+                except: pass
             os.remove(OUTPUT_FILENAME)
         except Exception as e:
-            print(f"Warning: Could not remove existing {OUTPUT_FILENAME}: {e}")
+            print(f"Warning: Could not remove existing output file: {e}")
+            # If we can't remove it, we try to overwrite it anyway, but likely to fail
 
     try:
-        # Increase field size limit for safety with large text fields
+        # Increase field size limit for safety
         csv.field_size_limit(sys.maxsize)
         row_count = 0
         
-        # Open the input stream
         if is_zip:
-            # We use io.TextIOWrapper to treat the binary zip stream as text
             infile = io.TextIOWrapper(zip_archive.open(source_file), encoding='utf-8', errors='replace')
         else:
             infile = open(source_file, mode='r', encoding='utf-8', errors='replace')
 
+        # We use a context manager to ensure handles are closed even on error
         with infile, open(OUTPUT_FILENAME, mode='w', encoding='utf-8', newline='') as outfile:
-            # WCVP Format: Pipe delimited '|', often no quotes
             reader = csv.reader(infile, delimiter='|', quoting=csv.QUOTE_NONE)
-            
-            # Output Format: Standard CSV, comma delimited
             writer = csv.writer(outfile, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
             
             for row in reader:
@@ -101,12 +121,18 @@ def convert_wcvp():
                 row_count += 1
                 if row_count % 100000 == 0:
                     print(f"  Processed {row_count:,} rows...")
+            
+            outfile.flush()
+            os.fsync(outfile.fileno())
 
         print(f"Success! Converted {row_count:,} rows.")
-        print(f"Created: {os.path.abspath(OUTPUT_FILENAME)}")
 
     except Exception as e:
         print(f"\nFATAL ERROR: {str(e)}")
+        if "Operation not permitted" in str(e):
+            print("\n💡 macOS TROUBLESHOOTING:")
+            print("1. Close any apps that might have the CSV open (Excel, Numbers, VS Code).")
+            print("2. Ensure Terminal/iTerm has permission to access your Documents folder.")
     finally:
         if zip_archive:
             zip_archive.close()
