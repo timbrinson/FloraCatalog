@@ -17,40 +17,41 @@ DROP TABLE IF EXISTS wcvp_import CASCADE;
 
 -- =============================================================================
 -- WCVP Import Schema (Staging Table)
+-- MUST MATCH CSV COLUMN ORDER EXACTLY FOR POSITIONAL COPY
 -- =============================================================================
 
 CREATE TABLE wcvp_import (
     plant_name_id text PRIMARY KEY,
     ipni_id text,
-    powo_id text,
-    accepted_plant_name_id text,
-    parent_plant_name_id text,
-    basionym_plant_name_id text,
-    homotypic_synonym text,
-    taxon_name text,
-    taxon_authors text,
-    family text,
-    genus text,
-    genus_hybrid text,
-    species text,
-    species_hybrid text,
-    infraspecies text,
-    infraspecific_rank text,
     taxon_rank text,
     taxon_status text,
-    hybrid_formula text,
+    family text,
+    genus_hybrid text,
+    genus text,
+    species_hybrid text,
+    species text,
+    infraspecific_rank text,
+    infraspecies text,
     parenthetical_author text,
     primary_author text,
     publication_author text,
-    replaced_synonym_author text,
     place_of_publication text,
     volume_and_page text,
     first_published text,
     nomenclatural_remarks text,
-    reviewed text,
     geographic_area text,
     lifeform_description text,
-    climate_description text
+    climate_description text,
+    taxon_name text,
+    taxon_authors text,
+    accepted_plant_name_id text,
+    basionym_plant_name_id text,
+    replaced_synonym_author text,
+    homotypic_synonym text,
+    parent_plant_name_id text,
+    powo_id text,
+    hybrid_formula text,
+    reviewed text
 );
 
 -- =============================================================================
@@ -102,9 +103,9 @@ CREATE TABLE app_taxa (
     common_name text,
     
     genus text COLLATE "C",
-    genus_hybrid text, -- Changed from char(1) to text
+    genus_hybrid text, 
     species text COLLATE "C",
-    species_hybrid text, -- Changed from char(1) to text
+    species_hybrid text, 
     infraspecies text COLLATE "C",
     infraspecific_rank text,
     cultivar text COLLATE "C",
