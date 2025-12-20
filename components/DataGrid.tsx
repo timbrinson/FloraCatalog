@@ -63,7 +63,7 @@ const MultiSelectFilter = ({ options, selected, onChange, label }: { options: st
                 <span className="truncate">{selected.length === 0 ? `All ${label}s` : `${selected.length} selected`}</span>
                 <ChevronDown size={12} className="opacity-50"/>
             </button>
-            {isOpen && (<div className="absolute top-full left-0 right-0 mt-1 bg-white border border-slate-200 shadow-lg rounded-md z-50 max-h-48 overflow-y-auto min-w-[150px]"><div className="px-2 py-1.5 text-xs text-slate-500 hover:bg-slate-50 cursor-pointer border-b border-slate-50" onClick={() => { onChange([]); setIsOpen(false); }}>Clear Filter</div>{options.map(opt => (<div key={opt} className="flex items-center gap-2 px-2 py-1.5 hover:bg-leaf-50 cursor-pointer" onClick={() => toggleOption(opt)}><div className={`w-3 h-3 rounded border flex items-center justify-center flex-shrink-0 ${selected.includes(opt) ? 'bg-leaf-500 border-leaf-500' : 'border-slate-300 bg-white'}`}>{selected.includes(opt) && <Check size={10} className="text-white"/>}</div><span className="text-xs text-slate-700 capitalize whitespace-normal">{opt}</span></div>))}</div>)}
+            {isOpen && (<div className="absolute top-full left-0 right-0 mt-1 bg-white border border-slate-200 shadow-lg rounded-md z-50 max-h-48 overflow-y-auto min-w-[150px]"><div className="px-2 py-1.5 text-xs text-slate-500 hover:bg-slate-50 cursor-pointer border-b border-slate-50" onClick={() => { onChange([]); setIsOpen(false); }}>Clear Filter</div>{options.map(opt => (<div key={opt} className="flex items-center gap-2 px-2 py-1.5 hover:bg-leaf-50 cursor-pointer" onClick={() => toggleOption(opt)}><div className={`w-3 h-3 rounded border flex items-center justify-center flex-shrink-0 ${selected.includes(opt) ? 'bg-leaf-500 border-leaf-500' : 'border-slate-300 bg-white'}`}>{selected.includes(opt) && <Check size={10} className="text-white"/>}</div><span className="text-xs text-slate-700 capitalize whitespace-normal">{opt === 'NULL' || opt === 'null' ? <span className="italic opacity-60">None / Empty</span> : opt}</span></div>))}</div>)}
         </div>
     );
 };
@@ -131,7 +131,18 @@ const COLUMN_GROUPS: ColumnGroup[] = [
             { id: 'genusHybrid', label: 'GH', tooltip: 'Genus Hybrid Indicator', defaultWidth: 40, filterType: 'multi-select', filterOptions: ['×', '+', 'NULL'], disableSorting: true, hideHeaderIcons: true, headerAlign: 'center', lockWidth: true, defaultOn: true },
             { id: 'species', label: 'Species', tooltip: 'Species Epithet', defaultWidth: 120, filterType: 'text', defaultOn: true },
             { id: 'speciesHybrid', label: 'SH', tooltip: 'Species Hybrid Indicator', defaultWidth: 40, filterType: 'multi-select', filterOptions: ['×', '+', 'NULL'], disableSorting: true, hideHeaderIcons: true, headerAlign: 'center', lockWidth: true, defaultOn: true },
-            { id: 'infraspecificRank', label: 'I Rank', tooltip: 'Infraspecific Rank', defaultWidth: 60, filterType: 'text', hideHeaderIcons: true, headerAlign: 'center', lockWidth: true, defaultOn: true },
+            { 
+                id: 'infraspecificRank', 
+                label: 'I Rank', 
+                tooltip: 'Infraspecific Rank', 
+                defaultWidth: 80, 
+                filterType: 'multi-select', 
+                filterOptions: ['NULL', 'subsp.', 'var.', 'f.', 'agamosp.', 'convar.', 'ecas.', 'grex', 'lusus', 'microf.', 'microgène', 'micromorphe', 'modif.', 'monstr.', 'mut.', 'nid', 'nothof.', 'nothosubsp.', 'nothovar.', 'positio', 'proles', 'provar.', 'psp.', 'stirps', 'subap.', 'subf.', 'sublusus', 'subproles', 'subspecioid', 'subsubsp.', 'subvar.'],
+                hideHeaderIcons: true, 
+                headerAlign: 'center', 
+                lockWidth: true, 
+                defaultOn: true 
+            },
             { id: 'infraspecies', label: 'Infraspecies', tooltip: 'Infraspecific Epithet', defaultWidth: 120, filterType: 'text', defaultOn: true },
             { id: 'cultivar', label: 'Cultivar', tooltip: 'Cultivar Name', defaultWidth: 150, filterType: 'text', defaultOn: true },
         ]
@@ -142,9 +153,34 @@ const COLUMN_GROUPS: ColumnGroup[] = [
         columns: [
             { id: 'commonName', label: 'Common Name', tooltip: 'Common Name', defaultWidth: 150, filterType: 'text', defaultOn: false },
             { id: 'description', label: 'Description', tooltip: 'Description', defaultWidth: 250, filterType: 'text', defaultOn: false },
-            { id: 'geographicArea', label: 'Geography', tooltip: 'Geographic Area', defaultWidth: 180, filterType: 'text', defaultOn: false },
-            { id: 'lifeformDescription', label: 'Lifeform', tooltip: 'Lifeform Description', defaultWidth: 150, filterType: 'text', defaultOn: false },
-            { id: 'climateDescription', label: 'Climate', tooltip: 'Climate Description', defaultWidth: 180, filterType: 'text', defaultOn: false },
+            { 
+                id: 'geographicArea', 
+                label: 'Geography', 
+                tooltip: 'Geographic Area', 
+                defaultWidth: 180, 
+                filterType: 'text', 
+                defaultOn: false 
+            },
+            { 
+                id: 'lifeformDescription', 
+                label: 'Lifeform', 
+                tooltip: 'Lifeform Description', 
+                defaultWidth: 150, 
+                filterType: 'multi-select', 
+                filterOptions: [
+                    'annual', 'annual bamboo', 'annual or biennial', 'annual or helophyte', 'annual or lithophyte', 'annual or perennial', 'annual or rhizomatous geophyte', 'annual or shrub', 'annual or subshrub', 'annual or tuberous geophyte', 'annual, biennial or perennial', 'annual, biennial or subshrub', 'annual, perennial or subshrub', 'annual, subshrub or shrub', 'bamboo', 'biennial', 'biennial or perennial', 'biennial or shrub', 'biennial or subshrub', 'bulbous geophyte', 'bulbous geophyte or epiphyte', 'bulbous geophyte or helophyte', 'bulbous hydrogeophyte', 'caudex geophyte', 'caudex pachycaul shrub', 'caudex shrub', 'caudex shrub or tree', 'caudex subshrub', 'caudex subshrub or shrub', 'caudex tree', 'climber', 'climbing annual', 'climbing annual or biennial', 'climbing annual or perennial', 'climbing bamboo', 'climbing biennial', 'climbing bulbous geophyte', 'climbing caudex geophyte', 'climbing caudex tree', 'climbing epiphyte', 'climbing epiphyte or lithophyte', 'climbing helophyte', 'climbing hemiparasite', 'climbing herbaceous tree', 'climbing herbaceous tree or liana', 'climbing holomycotroph', 'climbing holoparasite', 'climbing lithophyte', 'climbing perennial', 'climbing perennial or climbing chamaephyte', 'climbing perennial or herbaceous tree', 'climbing perennial or shrub', 'climbing perennial or subshrub', 'climbing rhizomatous geophyte', 'climbing shrub', 'climbing shrub or liana', 'climbing shrub or tree', 'climbing subshrub', 'climbing subshrub or climbing shrub', 'climbing subshrub or epiphyte', 'climbing subshrub or shrub', 'climbing subshrub or tree', 'climbing succulent', 'climbing tuberous geophyte', 'climbing, sometimes tuberous shrub', 'epiphyte', 'epiphyte or lithophyte', 'epiphyte or perennial', 'epiphyte or subshrub', 'epiphyte or tuberous geophyte', 'epiphytic annual or subshrub', 'epiphytic bulb geophyte', 'epiphytic caudex subshrub', 'epiphytic climbing shrub', 'epiphytic climbing subshrub', 'epiphytic liana', 'epiphytic or lithophytic chamaephyte', 'epiphytic or lithophytic shrub', 'epiphytic or lithophytic tuberous geophyte', 'epiphytic perennial or subshrub', 'epiphytic rhizomatous geophyte', 'epiphytic rhizomatous subshrub', 'epiphytic scrambling subshrub', 'epiphytic shrub', 'epiphytic shrub or tree', 'epiphytic subshrub', 'epiphytic subshrub or shrub', 'epiphytic tuberous chamaephyte', 'epiphytic tuberous geophyte', 'geophyte', 'helophyte', 'helophyte or annual', 'helophyte or hydroperennial', 'helophyte or hydrosubshrub', 'helophyte or lithophyte', 'helophyte or perennial', 'helophyte or rhizomatous hydrogeophyte', 'helophyte or subshrub', 'helophyte or tree', 'helophyte or tuberous geophyte', 'hemiepiphyte', 'hemiepiphytic Caudex geophyte', 'hemiepiphytic liana', 'hemiepiphytic perennial', 'hemiepiphytic shrub', 'hemiepiphytic shrub or tree', 'hemiepiphytic subshrub', 'hemiepiphytic subshrub or shrub', 'hemiepiphytic tree', 'hemillithophytic shrub', 'hemillithophytic subshrub', 'hemimycotrophic annual', 'hemimycotrophic rhizomatous geophyte', 'hemimycotrophic tuberous geophyte', 'hemiparasite', 'hemiparasitic annual', 'hemiparasitic annual or biennial', 'hemiparasitic annual or perennial', 'hemiparasitic biennial', 'hemiparasitic biennial or perennial', 'hemiparasitic climber', 'hemiparasitic epiphyte', 'hemiparasitic perennial', 'hemiparasitic shrub', 'hemiparasitic subshrub', 'hemiparasitic subshrub or shrub', 'hemiparasitic tree', 'herbaceous bamboo', 'herbaceous shrub', 'herbaceous tree', 'holomycotroph', 'holomycotrophic annual', 'holomycotrophic geophyte', 'holomycotrophic perennial', 'holomycotrophic rhizomatous geophyte', 'holomycotrophic tuberous geophyte', 'holoparasite', 'holoparasitic annual', 'holoparasitic annual or biennial', 'holoparasitic annual or perennial', 'holoparasitic biennial', 'holoparasitic chamaephyte', 'holoparasitic epiphyte', 'holoparasitic geophyte', 'holoparasitic perennial', 'holoparasitic perennial or biennial', 'holoparasitic tuberous geophyte', 'hydroannual', 'hydroannual or helophyte', 'hydroannual or hydroperennial', 'hydroannual or hydrosubshrub', 'hydroannual or tuberous geophyte', 'hydroperennial', 'hydroperennial or tuberous geophyte', 'hydroshrub', 'hydrosubshrub', 'hydrosubshrub or perennial', 'hydrosubshrub or subshrub', 'liana', 'liana or rhizomatous geophyte', 'liana or shrub', 'liana or subshrub', 'liana or tree', 'lithophyte', 'lithophyte or annual', 'lithophyte or epiphyte', 'lithophyte or helophyte', 'lithophyte or perennial', 'lithophyte or subshrub', 'lithophytic annual', 'lithophytic subshrub', 'lithophytic tuberous geophyte', 'monocarpic lithophyte', 'monocarpic perennial', 'monocarpic perennial or epiphyte', 'monocarpic perennial or lithophyte', 'monocarpic perennial or subshrub', 'monocarpic shrub', 'monocarpic shrub or tree', 'monocarpic tree', 'pachycaul tree', 'parasitic', 'perennial', 'perennial or annual', 'perennial or bulbous geophyte', 'perennial or climbing perennial', 'perennial or epiphyte', 'perennial or geophyte', 'perennial or helophyte', 'perennial or lithophyte', 'perennial or monocarpic perennial', 'perennial or pseudobulb subshrub', 'perennial or rhizomatous geophyte', 'perennial or shrub', 'perennial or subshrub', 'perennial or tree', 'perennial or tuberous geophyte', 'perennial, lithophyte or epiphyte', 'perennial, subshrub or shrub', 'pseudobulbous epiphyte', 'pseudobulbous epiphyte or geophyte', 'pseudobulbous epiphyte or lithophyte', 'pseudobulbous epiphyte or perennial', 'pseudobulbous geophyte', 'pseudobulbous geophyte or epiphyte', 'pseudobulbous geophyte or lithophyte', 'pseudobulbous lithophyte', 'pseudobulbous lithophyte or epiphyte', 'pseudobulbous or rhizomatous geophyte', 'pseudobulbous subshrub', 'rhizomatous epiphyte', 'rhizomatous epiphyte or lithophyte', 'rhizomatous geophyte', 'rhizomatous geophyte or epiphyte', 'rhizomatous geophyte or helophyte', 'rhizomatous geophyte or lithophyte', 'rhizomatous geophyte or subshrub', 'rhizomatous hydrogeophyte', 'rhizomatous hydrogeophyte or helophyte', 'rhizomatous lithophyte', 'rhizomatous or pseudobulbous epiphyte', 'rhizomatous or tuberous geophyte', 'rhizomatous perennial', 'rhizomatous shrub', 'rhizomatous subshrub', 'rhizome lithophyte or epiphyte', 'scrambling annual', 'scrambling annual or perennial', 'scrambling annual or subshrub', 'scrambling bamboo', 'scrambling caudex geophyte', 'scrambling caudex shrub', 'scrambling epiphyte', 'scrambling geophyte', 'scrambling herbaceous tree', 'scrambling perennial', 'scrambling perennial or annual', 'scrambling perennial or epiphyte', 'scrambling perennial or subshrub', 'scrambling perennial or tuberous geophyte', 'scrambling rhizomatous geophyte', 'scrambling semisucculent subshrub or shrub', 'scrambling shrub', 'scrambling shrub or liana', 'scrambling shrub or tree', 'scrambling subshrub', 'scrambling subshrub or climbing shrub', 'scrambling subshrub or liana', 'scrambling subshrub or lithophyte', 'scrambling subshrub or shrub', 'scrambling subshrub or tree', 'scrambling subshrub or tuberous geophyte', 'scrambling succulent', 'scrambling succulent shrub', 'scrambling succulent subshrub', 'scrambling succulent subshrub or shrub', 'scrambling succulent tuberous shrub', 'scrambling tree', 'scrambling tuberous geophyte', 'semiaquatic annual', 'semiaquatic subshrub', 'semisucculent annual', 'semisucculent annual or biennial', 'semisucculent annual or subshrub', 'semisucculent climber', 'semisucculent epiphyte', 'semisucculent liana', 'semisucculent perennial', 'semisucculent shrub', 'semisucculent shrub or tree', 'semisucculent subshrub', 'semisucculent subshrub or epiphyte', 'semisucculent subshrub or shrub', 'semisucculent tree', 'semisucculent tuberous geophyte', 'semisucculent tuberous shrub', 'semisucculent tuberous subshrub', 'shrub', 'shrub or liana', 'shrub or tree', 'sometimes tuberous perennial', 'sometimes tuberous subshrub', 'sometimes tuberous subshrub or shrub', 'subshrub', 'subshrub or climbing shrub', 'subshrub or epiphyte', 'subshrub or helophyte', 'subshrub or lithophyte', 'subshrub or perennial', 'subshrub or rhizomatous geophyte', 'subshrub or rhizomatous subshrub', 'subshrub or shrub', 'subshrub or tree', 'subshrub or tuberous geophyte', 'subshrub, shrub or tree', 'succulent', 'succulent annual', 'succulent annual or biennial', 'succulent annual or subshrub', 'succulent biennial', 'succulent biennial or subshrub', 'succulent bulbous geophyte', 'succulent epiphyte', 'succulent epiphyte or lithophyte', 'succulent epiphytic subshrub', 'succulent lithophyte', 'succulent lithophyte or epiphyte', 'succulent perennial', 'succulent perennial or bulbous geophyte', 'succulent perennial or chamaephyte', 'succulent perennial or epiphyte', 'succulent rhizomatous geophyte', 'succulent shrub', 'succulent shrub or tree', 'succulent subshrub', 'succulent subshrub or epiphyte', 'succulent subshrub or lithophyte', 'succulent subshrub or shrub', 'succulent subshrub or tree', 'succulent tree', 'succulent tuberous geophyte', 'succulent tuberous shrub', 'succulent tuberous subshrub', 'succulent tuberous subshrub or shrub', 'succulent, somewhat tuberous subshrub', 'tree', 'tuberous epiphyte', 'tuberous epiphyte or lithophyte', 'tuberous geophyte', 'tuberous geophyte or annual', 'tuberous geophyte or epiphyte', 'tuberous geophyte or helophyte', 'tuberous geophyte or lithophyte', 'tuberous geophyte or perennial', 'tuberous geophyte or subshrub', 'tuberous helophyte', 'tuberous hydrogeophyte', 'tuberous lithophyte', 'tuberous lithophyte or epiphyte', 'tuberous or rhizomatous geophyte', 'tuberous perennial', 'tuberous perennial or subshrub', 'tuberous shrub', 'tuberous shrub or tree', 'tuberous subshrub', 'tuberous subshrub or shrub', 'tuberous tree', 'NULL'
+                ],
+                defaultOn: false 
+            },
+            { 
+                id: 'climateDescription', 
+                label: 'Climate', 
+                tooltip: 'Climate Description', 
+                defaultWidth: 180, 
+                filterType: 'multi-select', 
+                filterOptions: ['desert or dry shrubland', 'montane tropical', 'seasonally dry tropical', 'subalpine or subarctic', 'subtropical', 'subtropical or tropical', 'temperate', 'temperate, subtropical or tropical', 'wet tropical', 'NULL'],
+                defaultOn: false 
+            },
         ]
     },
     {
@@ -167,7 +203,17 @@ const COLUMN_GROUPS: ColumnGroup[] = [
             { id: 'volumeAndPage', label: 'Vol/Page', tooltip: 'Volume And Page', defaultWidth: 120, filterType: 'text', defaultOn: false },
             { id: 'firstPublished', label: 'First Published', tooltip: 'First Published Date', defaultWidth: 120, filterType: 'text', defaultOn: false },
             { id: 'nomenclaturalRemarks', label: 'Nom. Remarks', tooltip: 'Nomenclatural Remarks', defaultWidth: 200, filterType: 'text', defaultOn: false },
-            { id: 'reviewed', label: 'Reviewed', tooltip: 'Reviewed Status', defaultWidth: 80, filterType: 'multi-select', filterOptions: ['Y', 'N'], lockWidth: true, headerAlign: 'center', defaultOn: false },
+            { 
+                id: 'reviewed', 
+                label: 'Reviewed', 
+                tooltip: 'Reviewed Status', 
+                defaultWidth: 80, 
+                filterType: 'multi-select', 
+                filterOptions: ['N', 'Y', 'NULL'], 
+                lockWidth: true, 
+                headerAlign: 'center', 
+                defaultOn: false 
+            },
         ]
     },
     {
@@ -199,7 +245,6 @@ const DataGrid: React.FC<DataGridProps> = ({
   const [visibleColumns, setVisibleColumns] = useState<Set<string>>(() => {
       const saved = loadState<string[]>('grid_visible_cols_rev9', []);
       if (saved.length > 0) return new Set(saved);
-      // Fallback to defaults from CSV spec
       return new Set(ALL_COLUMNS.filter(c => c.defaultOn).map(c => c.id));
   });
   

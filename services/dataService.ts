@@ -1,4 +1,3 @@
-
 import { getSupabase, getIsOffline } from './supabaseClient';
 import { Taxon, TaxonRank, TaxonomicStatus, Synonym, Link } from '../types';
 
@@ -21,7 +20,8 @@ const mapFromDB = (row: any): Taxon => {
     plantNameId: row.wcvp_id,
     ipniId: row.ipni_id,
     powoId: row.powo_id,
-    accepted_plant_name_id: row.accepted_plant_name_id,
+    // Fix: Changed 'accepted_plant_name_id' to 'acceptedPlantNameId' to match Taxon interface
+    acceptedPlantNameId: row.accepted_plant_name_id,
     parentPlantNameId: row.parent_plant_name_id,
     // Fix: Corrected typo 'basionymPlantName_id' to 'basionymPlantNameId'
     basionymPlantNameId: row.basionym_plant_name_id,
