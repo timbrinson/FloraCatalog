@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { Taxon, UserPreferences, ColorTheme } from '../types';
 import { 
@@ -81,6 +82,7 @@ const getDescendantCount = (taxon: Taxon): number => taxon.descendantCount || 0;
 interface ColumnConfig { 
     id: string; 
     label: string; 
+    tooltip: string;
     defaultWidth: number; 
     filterType?: 'text' | 'multi-select'; 
     filterOptions?: string[]; 
@@ -89,6 +91,7 @@ interface ColumnConfig {
     hideHeaderIcons?: boolean; 
     headerAlign?: 'left' | 'center' | 'right';
     lockWidth?: boolean;
+    defaultOn?: boolean;
 }
 
 interface ColumnGroup {
@@ -99,80 +102,84 @@ interface ColumnGroup {
 
 const COLUMN_GROUPS: ColumnGroup[] = [
     {
-        id: 'control',
-        label: 'Control',
+        id: 'system',
+        label: 'System',
         columns: [
-            { id: 'treeControl', label: 'Tree', defaultWidth: 55, disableSorting: true, lockWidth: true, hideHeaderIcons: true, headerAlign: 'center' },
-            { id: 'actions', label: 'Actions', defaultWidth: 90, disableSorting: true, lockWidth: true, hideHeaderIcons: true, headerAlign: 'center' },
-            { id: 'childCount', label: '#', defaultWidth: 50, filterType: 'text', hideHeaderIcons: true, headerAlign: 'center', lockWidth: true },
+            { id: 'id', label: 'Internal ID', tooltip: 'Internal UUID', defaultWidth: 100, filterType: 'text', defaultOn: false },
+            { id: 'parentId', label: 'Parent ID', tooltip: 'Parent UUID', defaultWidth: 100, filterType: 'text', defaultOn: false },
+            { id: 'treeControl', label: 'Tree', tooltip: 'Tree Control', defaultWidth: 55, disableSorting: true, lockWidth: true, hideHeaderIcons: true, headerAlign: 'center', defaultOn: true },
+            { id: 'childCount', label: '#', tooltip: 'Child Count', defaultWidth: 50, filterType: 'text', hideHeaderIcons: true, headerAlign: 'center', lockWidth: true, defaultOn: true },
+            { id: 'actions', label: 'Actions', tooltip: 'Record Actions', defaultWidth: 90, disableSorting: true, lockWidth: true, hideHeaderIcons: true, headerAlign: 'center', defaultOn: false },
         ]
     },
     {
-        id: 'taxonBreakdown',
-        label: 'Taxon Breakdown',
+        id: 'taxonomy',
+        label: 'Taxonomy',
         columns: [
-            { id: 'genusHybrid', label: 'GH', defaultWidth: 40, filterType: 'multi-select', filterOptions: ['×', '+', 'NULL'], disableSorting: true, hideHeaderIcons: true, headerAlign: 'center', lockWidth: true },
-            { id: 'genus', label: 'Genus', defaultWidth: 120, filterType: 'text' },
-            { id: 'speciesHybrid', label: 'SH', defaultWidth: 40, filterType: 'multi-select', filterOptions: ['×', '+', 'NULL'], disableSorting: true, hideHeaderIcons: true, headerAlign: 'center', lockWidth: true },
-            { id: 'species', label: 'Species', defaultWidth: 120, filterType: 'text' },
-            { id: 'infraspecificRank', label: 'I Rank', defaultWidth: 60, filterType: 'text', hideHeaderIcons: true, headerAlign: 'center', lockWidth: true },
-            { id: 'infraspecies', label: 'Infraspecies', defaultWidth: 120, filterType: 'text' },
-            { id: 'cultivar', label: 'Cultivar', defaultWidth: 150, filterType: 'text' },
+            { id: 'taxonName', label: 'Taxon Name', tooltip: 'Full Scientific Name', defaultWidth: 220, filterType: 'text', defaultOn: true },
+            { id: 'taxonRank', label: 'Rank', tooltip: 'Taxon Rank', defaultWidth: 110, filterType: 'multi-select', filterOptions: ['Family', 'Genus', 'Species', 'Subspecies', 'Variety', 'Form', 'Hybrid', 'Cultivar', 'Grex', 'Unranked'], lockWidth: true, defaultOn: false },
+            { id: 'taxonStatus', label: 'Status', tooltip: 'Taxonomic Status', defaultWidth: 110, filterType: 'multi-select', filterOptions: ['Accepted', 'Synonym', 'Unplaced', 'Artificial Hybrid', 'Illegitimate', 'Invalid', 'Misapplied', 'Orthographic', 'Provisionally Accepted', 'Unresolved', 'Local Biotype'], defaultOn: false },
+            { id: 'family', label: 'Family', tooltip: 'Family', defaultWidth: 120, filterType: 'text', defaultOn: false },
+            { id: 'hybridFormula', label: 'Hybrid Formula', tooltip: 'Hybrid Formula', defaultWidth: 180, filterType: 'text', defaultOn: false },
         ]
     },
     {
-        id: 'basicInfo',
-        label: 'Basic Info',
+        id: 'nomenclature',
+        label: 'Nomenclature',
         columns: [
-            { id: 'taxonName', label: 'Scientific Name', defaultWidth: 220, filterType: 'text' },
-            { id: 'commonName', label: 'Common Name', defaultWidth: 150, filterType: 'text' },
-            { id: 'description', label: 'Description', defaultWidth: 250, filterType: 'text' },
-            { id: 'geographicArea', label: 'Geography', defaultWidth: 180, filterType: 'text' },
-            { id: 'climateDescription', label: 'Climate', defaultWidth: 180, filterType: 'text' },
+            { id: 'genus', label: 'Genus', tooltip: 'Genus', defaultWidth: 120, filterType: 'text', defaultOn: true },
+            { id: 'genusHybrid', label: 'GH', tooltip: 'Genus Hybrid Indicator', defaultWidth: 40, filterType: 'multi-select', filterOptions: ['×', '+', 'NULL'], disableSorting: true, hideHeaderIcons: true, headerAlign: 'center', lockWidth: true, defaultOn: true },
+            { id: 'species', label: 'Species', tooltip: 'Species Epithet', defaultWidth: 120, filterType: 'text', defaultOn: true },
+            { id: 'speciesHybrid', label: 'SH', tooltip: 'Species Hybrid Indicator', defaultWidth: 40, filterType: 'multi-select', filterOptions: ['×', '+', 'NULL'], disableSorting: true, hideHeaderIcons: true, headerAlign: 'center', lockWidth: true, defaultOn: true },
+            { id: 'infraspecificRank', label: 'I Rank', tooltip: 'Infraspecific Rank', defaultWidth: 60, filterType: 'text', hideHeaderIcons: true, headerAlign: 'center', lockWidth: true, defaultOn: true },
+            { id: 'infraspecies', label: 'Infraspecies', tooltip: 'Infraspecific Epithet', defaultWidth: 120, filterType: 'text', defaultOn: true },
+            { id: 'cultivar', label: 'Cultivar', tooltip: 'Cultivar Name', defaultWidth: 150, filterType: 'text', defaultOn: true },
         ]
     },
     {
-        id: 'additionalInfo',
-        label: 'Additional Info',
+        id: 'descriptive',
+        label: 'Descriptive',
         columns: [
-            { id: 'lifeformDescription', label: 'Lifeform', defaultWidth: 150, filterType: 'text' },
-            { id: 'taxonRank', label: 'Rank', defaultWidth: 110, filterType: 'multi-select', filterOptions: ['Family', 'Genus', 'Species', 'Subspecies', 'Variety', 'Form', 'Hybrid', 'Cultivar', 'Grex', 'Unranked'], lockWidth: true },
-            { id: 'family', label: 'Family', defaultWidth: 120, filterType: 'text' },
-            { id: 'hybridFormula', label: 'Hybrid Formula', defaultWidth: 180, filterType: 'text' },
-        ]
-    },
-    {
-        id: 'nameOrigin',
-        label: 'Name Origin',
-        columns: [
-            { id: 'taxonAuthors', label: 'Authorship', defaultWidth: 150, filterType: 'text' },
-            { id: 'publicationAuthor', label: 'Pub. Author', defaultWidth: 150, filterType: 'text' },
-            { id: 'parentheticalAuthor', label: 'Paren. Author', defaultWidth: 150, filterType: 'text' },
-            { id: 'placeOfPublication', label: 'Publication', defaultWidth: 200, filterType: 'text' },
-            { id: 'volumeAndPage', label: 'Vol/Page', defaultWidth: 120, filterType: 'text' },
-            { id: 'firstPublished', label: 'First Published', defaultWidth: 120, filterType: 'text' },
-        ]
-    },
-    {
-        id: 'review',
-        label: 'Review',
-        columns: [
-            { id: 'taxonStatus', label: 'Status', defaultWidth: 110, filterType: 'multi-select', filterOptions: ['Accepted', 'Synonym', 'Unplaced', 'Artificial Hybrid', 'Illegitimate', 'Invalid', 'Misapplied', 'Orthographic', 'Provisionally Accepted', 'Unresolved', 'Local Biotype'] },
-            { id: 'reviewed', label: 'Reviewed', defaultWidth: 80, filterType: 'multi-select', filterOptions: ['Y', 'N'], lockWidth: true, headerAlign: 'center' },
-            { id: 'nomenclaturalRemarks', label: 'Nom. Remarks', defaultWidth: 200, filterType: 'text' },
+            { id: 'commonName', label: 'Common Name', tooltip: 'Common Name', defaultWidth: 150, filterType: 'text', defaultOn: false },
+            { id: 'description', label: 'Description', tooltip: 'Description', defaultWidth: 250, filterType: 'text', defaultOn: false },
+            { id: 'geographicArea', label: 'Geography', tooltip: 'Geographic Area', defaultWidth: 180, filterType: 'text', defaultOn: false },
+            { id: 'lifeformDescription', label: 'Lifeform', tooltip: 'Lifeform Description', defaultWidth: 150, filterType: 'text', defaultOn: false },
+            { id: 'climateDescription', label: 'Climate', tooltip: 'Climate Description', defaultWidth: 180, filterType: 'text', defaultOn: false },
         ]
     },
     {
         id: 'identifiers',
-        label: 'Identifiers',
+        label: 'Standard Identifiers',
         columns: [
-            { id: 'id', label: 'Internal ID', defaultWidth: 100, filterType: 'text' },
-            { id: 'parentId', label: 'Parent ID', defaultWidth: 100, filterType: 'text' },
-            { id: 'plantNameId', label: 'WCVP ID', defaultWidth: 100, filterType: 'text' },
-            { id: 'ipniId', label: 'IPNI ID', defaultWidth: 100, filterType: 'text' },
-            { id: 'powoId', label: 'POWO ID', defaultWidth: 100, filterType: 'text' },
-            { id: 'acceptedPlantNameId', label: 'Accepted ID', defaultWidth: 100, filterType: 'text' },
-            { id: 'basionymPlantNameId', label: 'Basionym ID', defaultWidth: 100, filterType: 'text' },
+            { id: 'plantNameId', label: 'WCVP ID', tooltip: 'WCVP Plant Name ID', defaultWidth: 100, filterType: 'text', defaultOn: false },
+            { id: 'ipniId', label: 'IPNI ID', tooltip: 'IPNI ID', defaultWidth: 100, filterType: 'text', defaultOn: false },
+            { id: 'powoId', label: 'POWO ID', tooltip: 'POWO ID', defaultWidth: 100, filterType: 'text', defaultOn: false },
+        ]
+    },
+    {
+        id: 'publication',
+        label: 'Publication',
+        columns: [
+            { id: 'taxonAuthors', label: 'Authorship', tooltip: 'Taxon Authors', defaultWidth: 150, filterType: 'text', defaultOn: false },
+            { id: 'primaryAuthor', label: 'Prim. Author', tooltip: 'Primary Author', defaultWidth: 150, filterType: 'text', defaultOn: false },
+            { id: 'publicationAuthor', label: 'Pub. Author', tooltip: 'Publication Author', defaultWidth: 150, filterType: 'text', defaultOn: false },
+            { id: 'placeOfPublication', label: 'Pub. Place', tooltip: 'Place Of Publication', defaultWidth: 200, filterType: 'text', defaultOn: false },
+            { id: 'volumeAndPage', label: 'Vol/Page', tooltip: 'Volume And Page', defaultWidth: 120, filterType: 'text', defaultOn: false },
+            { id: 'firstPublished', label: 'First Published', tooltip: 'First Published Date', defaultWidth: 120, filterType: 'text', defaultOn: false },
+            { id: 'nomenclaturalRemarks', label: 'Nom. Remarks', tooltip: 'Nomenclatural Remarks', defaultWidth: 200, filterType: 'text', defaultOn: false },
+            { id: 'reviewed', label: 'Reviewed', tooltip: 'Reviewed Status', defaultWidth: 80, filterType: 'multi-select', filterOptions: ['Y', 'N'], lockWidth: true, headerAlign: 'center', defaultOn: false },
+        ]
+    },
+    {
+        id: 'related',
+        label: 'Related Plants',
+        columns: [
+            { id: 'homotypicSynonym', label: 'Homotypic Syn.', tooltip: 'Homotypic Synonym ID', defaultWidth: 100, filterType: 'text', defaultOn: false },
+            { id: 'acceptedPlantNameId', label: 'Accepted ID', tooltip: 'Accepted Plant Name ID', defaultWidth: 100, filterType: 'text', defaultOn: false },
+            { id: 'parentheticalAuthor', label: 'Paren. Author', tooltip: 'Parenthetical Author', defaultWidth: 150, filterType: 'text', defaultOn: false },
+            { id: 'replacedSynonymAuthor', label: 'Syn. Author', tooltip: 'Replaced Synonym Author', defaultWidth: 150, filterType: 'text', defaultOn: false },
+            { id: 'parentPlantNameId', label: 'Parent Plant ID', tooltip: 'Parent Plant Name ID', defaultWidth: 100, filterType: 'text', defaultOn: false },
+            { id: 'basionymPlantNameId', label: 'Basionym ID', tooltip: 'Basionym Plant Name ID', defaultWidth: 100, filterType: 'text', defaultOn: false },
         ]
     }
 ];
@@ -190,14 +197,14 @@ const DataGrid: React.FC<DataGridProps> = ({
   };
 
   const [visibleColumns, setVisibleColumns] = useState<Set<string>>(() => {
-      const saved = loadState<string[]>('grid_visible_cols_rev8', []);
-      return saved.length > 0 ? new Set(saved) : new Set([
-          'treeControl', 'childCount', 'taxonName', 'commonName', 'description', 'geographicArea', 'climateDescription'
-      ]);
+      const saved = loadState<string[]>('grid_visible_cols_rev9', []);
+      if (saved.length > 0) return new Set(saved);
+      // Fallback to defaults from CSV spec
+      return new Set(ALL_COLUMNS.filter(c => c.defaultOn).map(c => c.id));
   });
   
-  const [columnOrder, setColumnOrder] = useState<string[]>(() => loadState('grid_col_order_rev8', ALL_COLUMNS.map(c => c.id)));
-  const [colWidths, setColWidths] = useState<Record<string, number>>(() => loadState('grid_col_widths_rev8', Object.fromEntries(ALL_COLUMNS.map(c => [c.id, c.defaultWidth]))));
+  const [columnOrder, setColumnOrder] = useState<string[]>(() => loadState('grid_col_order_rev9', ALL_COLUMNS.map(c => c.id)));
+  const [colWidths, setColWidths] = useState<Record<string, number>>(() => loadState('grid_col_widths_rev9', Object.fromEntries(ALL_COLUMNS.map(c => [c.id, c.defaultWidth]))));
   const [isHierarchyMode, setIsHierarchyMode] = useState<boolean>(false);
   const [groupBy, setGroupBy] = useState<string[]>([]);
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
@@ -212,10 +219,10 @@ const DataGrid: React.FC<DataGridProps> = ({
   const legendRef = useRef<HTMLDivElement>(null);
   const colPickerRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => { if (isHierarchyMode) setGroupBy(['genus', 'species', 'infraspecies']); else setGroupBy([]); }, [isHierarchyMode]);
-  useEffect(() => localStorage.setItem('grid_visible_cols_rev8', JSON.stringify(Array.from(visibleColumns))), [visibleColumns]);
-  useEffect(() => localStorage.setItem('grid_col_order_rev8', JSON.stringify(columnOrder)), [columnOrder]);
-  useEffect(() => localStorage.setItem('grid_col_widths_rev8', JSON.stringify(colWidths)), [colWidths]);
+  useEffect(() => { if (isHierarchyMode) setGroupBy(['family', 'genus', 'species', 'infraspecies']); else setGroupBy([]); }, [isHierarchyMode]);
+  useEffect(() => localStorage.setItem('grid_visible_cols_rev9', JSON.stringify(Array.from(visibleColumns))), [visibleColumns]);
+  useEffect(() => localStorage.setItem('grid_col_order_rev9', JSON.stringify(columnOrder)), [columnOrder]);
+  useEffect(() => localStorage.setItem('grid_col_widths_rev9', JSON.stringify(colWidths)), [colWidths]);
 
   useEffect(() => {
       const handleClickOutside = (event: MouseEvent) => {
@@ -252,6 +259,7 @@ const DataGrid: React.FC<DataGridProps> = ({
           return candidates.find(t => {
              const valMatches = String(getRowValue(t, field)) === value;
              if (!valMatches) return false;
+             if (field === 'family') return t.taxonRank === 'family';
              if (field === 'genus') return t.taxonRank === 'genus';
              if (field === 'species') return t.taxonRank === 'species';
              if (field === 'infraspecies') return ['variety', 'subspecies', 'form'].includes(t.taxonRank);
@@ -306,6 +314,16 @@ const DataGrid: React.FC<DataGridProps> = ({
       setCollapsedGroups(next);
   };
   
+  const expandTreeLevel = (targetDepth: number) => {
+      const newCollapsed = new Set<string>();
+      gridRows.forEach(row => {
+          if (row.isTreeHeader && row.treePath) {
+              if ((row.depth || 0) >= targetDepth) newCollapsed.add(row.treePath);
+          }
+      });
+      setCollapsedGroups(newCollapsed);
+  };
+
   const toggleColumnGroup = (groupId: string) => {
       const group = COLUMN_GROUPS.find(g => g.id === groupId);
       if (!group) return;
@@ -367,6 +385,16 @@ const DataGrid: React.FC<DataGridProps> = ({
   const handleDragOver = (e: React.DragEvent) => { e.preventDefault(); e.dataTransfer.dropEffect = "move"; };
   const handleDrop = (e: React.DragEvent, targetId: string) => { e.preventDefault(); if (!draggedColumn || draggedColumn === targetId) return; const newOrder = [...columnOrder]; const sIdx = newOrder.indexOf(draggedColumn); const tIdx = newOrder.indexOf(targetId); newOrder.splice(sIdx, 1); newOrder.splice(tIdx, 0, draggedColumn); setColumnOrder(newOrder); setDraggedColumn(null); };
 
+  const isAnyGroupCollapsed = collapsedGroups.size > 0;
+  const toggleAllGroups = () => {
+    if (isAnyGroupCollapsed) {
+        setCollapsedGroups(new Set());
+    } else {
+        const allPaths = new Set(gridRows.filter(r => r.isTreeHeader && r.treePath).map(r => r.treePath!));
+        setCollapsedGroups(allPaths);
+    }
+  };
+
   return (
     <div className="bg-white rounded-xl shadow border border-slate-200 overflow-hidden flex flex-col h-full relative">
       <div className="p-2 border-b border-slate-200 bg-slate-50 flex justify-between items-center z-20 relative flex-shrink-0">
@@ -374,8 +402,18 @@ const DataGrid: React.FC<DataGridProps> = ({
              <span>{totalRecords.toLocaleString()} records</span>
              {isLoadingMore && <span className="flex items-center gap-1 text-leaf-600"><Loader2 size={12} className="animate-spin"/> Loading...</span>}
              {isHierarchyMode && (
-                 <div className="flex items-center gap-1 bg-white border border-slate-200 rounded p-0.5 ml-2">
-                     <button onClick={() => setCollapsedGroups(new Set())} className="px-2 py-0.5 text-[10px] text-slate-600 hover:bg-slate-100 rounded">Expand All</button>
+                 <div className="flex items-center gap-1 bg-white border border-slate-200 rounded p-0.5 ml-2 shadow-sm">
+                     <button onClick={() => expandTreeLevel(1)} className="px-2 py-0.5 text-[10px] text-slate-600 hover:bg-slate-100 rounded" title="Level 1: Family">1</button>
+                     <button onClick={() => expandTreeLevel(2)} className="px-2 py-0.5 text-[10px] text-slate-600 hover:bg-slate-100 rounded" title="Level 2: Genus">2</button>
+                     <button onClick={() => expandTreeLevel(3)} className="px-2 py-0.5 text-[10px] text-slate-600 hover:bg-slate-100 rounded" title="Level 3: Species">3</button>
+                     <button onClick={() => expandTreeLevel(4)} className="px-2 py-0.5 text-[10px] text-slate-600 hover:bg-slate-100 rounded" title="Level 4: Infraspecies">4</button>
+                     <div className="w-px h-3 bg-slate-200 mx-1"></div>
+                     <button 
+                        onClick={toggleAllGroups} 
+                        className="px-2 py-0.5 text-[10px] font-bold text-leaf-600 hover:bg-leaf-50 rounded"
+                     >
+                        {isAnyGroupCollapsed ? 'Expand All' : 'Collapse All'}
+                     </button>
                  </div>
              )}
          </div>
@@ -407,7 +445,7 @@ const DataGrid: React.FC<DataGridProps> = ({
                                         </div>
                                         <div className="grid grid-cols-1 gap-0.5 ml-5">
                                             {group.columns.map(col => (
-                                                <div key={col.id} onClick={() => toggleColumn(col.id)} className="flex items-center gap-2 px-2 py-1 hover:bg-slate-50 cursor-pointer rounded transition-colors group/col">
+                                                <div key={col.id} onClick={() => toggleColumn(col.id)} className="flex items-center gap-2 px-2 py-1 hover:bg-slate-50 cursor-pointer rounded transition-colors group/col" title={col.tooltip}>
                                                     <div className={`w-3 h-3 rounded flex items-center justify-center border flex-shrink-0 ${visibleColumns.has(col.id) ? 'bg-leaf-500 border-leaf-500' : 'border-slate-300'}`}>
                                                         {visibleColumns.has(col.id) && <Check size={10} className="text-white"/>}
                                                     </div>
@@ -430,7 +468,7 @@ const DataGrid: React.FC<DataGridProps> = ({
            <thead className="bg-slate-50 sticky top-0 z-10 text-xs font-bold text-slate-500 uppercase tracking-wide shadow-sm">
               <tr>
                   {activeColumns.map(col => (
-                      <th key={col.id} className="border-b border-slate-200 border-r border-slate-100 last:border-r-0 bg-slate-50 select-none relative group" style={{ width: colWidths[col.id], minWidth: 30 }} draggable={!col.disableDrag} onDragStart={(e) => handleDragStart(e, col.id)} onDragOver={handleDragOver} onDrop={(e) => handleDrop(e, col.id)}>
+                      <th key={col.id} className="border-b border-slate-200 border-r border-slate-100 last:border-r-0 bg-slate-50 select-none relative group" style={{ width: colWidths[col.id], minWidth: 30 }} draggable={!col.disableDrag} onDragStart={(e) => handleDragStart(e, col.id)} onDragOver={handleDragOver} onDrop={(e) => handleDrop(e, col.id)} title={col.tooltip}>
                          <div className={`flex items-center gap-1 p-2 h-full w-full ${col.headerAlign === 'center' ? 'justify-center' : 'justify-between'}`}>
                              {col.id === 'treeControl' ? (
                                 <button onClick={(e) => { e.stopPropagation(); setIsHierarchyMode(!isHierarchyMode); }} className={`p-1 rounded hover:bg-slate-200 transition-colors ${isHierarchyMode ? 'text-indigo-600 bg-indigo-50 ring-1 ring-indigo-200 shadow-inner' : 'text-slate-400'}`} title={isHierarchyMode ? "Flat View" : "Tree View"}>{isHierarchyMode ? <Network size={16} /> : <List size={16} />}</button>
@@ -445,6 +483,29 @@ const DataGrid: React.FC<DataGridProps> = ({
                              )}
                          </div>
                          {col.id !== 'actions' && (<div className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-leaf-400 z-20" onMouseDown={(e) => handleResizeStart(e, col.id)}/>)}
+                      </th>
+                  ))}
+              </tr>
+              <tr>
+                  {activeColumns.map(col => (
+                      <th key={`${col.id}-filter`} className="p-1 border-b border-slate-200 border-r border-slate-100 bg-slate-50/80">
+                          {col.id === 'actions' || col.id === 'treeControl' ? null 
+                           : col.filterType === 'multi-select' 
+                             ? (<MultiSelectFilter label={col.label} options={col.filterOptions || []} selected={filters[col.id] || []} onChange={(vals) => onFilterChange(col.id, vals)}/>) 
+                             : (
+                                <div className="relative">
+                                    <input 
+                                        className={`w-full text-xs px-2 py-1.5 bg-white border border-slate-200 rounded outline-none focus:border-leaf-300 focus:ring-1 focus:ring-leaf-200 font-normal ${col.id === 'taxonName' ? 'pl-7 border-leaf-300 ring-1 ring-leaf-100' : ''}`} 
+                                        placeholder={col.id === 'taxonName' ? 'Search DB...' : 'Filter...'}
+                                        value={localTextFilters[col.id] || ''} 
+                                        onChange={e => handleTextFilterChange(col.id, e.target.value)}
+                                    />
+                                    {col.id === 'taxonName' && (
+                                        <Search size={12} className="absolute left-2 top-2 text-leaf-500" />
+                                    )}
+                                </div>
+                             )
+                          }
                       </th>
                   ))}
               </tr>

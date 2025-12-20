@@ -1,7 +1,7 @@
 
 -- =============================================================================
--- PERFORMANCE OVERHAUL V2: Standardized Trigram, Composite, and ID Indices
--- Fixes 57014 Timeouts and synchronizes indices with master schema.
+-- PERFORMANCE OVERHAUL V3: Standardized Indices & Sort Optimization
+-- Fixes 57014 Timeouts by providing B-Tree support for Grid sorting.
 -- =============================================================================
 
 -- 1. Enable Trigram Extension
@@ -39,29 +39,30 @@ DROP INDEX IF EXISTS idx_app_taxa_basionym_wcvp;
 DROP INDEX IF EXISTS idx_app_taxa_geo;
 DROP INDEX IF EXISTS idx_app_taxa_path_gist;
 
--- 3. NOMENCLATURE SEARCH & SORT
--- GIN Index: Fast case-insensitive wildcard search (ILIKE '%term%')
-CREATE INDEX IF NOT EXISTS idx_app_taxa_name_trgm ON app_taxa USING GIN (taxon_name gin_trgm_ops);
-
--- B-Tree Index: Optimized for ORDER BY and Prefix Match.
+-- 3. NOMENCLATURE SEARCH & SORT (CRITICAL)
+-- B-Tree Index for ORDER BY and Prefix LIKE. Uses COLLATE "C" for max performance.
 CREATE INDEX IF NOT EXISTS idx_app_taxa_name_sort ON app_taxa (taxon_name COLLATE "C");
 
+-- GIN Index: Fast wildcard search (ILIKE '%term%')
+CREATE INDEX IF NOT EXISTS idx_app_taxa_name_trgm ON app_taxa USING GIN (taxon_name gin_trgm_ops);
+
 -- 4. HIERARCHY & COMBINATION FILTERS
--- Composite: Optimized for Genus + Species searches
+-- Composite for Genus + Species searches
 CREATE INDEX IF NOT EXISTS idx_app_taxa_genus_species ON app_taxa (genus, species);
 
--- Standalone Species: For users filtering ONLY by species epithet
-CREATE INDEX IF NOT EXISTS idx_app_taxa_species_alone ON app_taxa (species);
-
--- Other Grid Columns
-CREATE INDEX IF NOT EXISTS idx_app_taxa_family ON app_taxa(family);
+-- Standalone sort support for major columns
+CREATE INDEX IF NOT EXISTS idx_app_taxa_family ON app_taxa(family COLLATE "C");
+CREATE INDEX IF NOT EXISTS idx_app_taxa_genus ON app_taxa(genus COLLATE "C");
+CREATE INDEX IF NOT EXISTS idx_app_taxa_species ON app_taxa(species COLLATE "C");
 CREATE INDEX IF NOT EXISTS idx_app_taxa_rank ON app_taxa(taxon_rank);
 CREATE INDEX IF NOT EXISTS idx_app_taxa_status ON app_taxa(taxon_status);
-CREATE INDEX IF NOT EXISTS idx_app_taxa_cultivar ON app_taxa(cultivar);
+CREATE INDEX IF NOT EXISTS idx_app_taxa_cultivar ON app_taxa(cultivar COLLATE "C");
+
+-- Hybrid Markers
 CREATE INDEX IF NOT EXISTS idx_app_taxa_gh ON app_taxa(genus_hybrid);
 CREATE INDEX IF NOT EXISTS idx_app_taxa_sh ON app_taxa(species_hybrid);
 
--- 5. IDENTIFIER LOOKUPS (WCVP / IPNI / POWO)
+-- 5. IDENTIFIER LOOKUPS (Internal & External)
 CREATE INDEX IF NOT EXISTS idx_app_taxa_wcvp ON app_taxa(wcvp_id);
 CREATE INDEX IF NOT EXISTS idx_app_taxa_ipni ON app_taxa(ipni_id);
 CREATE INDEX IF NOT EXISTS idx_app_taxa_powo ON app_taxa(powo_id);
@@ -70,10 +71,11 @@ CREATE INDEX IF NOT EXISTS idx_app_taxa_accepted_wcvp ON app_taxa(accepted_plant
 CREATE INDEX IF NOT EXISTS idx_app_taxa_parent_wcvp ON app_taxa(parent_plant_name_id);
 CREATE INDEX IF NOT EXISTS idx_app_taxa_basionym_wcvp ON app_taxa(basionym_plant_name_id);
 
--- 6. PATHS
+-- 6. GEOGRAPHIC & PATHS
 CREATE INDEX IF NOT EXISTS idx_app_taxa_path_gist ON app_taxa USING GIST (hierarchy_path);
+CREATE INDEX IF NOT EXISTS idx_app_taxa_geo_trgm ON app_taxa USING GIN (geographic_area gin_trgm_ops);
 
--- 7. Refresh Statistics for the Query Planner
+-- 7. Refresh Statistics
 ANALYZE app_taxa;
 
-SELECT 'Optimization Complete: Indices synchronized.' as status;
+SELECT 'Performance tuning complete. Table statistics refreshed.' as status;

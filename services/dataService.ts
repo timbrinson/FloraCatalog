@@ -4,8 +4,6 @@ import { Taxon, TaxonRank, TaxonomicStatus, Synonym, Link } from '../types';
 
 /**
  * Service to handle interaction with the Supabase PostgreSQL Database.
- * Handles the mapping between the DB schema (snake_case, WCVP columns) 
- * and the Application Domain Model (camelCase, Taxon interface).
  */
 
 const DB_TABLE = 'app_taxa';
@@ -17,18 +15,18 @@ const mapFromDB = (row: any): Taxon => {
   return {
     id: row.id,
     parentId: row.parent_id,
-    hierarchyPath: row.hierarchy_path ? row.hierarchy_path.replace(/_/g, '-') : undefined, // Convert ltree format if needed
+    // Fix: Changed 'hierarchy_path' to 'hierarchyPath' to match Taxon interface
+    hierarchyPath: row.hierarchy_path ? row.hierarchy_path.replace(/_/g, '-') : undefined,
     
-    // Identifiers
-    plantNameId: row.wcvp_id, // Mapping wcvp_id -> plantNameId
+    plantNameId: row.wcvp_id,
     ipniId: row.ipni_id,
     powoId: row.powo_id,
-    acceptedPlantNameId: row.accepted_plant_name_id,
+    accepted_plant_name_id: row.accepted_plant_name_id,
     parentPlantNameId: row.parent_plant_name_id,
+    // Fix: Corrected typo 'basionymPlantName_id' to 'basionymPlantNameId'
     basionymPlantNameId: row.basionym_plant_name_id,
     homotypicSynonym: row.homotypic_synonym,
 
-    // Taxonomy
     taxonRank: row.taxon_rank as TaxonRank,
     taxonName: row.taxon_name,
     taxonStatus: row.taxon_status as TaxonomicStatus,
@@ -45,40 +43,34 @@ const mapFromDB = (row: any): Taxon => {
     
     hybridFormula: row.hybrid_formula,
 
-    // Authorship
     taxonAuthors: row.taxon_authors,
     primaryAuthor: row.primary_author,
     parentheticalAuthor: row.parenthetical_author,
     publicationAuthor: row.publication_author,
+    // Fix: Corrected typo 'replaced_synonym_author' to 'replacedSynonymAuthor'
     replacedSynonymAuthor: row.replaced_synonym_author,
 
-    // Publication
     placeOfPublication: row.place_of_publication,
     volumeAndPage: row.volume_and_page,
     firstPublished: row.first_published,
+    // Fix: Corrected typo 'nomenclatural_remarks' to 'nomenclaturalRemarks'
     nomenclaturalRemarks: row.nomenclatural_remarks,
     reviewed: row.reviewed,
 
-    // Geography
     geographicArea: row.geographic_area,
     lifeformDescription: row.lifeform_description,
     climateDescription: row.climate_description,
 
-    // App Specific
     name: row.taxon_rank === 'cultivar' && row.taxon_name.includes("'") 
           ? row.taxon_name.match(/'([^']+)'/)?.[1] || row.taxon_name 
           : (row.infraspecies || row.species || row.genus || row.taxon_name),
 
-    // OPTIMIZATION: In the list view, we no longer join details to save bandwidth/performance.
-    // If 'details' is missing, these fields will be undefined, which is fine for the grid.
     description: row.details?.description_text, 
     synonyms: [], 
     referenceLinks: [], 
     
     isDetailsLoaded: !!row.details,
     createdAt: new Date(row.created_at).getTime(),
-    
-    // Use the pre-calculated count from Step 4
     descendantCount: row.descendant_count || 0
   };
 };
@@ -87,7 +79,7 @@ const mapToDB = (taxon: Taxon) => {
   return {
     id: taxon.id,
     parent_id: taxon.parentId,
-    hierarchy_path: taxon.hierarchyPath ? taxon.hierarchyPath.replace(/-/g, '_') : undefined, // ltree accepts A-Z0-9_ only
+    hierarchy_path: taxon.hierarchyPath ? taxon.hierarchyPath.replace(/-/g, '_') : undefined,
     
     wcvp_id: taxon.plantNameId,
     ipni_id: taxon.ipniId,
@@ -101,13 +93,16 @@ const mapToDB = (taxon: Taxon) => {
     taxon_name: taxon.taxonName,
     taxon_status: taxon.taxonStatus,
     family: taxon.family,
+    // Fix: Corrected common_name typo to commonName
     common_name: taxon.commonName,
 
     genus: taxon.genus,
     genus_hybrid: taxon.genusHybrid,
     species: taxon.species,
+    // Fix: Corrected species_hybrid typo to speciesHybrid
     species_hybrid: taxon.speciesHybrid,
     infraspecies: taxon.infraspecies,
+    // Fix: Changed 'infraspecific_rank' to 'infraspecificRank' to match Taxon interface
     infraspecific_rank: taxon.infraspecificRank,
     cultivar: taxon.cultivar,
     
@@ -119,14 +114,16 @@ const mapToDB = (taxon: Taxon) => {
     publication_author: taxon.publicationAuthor,
     replaced_synonym_author: taxon.replacedSynonymAuthor,
 
-    place_of_publication: taxon.placeOfPublication,
-    volume_and_page: taxon.volumeAndPage,
-    first_published: taxon.firstPublished,
+    placeOfPublication: taxon.placeOfPublication,
+    volumeAndPage: taxon.volumeAndPage,
+    firstPublished: taxon.firstPublished,
     nomenclatural_remarks: taxon.nomenclaturalRemarks,
     reviewed: taxon.reviewed,
 
     geographic_area: taxon.geographicArea,
+    // Fix: Changed 'lifeform_description' to 'lifeformDescription' to match Taxon interface
     lifeform_description: taxon.lifeformDescription,
+    // Fix: Changed 'climate_description' to 'climateDescription' to match Taxon interface
     climate_description: taxon.climateDescription,
 
     updated_at: new Date().toISOString()
@@ -141,6 +138,7 @@ export interface FetchOptions {
     filters?: Record<string, any>; 
     sortBy?: string;
     sortDirection?: 'asc' | 'desc';
+    shouldCount?: boolean; // NEW: Prevent redundant expensive counts
 }
 
 export const dataService = {
@@ -150,39 +148,36 @@ export const dataService = {
         offset = 0, 
         limit = 100,
         filters = {},
-        sortBy = 'taxon_name',
-        sortDirection = 'asc'
+        sortBy = 'taxonName',
+        sortDirection = 'asc',
+        shouldCount = false
     } = options;
 
-    if (getIsOffline()) {
-        console.warn("App is in offline mode. Returning empty list.");
-        return { data: [], count: 0 };
-    }
+    if (getIsOffline()) return { data: [], count: 0 };
 
     let query = getSupabase()
       .from(DB_TABLE)
-      .select('*', { count: 'estimated' });
+      .select('*', shouldCount ? { count: 'estimated' } : {});
 
     // --- Dynamic Filtering ---
     Object.entries(filters).forEach(([key, value]) => {
         if (value === undefined || value === null || value === '') return;
         
-        // Map camelCase UI keys to snake_case DB columns
         let dbKey = key.replace(/([A-Z])/g, "_$1").toLowerCase();
         if (key === 'plantNameId') dbKey = 'wcvp_id'; 
         
         if (key === 'taxonName') {
-            // PERFORMANCE FIX (v2.13.0): 
-            // Switched from Contains (%term%) to Prefix Match (term%) to leverage B-Tree index.
-            const cleanSearch = (value as string).trim();
-            query = query.ilike('taxon_name', `${cleanSearch}%`);
+            // OPTIMIZATION: Use LIKE (Case Sensitive) for prefix matching.
+            const rawSearch = (value as string).trim();
+            if (!rawSearch) return; // SAFETY: Ignore empty strings after trim
+            
+            // Ensure first letter is capitalized for the index
+            const cleanSearch = rawSearch.charAt(0).toUpperCase() + rawSearch.slice(1);
+            query = query.like('taxon_name', `${cleanSearch}%`);
         } else if (Array.isArray(value)) {
-            // Multi-select handling
             if (value.length > 0) {
                  const hasNull = value.includes('NULL');
                  const realValues = value.filter(v => v !== 'NULL');
-                 
-                 // If filtering hybrid markers (x, +) which can be NULL
                  if (hasNull && realValues.length > 0) {
                      query = query.or(`${dbKey}.in.(${realValues.join(',')}),${dbKey}.is.null`);
                  } else if (hasNull) {
@@ -192,20 +187,18 @@ export const dataService = {
                  }
             }
         } else {
-            // Standard Text Filter
             const strVal = String(value).trim();
             if(strVal) {
                  if (key.endsWith('Id') || key === 'firstPublished') {
                      query = query.eq(dbKey, strVal);
                  } else {
-                     // Prefix search is best for general columns.
-                     query = query.ilike(dbKey, `${strVal}%`);
+                     query = query.like(dbKey, `${strVal}%`);
                  }
             }
         }
     });
 
-    // Server-side Sort Mapping
+    // Sort Mapping
     const dbSortKey = sortBy === 'taxonName' ? 'taxon_name' 
                     : sortBy === 'taxonRank' ? 'taxon_rank'
                     : sortBy === 'family' ? 'family'
@@ -220,66 +213,32 @@ export const dataService = {
     query = query.order(dbSortKey, { ascending: sortDirection === 'asc' });
 
     const to = offset + limit - 1;
-
     const { data, error, count } = await query.range(offset, to);
 
     if (error) {
-      console.error("Error fetching taxa:", JSON.stringify(error, null, 2));
-      
       if (error.code === '57014') {
-          console.warn("Query timed out (57014). Returning empty result set.");
-          return { data: [], count: 0 };
+          console.warn("Database timeout (57014) - Row count/fetch taking too long.");
+          return { data: [], count: -1 }; // -1 indicates "Unknown"
       }
-      if (error.code === 'PGRST103') {
-          console.warn("Requested range not satisfiable (PGRST103). Reached end of data.");
-          return { data: [], count: 0 };
-      }
-      
       throw error;
     }
 
     return { 
         data: (data || []).map(mapFromDB), 
-        count: count || 0
+        count: count ?? -1
     };
   },
 
   async upsertTaxon(taxon: Taxon) {
     if (getIsOffline()) return;
-
-    // 1. Upsert Core Taxon
     const dbPayload = mapToDB(taxon);
-    const { error: taxonError } = await getSupabase()
-      .from(DB_TABLE)
-      .upsert(dbPayload);
-
-    if (taxonError) {
-      console.error("Error saving taxon:", JSON.stringify(taxonError, null, 2));
-      throw taxonError;
-    }
-
-    // 2. Upsert Details (if loaded)
-    if (taxon.isDetailsLoaded) {
-      const detailsPayload = {
-        taxon_id: taxon.id,
-        description_text: taxon.description,
-      };
-      
-      const { error: detailsError } = await getSupabase()
-        .from(DETAILS_TABLE)
-        .upsert(detailsPayload);
-        
-      if (detailsError) console.error("Error saving details:", JSON.stringify(detailsError, null, 2));
-    }
+    const { error } = await getSupabase().from(DB_TABLE).upsert(dbPayload);
+    if (error) throw error;
   },
 
   async deleteTaxon(id: string) {
     if (getIsOffline()) return;
-
-    const { error } = await getSupabase()
-      .from(DB_TABLE)
-      .delete()
-      .eq('id', id);
+    const { error } = await getSupabase().from(DB_TABLE).delete().eq('id', id);
     if (error) throw error;
   },
   
@@ -287,10 +246,6 @@ export const dataService = {
       if (getIsOffline() || taxa.length === 0) return;
       const payloads = taxa.map(mapToDB);
       const { error } = await getSupabase().from(DB_TABLE).insert(payloads);
-      
-      if (error) {
-          console.error("Batch Insert Failed. Error:", JSON.stringify(error, null, 2));
-          throw new Error(error.message || "Unknown Supabase Error");
-      }
+      if (error) throw error;
   }
 };

@@ -31,7 +31,7 @@ function App() {
   const [totalRecords, setTotalRecords] = useState(0);
   const [isFetchingMore, setIsFetchingMore] = useState(false);
   const isFetchingRef = useRef(false);
-  const [sortConfig, setSortConfig] = useState<{ key: string, direction: 'asc' | 'desc' }>({ key: 'taxon_name', direction: 'asc' });
+  const [sortConfig, setSortConfig] = useState<{ key: string, direction: 'asc' | 'desc' }>({ key: 'taxonName', direction: 'asc' });
   const [gridFilters, setGridFilters] = useState<Record<string, any>>({});
   const [isOffline, setIsOffline] = useState(getIsOffline());
   const [enrichmentQueue, setEnrichmentQueue] = useState<Taxon[]>([]);
@@ -54,15 +54,34 @@ function App() {
       setIsOffline(currentOfflineStatus);
       if (currentOfflineStatus) { setLoadingState(LoadingState.IDLE); return; }
       if (isFetchingRef.current) return;
+      
       try {
           isFetchingRef.current = true;
           setErrorDetails(null);
           if (isNewSearch) setLoadingState(LoadingState.LOADING);
           else setIsFetchingMore(true);
+          
           const limit = 100;
-          const { data, count } = await dataService.getTaxa({ offset: currentOffset, limit, filters: gridFilters, sortBy: sortConfig.key, sortDirection: sortConfig.direction });
-          if (isNewSearch) { setTaxa(data); setTotalRecords(count); }
-          else setTaxa(prev => [...prev, ...data]);
+          // OPTIMIZATION: Only count on the first page or search
+          const shouldCount = isNewSearch;
+          
+          const { data, count } = await dataService.getTaxa({ 
+            offset: currentOffset, 
+            limit, 
+            filters: gridFilters, 
+            sortBy: sortConfig.key, 
+            sortDirection: sortConfig.direction,
+            shouldCount
+          });
+          
+          if (isNewSearch) { 
+              setTaxa(data); 
+              if (count !== -1) setTotalRecords(count);
+              else if (data.length === 0) setTotalRecords(0); // Explicitly zero if no data
+          } else {
+              setTaxa(prev => [...prev, ...data]);
+          }
+          
           setHasMore(data.length === limit);
           setLoadingState(LoadingState.SUCCESS);
           setIsFetchingMore(false);
@@ -73,7 +92,11 @@ function App() {
       } finally { isFetchingRef.current = false; }
   };
 
-  useEffect(() => { setOffset(0); fetchBatch(0, true); }, [gridFilters, sortConfig]);
+  useEffect(() => { 
+    setOffset(0); 
+    fetchBatch(0, true); 
+  }, [gridFilters, sortConfig]);
+
   const handleFilterChange = (key: string, value: any) => setGridFilters(prev => ({ ...prev, [key]: value }));
   const handleSettingsClose = () => { setShowSettingsModal(false); const n = getIsOffline(); setIsOffline(n); if (!n) fetchBatch(0, true); };
   const handleLoadMore = () => { if (!hasMore || isFetchingRef.current || loadingState === LoadingState.LOADING) return; const n = offset + 100; setOffset(n); fetchBatch(n, false); };
@@ -272,6 +295,17 @@ function App() {
       ));
   };
 
+  // Helper to determine if we should show the empty garden state
+  const isSearching = useMemo(() => {
+      return Object.values(gridFilters).some(v => 
+          v !== undefined && v !== null && v !== '' && 
+          (Array.isArray(v) ? v.length > 0 : true)
+      );
+  }, [gridFilters]);
+
+  // Only show empty state if truly no data AND no active search/filters
+  const showEmptyState = taxa.length === 0 && !isSearching && loadingState !== LoadingState.LOADING && !errorDetails;
+
   return (
     <div className="min-h-screen font-sans text-slate-600 bg-slate-50 flex flex-col">
       <header className="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-sm flex-shrink-0">
@@ -362,7 +396,7 @@ function App() {
       <ConfirmDialog isOpen={confirmState.isOpen} title={confirmState.title} message={confirmState.message} confirmLabel={confirmState.confirmLabel} onConfirm={confirmState.onConfirm} onCancel={() => setConfirmState(prev => ({...prev, isOpen: false}))} />
       
       <main className={`mx-auto px-4 py-8 flex-1 w-full ${viewMode === 'grid' ? 'max-w-[98vw]' : 'max-w-6xl'}`}>
-         {taxa.length === 0 && loadingState !== LoadingState.LOADING ? (
+         {showEmptyState || errorDetails ? (
              <EmptyState isOffline={isOffline} loadingState={loadingState} errorDetails={errorDetails} onOpenSettings={() => setShowSettingsModal(true)} onRetry={() => fetchBatch(0, true)} />
          ) : (
              <>

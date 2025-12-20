@@ -43,7 +43,9 @@ const FILE_SCHEMA = 'scripts/wcvp_schema.sql.txt';
 const FILE_OPTIMIZE = 'scripts/optimize_indexes.sql.txt';
 
 // Granular segments to prevent Supabase connection resets
+// UPDATED: Added ranges to catch leading symbols (+, ×) common in hybrids
 const SEGMENTS = [
+    { label: "Symbols (+, etc)", start: " ", end: "A" },
     { label: "A", start: "A", end: "B" },
     { label: "B", start: "B", end: "C" },
     { label: "C", start: "C", end: "D" },
@@ -64,7 +66,8 @@ const SEGMENTS = [
     { label: "S", start: "S", end: "T" },
     { label: "T", start: "T", end: "U" },
     { label: "U - V", start: "U", end: "W" },
-    { label: "W - Z", start: "W", end: "{" } 
+    { label: "W - Z", start: "W", end: "{" },
+    { label: "Hybrids (×, etc)", start: "{", end: "\uffff" } 
 ];
 
 // --- SQL TEMPLATES ---
