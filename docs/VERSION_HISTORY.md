@@ -1,5 +1,14 @@
 # Version History
 
+## v2.16.0 - UX Stability & Tree Logic Overhaul
+**Date:** June 3, 2025
+
+### Improvements
+- **Grid Persistence:** Fixed a bug where the DataGrid would unmount and lose filter input focus when a search returned no results. The grid now stays mounted during loading if active filters are present.
+- **Holistic Tree Walk:** Re-engineered the `expandTreeLevel` logic in `DataGrid.tsx`. It now performs a virtual walk of the entire loaded dataset to identify hidden taxonomic paths, ensuring level buttons (1, 2, 3, 4) work reliably even if parents were previously collapsed.
+- **Dynamic Level Buttons:** Numeric expansion buttons now automatically adjust based on whether the "Family" column is visible.
+- **Filter State Synchronization:** Implemented a sync effect between global filters and local text input states to prevent "stale" or "ghost" filter values after grid refreshes.
+
 ## v2.15.0 - UI Filter Enhancements & Data Integrity
 **Date:** June 1, 2025
 
@@ -43,20 +52,3 @@
 - **Database Optimization:** Reduced Data Grid fetch batch size from 1,000 to **100 records**. This eliminates the `57014` "statement timeout" errors caused by large datasets on the Supabase free tier.
 - **Query Performance:** Modified the main `getTaxa` service to stop joining the heavy `app_taxon_details` table by default. The grid now loads lightweight rows, and full details (descriptions, links) are fetched lazily only when a user expands a row.
 - **Dynamic Connectivity:** Refactored `supabaseClient` to allow runtime credential updates. Users can now switch from Offline Mode to Connected Mode via Settings without a full page reload.
-
-## v2.10 - Strict Audit Context
-**Date:** May 30, 2025
-
-### Changes
-- **Data Governance:** Updated `DATA_MODEL.md` to strictly require `appName`, `appVersion`, and `userId` in lineage tracking.
-- **Schema:** Updated `wcvp_schema.txt` `app_audit_log` table to include columns for Application Context and User Identity.
-- **Types:** Updated `AuditRecord` interface in `types.ts` to include `appName`, `appVersion`, and `userId` fields.
-
-## v2.9 - Data Governance & Lineage Architecture
-**Date:** May 30, 2025
-
-### Changes
-- **Data Modeling:** Created `DATA_MODEL.md` defining the strategy for Lineage (Source -> Process -> Timestamp) and Source of Truth hierarchy (WCVP > Societies > AI).
-- **Schema Design:** Updated `wcvp_schema.txt` to include Application Layer tables (`app_data_sources`, `app_audit_log`, `app_taxon_details`) alongside the raw WCVP staging table.
-- **Type Definitions:** Updated `types.ts` with `DataSource`, `AuditRecord`, and `TaxonMetadata` interfaces to support future lineage UI features.
-- **Infrastructure:** Added `.gitignore` for repository health.
