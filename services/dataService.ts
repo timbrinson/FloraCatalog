@@ -17,7 +17,7 @@ const mapFromDB = (row: any): Taxon => {
     // Fix: Changed 'hierarchy_path' to 'hierarchyPath' to match Taxon interface
     hierarchyPath: row.hierarchy_path ? row.hierarchy_path.replace(/_/g, '-') : undefined,
     
-    plantNameId: row.wcvp_id,
+    wcvpId: row.wcvp_id,
     ipniId: row.ipni_id,
     powoId: row.powo_id,
     // Fix: Changed 'accepted_plant_name_id' to 'acceptedPlantNameId' to match Taxon interface
@@ -81,7 +81,7 @@ const mapToDB = (taxon: Taxon) => {
     parent_id: taxon.parentId,
     hierarchy_path: taxon.hierarchyPath ? taxon.hierarchyPath.replace(/-/g, '_') : undefined,
     
-    wcvp_id: taxon.plantNameId,
+    wcvp_id: taxon.wcvpId,
     ipni_id: taxon.ipniId,
     powo_id: taxon.powoId,
     accepted_plant_name_id: taxon.acceptedPlantNameId,
@@ -164,7 +164,7 @@ export const dataService = {
         if (value === undefined || value === null || value === '') return;
         
         let dbKey = key.replace(/([A-Z])/g, "_$1").toLowerCase();
-        if (key === 'plantNameId') dbKey = 'wcvp_id'; 
+        if (key === 'wcvpId') dbKey = 'wcvp_id'; 
         
         if (key === 'taxonName') {
             // OPTIMIZATION: Use LIKE (Case Sensitive) for prefix matching.

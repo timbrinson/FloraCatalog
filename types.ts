@@ -1,4 +1,3 @@
-
 /**
  * DATA SOURCE CITATION:
  * Govaerts R (ed.). 2025. WCVP: World Checklist of Vascular Plants. 
@@ -127,10 +126,10 @@ export interface Taxon {
   
   // IDs
   /** 
-   * WCVP identifier (mapped from 'plant_name_id'). 
+   * WCVP identifier (mapped from 'wcvp_id'). 
    * The primary key in the Kew database.
    */
-  plantNameId?: string; 
+  wcvpId?: string; 
   
   /** International Plant Names Index identifier (mapped from 'ipni_id') */
   ipniId?: string; 

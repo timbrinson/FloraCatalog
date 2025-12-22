@@ -30,18 +30,18 @@ const RANK_HIERARCHY: Record<string, number> = {
     'family': 1, 'genus': 2, 'species': 3, 'subspecies': 4, 'variety': 5, 'form': 6, 'hybrid': 7, 'grex': 8, 'cultivar': 9,
 };
 
-// Map column IDs to Rank Levels for dimming logic
 const COLUMN_RANK_MAP: Record<string, number> = {
     'family': 1,
-    'genus': 2, 'genusHybrid': 2,
-    'species': 3, 'speciesHybrid': 3,
-    'infraspecificRank': 5, 'infraspecies': 5,
+    'genus': 2,
+    'genusHybrid': 2,
+    'species': 3,
+    'speciesHybrid': 3,
+    'infraspecificRank': 5,
+    'infraspecies': 5,
     'cultivar': 9
 };
 
-// THEME DEFINITIONS
 type ThemeMap = Record<string, string>;
-
 const THEMES: Record<ColorTheme, ThemeMap> = {
     'option1a': { 'family': 'red', 'genus': 'orange', 'species': 'amber', 'subspecies': 'green', 'variety': 'green', 'form': 'green', 'hybrid': 'amber', 'cultivar': 'sky', 'grex': 'sky' },
     'option1b': { 'family': 'red', 'genus': 'sky', 'species': 'green', 'subspecies': 'amber', 'variety': 'amber', 'form': 'amber', 'hybrid': 'green', 'cultivar': 'orange', 'grex': 'orange' },
@@ -77,20 +77,6 @@ const MultiSelectFilter = ({ options, selected, onChange, label }: { options: st
     );
 };
 
-// Simple debounce hook for text inputs
-const useDebounce = <T,>(value: T, delay: number): T => {
-  const [debouncedValue, setDebouncedValue] = useState(value);
-  useEffect(() => {
-    const handler = setTimeout(() => {
-      setDebouncedValue(value);
-    }, delay);
-    return () => {
-      clearTimeout(handler);
-    };
-  }, [value, delay]);
-  return debouncedValue;
-};
-
 type TreeRow = Taxon & {
     isTreeHeader?: boolean;
     treeExpanded?: boolean;
@@ -100,9 +86,7 @@ type TreeRow = Taxon & {
     isVirtual?: boolean; 
 };
 
-const getDescendantCount = (taxon: Taxon): number => {
-    return taxon.descendantCount || 0;
-};
+const getDescendantCount = (taxon: Taxon): number => taxon.descendantCount || 0;
 
 const DataGridV2: React.FC<DataGridProps> = ({ 
     taxa, onAction, onUpdate, preferences, 
@@ -125,22 +109,15 @@ const DataGridV2: React.FC<DataGridProps> = ({
   }
 
   const allColumns: ColumnConfig[] = [
+      // --- SYSTEM ---
       { id: 'treeControl', label: 'Tree', defaultWidth: 55, filterType: undefined, disableSorting: true, lockWidth: true, hideHeaderIcons: true, headerAlign: 'center' }, 
       { id: 'actions', label: 'Actions', defaultWidth: 90, filterType: undefined, disableSorting: true, lockWidth: true, hideHeaderIcons: true, headerAlign: 'center' }, 
       { id: 'childCount', label: '#', defaultWidth: 50, filterType: 'text', hideHeaderIcons: true, headerAlign: 'center', lockWidth: true }, 
-      
-      { id: 'family', label: 'Family', defaultWidth: 120, filterType: 'text' },
-      { id: 'genusHybrid', label: 'GH', defaultWidth: 40, filterType: 'multi-select', filterOptions: ['×', '+', 'NULL'], disableSorting: true, hideHeaderIcons: true, headerAlign: 'center', lockWidth: true }, 
-      { id: 'genus', label: 'Genus', defaultWidth: 120, filterType: 'text' }, 
-      { id: 'speciesHybrid', label: 'SH', defaultWidth: 40, filterType: 'multi-select', filterOptions: ['×', '+', 'NULL'], disableSorting: true, hideHeaderIcons: true, headerAlign: 'center', lockWidth: true }, 
-      { id: 'species', label: 'Species', defaultWidth: 120, filterType: 'text' }, 
-      
-      { id: 'infraspecificRank', label: 'I Rank', defaultWidth: 60, filterType: 'text', hideHeaderIcons: true, headerAlign: 'center', lockWidth: true },
-      { id: 'infraspecies', label: 'Infraspecies', defaultWidth: 120, filterType: 'text' }, 
-      { id: 'cultivar', label: 'Cultivar', defaultWidth: 150, filterType: 'text' }, 
-      
+      { id: 'id', label: 'Internal ID', defaultWidth: 100, filterType: 'text' },
+      { id: 'parentId', label: 'Parent ID', defaultWidth: 100, filterType: 'text' },
+
+      // --- TAXONOMY ---
       { id: 'taxonName', label: 'Taxon Name', defaultWidth: 220, filterType: 'text' }, 
-      
       { id: 'taxonRank', label: 'Rank', defaultWidth: 110, filterType: 'multi-select', 
         filterOptions: [
             'Family', 'Genus', 'Species', 'Subspecies', 'Variety', 'Form', 'Hybrid', 'Cultivar', 'Grex', 'Unranked', 
@@ -153,16 +130,47 @@ const DataGridV2: React.FC<DataGridProps> = ({
       { id: 'taxonStatus', label: 'Status', defaultWidth: 110, filterType: 'multi-select', 
         filterOptions: ['Accepted', 'Synonym', 'Unplaced', 'Artificial Hybrid', 'Illegitimate', 'Invalid', 'Misapplied', 'Orthographic', 'Provisionally Accepted', 'Unresolved', 'Local Biotype'] 
       },
+      { id: 'family', label: 'Family', defaultWidth: 120, filterType: 'text' },
+      { id: 'hybridFormula', label: 'Hybrid Formula', defaultWidth: 180, filterType: 'text' },
+
+      // --- NOMENCLATURE ---
+      { id: 'genusHybrid', label: 'GH', defaultWidth: 40, filterType: 'multi-select', filterOptions: ['×', '+', 'NULL'], disableSorting: true, hideHeaderIcons: true, headerAlign: 'center', lockWidth: true }, 
+      { id: 'genus', label: 'Genus', defaultWidth: 120, filterType: 'text' }, 
+      { id: 'speciesHybrid', label: 'SH', defaultWidth: 40, filterType: 'multi-select', filterOptions: ['×', '+', 'NULL'], disableSorting: true, hideHeaderIcons: true, headerAlign: 'center', lockWidth: true }, 
+      { id: 'species', label: 'Species', defaultWidth: 120, filterType: 'text' }, 
+      { id: 'infraspecificRank', label: 'I Rank', defaultWidth: 60, filterType: 'text', hideHeaderIcons: true, headerAlign: 'center', lockWidth: true },
+      { id: 'infraspecies', label: 'Infraspecies', defaultWidth: 120, filterType: 'text' }, 
+      { id: 'cultivar', label: 'Cultivar', defaultWidth: 150, filterType: 'text' }, 
+
+      // --- DESCRIPTIVE ---
       { id: 'commonName', label: 'Common Name', defaultWidth: 150, filterType: 'text' },
-      { id: 'plantNameId', label: 'WCVP ID', defaultWidth: 100, filterType: 'text' }, 
+      { id: 'description', label: 'Description', defaultWidth: 250, filterType: 'text' },
+      { id: 'geographicArea', label: 'Geography', defaultWidth: 180, filterType: 'text' },
+      { id: 'lifeformDescription', label: 'Lifeform', defaultWidth: 150, filterType: 'multi-select', filterOptions: ['annual', 'perennial', 'shrub', 'tree', 'epiphyte', 'geophyte', 'succulent', 'climber'] },
+      { id: 'climateDescription', label: 'Climate', defaultWidth: 180, filterType: 'multi-select', filterOptions: ['temperate', 'tropical', 'subtropical', 'desert', 'montane'] },
+
+      // --- IDENTIFIERS ---
+      { id: 'wcvpId', label: 'WCVP ID', defaultWidth: 100, filterType: 'text' }, 
       { id: 'ipniId', label: 'IPNI ID', defaultWidth: 100, filterType: 'text' },
       { id: 'powoId', label: 'POWO ID', defaultWidth: 100, filterType: 'text' },
-      { id: 'id', label: 'Internal ID', defaultWidth: 100, filterType: 'text' },
+
+      // --- PUBLICATION ---
       { id: 'taxonAuthors', label: 'Authorship', defaultWidth: 150, filterType: 'text' }, 
-      { id: 'placeOfPublication', label: 'Publication', defaultWidth: 200, filterType: 'text' },
+      { id: 'primaryAuthor', label: 'Prim. Author', defaultWidth: 150, filterType: 'text' },
+      { id: 'publicationAuthor', label: 'Pub. Author', defaultWidth: 150, filterType: 'text' },
+      { id: 'placeOfPublication', label: 'Pub. Place', defaultWidth: 200, filterType: 'text' },
+      { id: 'volumeAndPage', label: 'Vol/Page', defaultWidth: 120, filterType: 'text' },
       { id: 'firstPublished', label: 'First Published', defaultWidth: 120, filterType: 'text' },
-      { id: 'geographicArea', label: 'Geography', defaultWidth: 180, filterType: 'text' },
-      { id: 'description', label: 'Description', defaultWidth: 250, filterType: 'text' },
+      { id: 'nomenclaturalRemarks', label: 'Nom. Remarks', defaultWidth: 200, filterType: 'text' },
+      { id: 'reviewed', label: 'Reviewed', defaultWidth: 80, filterType: 'multi-select', filterOptions: ['Y', 'N', 'NULL'], headerAlign: 'center', lockWidth: true },
+
+      // --- RELATED PLANTS ---
+      { id: 'homotypicSynonym', label: 'Homotypic Syn.', defaultWidth: 100, filterType: 'text' },
+      { id: 'acceptedPlantNameId', label: 'Accepted ID', defaultWidth: 100, filterType: 'text' },
+      { id: 'parentheticalAuthor', label: 'Paren. Author', defaultWidth: 150, filterType: 'text' },
+      { id: 'replacedSynonymAuthor', label: 'Syn. Author', defaultWidth: 150, filterType: 'text' },
+      { id: 'parentPlantNameId', label: 'Parent Plant ID', defaultWidth: 100, filterType: 'text' },
+      { id: 'basionymPlantNameId', label: 'Basionym ID', defaultWidth: 100, filterType: 'text' },
   ];
 
   const loadState = <T,>(key: string, def: T): T => {
@@ -172,11 +180,11 @@ const DataGridV2: React.FC<DataGridProps> = ({
   const [visibleColumns, setVisibleColumns] = useState<Set<ColumnId>>(() => {
       const saved = loadState<string[]>('grid_v2_visible_cols', []);
       return saved.length > 0 ? new Set(saved) : new Set([
-          'treeControl', 'actions', 'childCount', 'genusHybrid', 'genus', 'speciesHybrid', 'species', 'infraspecificRank', 'infraspecies', 'cultivar', 'taxonName'
+          'treeControl', 'childCount', 'taxonName', 'genus', 'species', 'cultivar'
       ]);
   });
   
-  const [columnOrder, setColumnOrder] = useState<ColumnId[]>(() => loadState('grid_v2_col_order_rev7', allColumns.map(c => c.id)));
+  const [columnOrder, setColumnOrder] = useState<ColumnId[]>(() => loadState('grid_v2_col_order_rev8', allColumns.map(c => c.id)));
   const [colWidths, setColWidths] = useState<Record<ColumnId, number>>(() => loadState('grid_v2_col_widths', Object.fromEntries(allColumns.map(c => [c.id, c.defaultWidth]))));
   
   const [isHierarchyMode, setIsHierarchyMode] = useState<boolean>(false);
@@ -190,7 +198,7 @@ const DataGridV2: React.FC<DataGridProps> = ({
   }, [isHierarchyMode]);
 
   useEffect(() => localStorage.setItem('grid_v2_visible_cols', JSON.stringify(Array.from(visibleColumns))), [visibleColumns]);
-  useEffect(() => localStorage.setItem('grid_v2_col_order_rev7', JSON.stringify(columnOrder)), [columnOrder]);
+  useEffect(() => localStorage.setItem('grid_v2_col_order_rev8', JSON.stringify(columnOrder)), [columnOrder]);
   useEffect(() => localStorage.setItem('grid_v2_col_widths', JSON.stringify(colWidths)), [colWidths]);
 
   const [draggedColumn, setDraggedColumn] = useState<ColumnId | null>(null);
@@ -212,72 +220,39 @@ const DataGridV2: React.FC<DataGridProps> = ({
   }, [showLegend, showColPicker]);
 
   const activeColumns = useMemo(() => columnOrder.filter(id => visibleColumns.has(id)).map(id => allColumns.find(c => c.id === id)).filter((c): c is ColumnConfig => !!c), [columnOrder, visibleColumns]);
-
-  const totalTableWidth = useMemo(() => {
-      return activeColumns.reduce((sum, col) => sum + (colWidths[col.id] || col.defaultWidth), 0);
-  }, [activeColumns, colWidths]);
-
+  const totalTableWidth = useMemo(() => activeColumns.reduce((sum, col) => sum + (colWidths[col.id] || col.defaultWidth), 0), [activeColumns, colWidths]);
   const activeColorMap = useMemo(() => THEMES[preferences.colorTheme] || THEMES['option1a'], [preferences.colorTheme]);
 
   const getRowValue = (row: Taxon, colId: string) => {
-       if (colId === 'childCount') {
-           const tr = row as TreeRow;
-           return tr.isTreeHeader ? tr.childCount : getDescendantCount(tr);
-       }
+       if (colId === 'childCount') { const tr = row as TreeRow; return tr.isTreeHeader ? tr.childCount : getDescendantCount(tr); }
        if (colId === 'cultivar' && row.taxonRank === 'cultivar') return row.name;
        // @ts-ignore
        return row[colId];
   };
 
-  // --- FILTER DEBOUNCE LOGIC ---
   const [localTextFilters, setLocalTextFilters] = useState<Record<string, string>>({});
   
-  // Sync prop filters to local state only on mount/reset, otherwise let local state drive input
   useEffect(() => {
-      // Intentionally empty: We only want one-way binding from Input -> State -> Debounce -> Prop
-      // unless filters are cleared externally.
-      // But we need to initialize if filters exist
       const initial: Record<string, string> = {};
-      Object.keys(filters).forEach(k => {
-          if (typeof filters[k] === 'string') initial[k] = filters[k];
-      });
+      Object.keys(filters).forEach(k => { if (typeof filters[k] === 'string') initial[k] = filters[k]; });
       setLocalTextFilters(initial);
   }, []);
 
   const handleTextFilterChange = (key: string, val: string) => {
       setLocalTextFilters(prev => ({ ...prev, [key]: val }));
-      
-      // Debounce logic handled via setTimeout
       if ((window as any).filterTimeout) clearTimeout((window as any).filterTimeout);
-      (window as any).filterTimeout = setTimeout(() => {
-          onFilterChange(key, val);
-      }, 600);
+      (window as any).filterTimeout = setTimeout(() => { onFilterChange(key, val); }, 600);
   };
 
-  const handleMultiFilterChange = (key: string, vals: string[]) => {
-      onFilterChange(key, vals);
-  };
-
-  // Infinite Scroll Handler
   const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
       const { scrollTop, clientHeight, scrollHeight } = e.currentTarget;
-      if (!isLoadingMore && scrollHeight - scrollTop - clientHeight < 300) {
-          onLoadMore();
-      }
+      if (!isLoadingMore && scrollHeight - scrollTop - clientHeight < 300) onLoadMore();
   };
 
-  // --- TREE GRID LOGIC (Virtual Grouping) ---
   const gridRows = useMemo((): TreeRow[] => {
-      // NOTE: With server-side filtering, we render 'taxa' directly.
-      // Virtual grouping is applied to the *fetched* records.
       if (groupBy.length === 0) return taxa as TreeRow[];
-
       const outputRows: TreeRow[] = [];
-      const bucketKey = (row: Taxon, depth: number) => {
-          const field = groupBy[depth];
-          return String(getRowValue(row, field) || ''); 
-      };
-
+      const bucketKey = (row: Taxon, depth: number) => String(getRowValue(row, groupBy[depth]) || '');
       const findHeaderTaxon = (candidates: Taxon[], field: string, value: string): Taxon | undefined => {
           return candidates.find(t => {
              const valMatches = String(getRowValue(t, field)) === value;
@@ -288,30 +263,15 @@ const DataGridV2: React.FC<DataGridProps> = ({
              return t.taxonRank.toLowerCase() === field.toLowerCase();
           });
       };
-
       const processLevel = (subset: Taxon[], depth: number, parentPath: string) => {
-          if (depth >= groupBy.length) {
-              subset.forEach(t => outputRows.push({ ...t, depth, treePath: `${parentPath}/${t.id}` }));
-              return;
-          }
-
+          if (depth >= groupBy.length) { subset.forEach(t => outputRows.push({ ...t, depth, treePath: `${parentPath}/${t.id}` })); return; }
           const field = groupBy[depth];
           const groups: Record<string, Taxon[]> = {};
-          subset.forEach(row => {
-              const val = bucketKey(row, depth);
-              if (!groups[val]) groups[val] = [];
-              groups[val].push(row);
-          });
-
+          subset.forEach(row => { const val = bucketKey(row, depth); if (!groups[val]) groups[val] = []; groups[val].push(row); });
           Object.keys(groups).sort().forEach(key => {
               const groupItems = groups[key];
               const path = `${parentPath}/${key}`;
-
-              if (key === '' || key === 'undefined' || key === 'null') {
-                  processLevel(groupItems, depth + 1, parentPath); 
-                  return;
-              }
-
+              if (key === '' || key === 'undefined' || key === 'null') { processLevel(groupItems, depth + 1, parentPath); return; }
               const headerTaxon = findHeaderTaxon(groupItems, field, key);
               const itemsWithoutHeader = headerTaxon ? groupItems.filter(i => i.id !== headerTaxon.id) : groupItems;
               const firstChild = groupItems[0];
@@ -329,23 +289,15 @@ const DataGridV2: React.FC<DataGridProps> = ({
                   speciesHybrid: firstChild?.speciesHybrid,
                   synonyms: [], referenceLinks: [], createdAt: 0
               } as any;
-
-              const childCount = headerTaxon ? headerTaxon.descendantCount : groupItems.length;
-              
               headerRow.isTreeHeader = true;
               headerRow.treeExpanded = !collapsedGroups.has(path);
-              headerRow.childCount = childCount; 
+              headerRow.childCount = headerTaxon ? headerTaxon.descendantCount : groupItems.length;
               headerRow.depth = depth;
               headerRow.treePath = path;
-
               outputRows.push(headerRow);
-
-              if (headerRow.treeExpanded) {
-                  processLevel(itemsWithoutHeader, depth + 1, path);
-              }
+              if (headerRow.treeExpanded) processLevel(itemsWithoutHeader, depth + 1, path);
           });
       };
-
       processLevel(taxa, 0, 'root');
       return outputRows;
   }, [taxa, groupBy, collapsedGroups]);
@@ -357,25 +309,8 @@ const DataGridV2: React.FC<DataGridProps> = ({
   };
   
   const expandTreeLevel = (targetDepth: number) => {
-      // Logic: Iterate over visible groups in gridRows.
-      // If a group's depth < targetDepth, ensure it is expanded (removed from collapsedGroups).
-      // If a group's depth >= targetDepth, collapse it (add to collapsedGroups).
       const newCollapsed = new Set<string>();
-      
-      // Since we don't have all possible paths without walking the whole list,
-      // we iterate the current virtual rows to decide.
-      // Note: This only affects loaded rows.
-      gridRows.forEach(row => {
-          if (row.isTreeHeader && row.treePath) {
-              const rowDepth = row.depth || 0;
-              // E.g. targetDepth 1 (Show Genus children). 
-              // Genus is depth 0. We want Genus expanded. 
-              // Species is depth 1. We want Species collapsed (so we see species headers but not their children).
-              if (rowDepth >= targetDepth) {
-                  newCollapsed.add(row.treePath);
-              }
-          }
-      });
+      gridRows.forEach(row => { if (row.isTreeHeader && row.treePath && (row.depth || 0) >= targetDepth) newCollapsed.add(row.treePath); });
       setCollapsedGroups(newCollapsed);
   };
 
@@ -445,44 +380,22 @@ const DataGridV2: React.FC<DataGridProps> = ({
          </div>
       </div>
       
-      {/* Table Area with Infinite Scroll */}
-      <div 
-        className="flex-1 overflow-auto custom-scrollbar" 
-        ref={containerRef}
-        onScroll={handleScroll}
-      >
-        <table 
-            className="text-left text-sm whitespace-nowrap border-separate border-spacing-0 table-fixed"
-            style={{ width: totalTableWidth }}
-        >
+      <div className="flex-1 overflow-auto custom-scrollbar" ref={containerRef} onScroll={handleScroll}>
+        <table className="text-left text-sm whitespace-nowrap border-separate border-spacing-0 table-fixed" style={{ width: totalTableWidth }}>
            <thead className="bg-slate-50 sticky top-0 z-10 text-xs font-bold text-slate-500 uppercase tracking-wide shadow-sm">
               <tr>
                   {activeColumns.map(col => (
-                      <th 
-                          key={String(col.id)} 
-                          className={`border-b border-slate-200 border-r border-slate-100 last:border-r-0 bg-slate-50 select-none relative group ${draggedColumn === col.id ? 'opacity-50 bg-slate-200' : ''}`} 
-                          style={{ width: colWidths[col.id], minWidth: 30 }} 
-                          draggable={!col.disableDrag}
-                          onDragStart={(e) => handleDragStart(e, col.id)} 
-                          onDragOver={handleDragOver} 
-                          onDrop={(e) => handleDrop(e, col.id)}
-                      >
+                      <th key={String(col.id)} className={`border-b border-slate-200 border-r border-slate-100 last:border-r-0 bg-slate-50 select-none relative group ${draggedColumn === col.id ? 'opacity-50 bg-slate-200' : ''}`} style={{ width: colWidths[col.id], minWidth: 30 }} draggable={!col.disableDrag} onDragStart={(e) => handleDragStart(e, col.id)} onDragOver={handleDragOver} onDrop={(e) => handleDrop(e, col.id)}>
                          <div className={`flex items-center gap-1 p-2 h-full w-full ${col.headerAlign === 'center' ? 'justify-center' : 'justify-between'}`}>
                              {col.id === 'treeControl' ? (
-                                <button
-                                    onClick={(e) => { e.stopPropagation(); setIsHierarchyMode(!isHierarchyMode); }}
-                                    className={`p-1 rounded hover:bg-slate-200 transition-colors ${isHierarchyMode ? 'text-indigo-600 bg-indigo-50 ring-1 ring-indigo-200 shadow-inner' : 'text-slate-400'}`}
-                                    title={isHierarchyMode ? "Switch to Flat View" : "Switch to Tree View"}
-                                >
-                                    {isHierarchyMode ? <Network size={16} /> : <List size={16} />}
-                                </button>
+                                <button onClick={(e) => { e.stopPropagation(); setIsHierarchyMode(!isHierarchyMode); }} className={`p-1 rounded hover:bg-slate-200 transition-colors ${isHierarchyMode ? 'text-indigo-600 bg-indigo-50 ring-1 ring-indigo-200 shadow-inner' : 'text-slate-400'}`} title={isHierarchyMode ? "Switch to Flat View" : "Switch to Tree View"}>{isHierarchyMode ? <Network size={16} /> : <List size={16} />}</button>
                              ) : (
                                  <>
                                      <div className="flex items-center gap-1 cursor-grab active:cursor-grabbing overflow-hidden" onClick={() => !col.disableSorting && handleSort(col.id)}>
                                         {col.id !== 'actions' && !col.disableDrag && !col.hideHeaderIcons && <GripVertical size={12} className="text-slate-300 opacity-0 group-hover:opacity-100 cursor-move flex-shrink-0" />}
                                         <span className="truncate">{col.label}</span>
                                      </div>
-                                     {col.id !== 'actions' && !col.disableSorting && !col.hideHeaderIcons && (<button onClick={() => handleSort(col.id)} className="flex-shrink-0"><ArrowUpDown size={12} className={sortConfig?.key === col.id ? 'text-leaf-600' : 'text-slate-300 hover:text-slate-500'}/></button>)}
+                                     {col.id !== 'actions' && !col.disableSorting && !col.hideHeaderIcons && (<button onClick={() => handleSort(col.id)} className="flex-shrink-0"><ArrowUpDown size={12} className={sortConfig?.key === col.id ? 'text-leaf-600' : 'text-slate-300 hover:text-slate-50'}/></button>)}
                                  </>
                              )}
                          </div>
@@ -495,18 +408,11 @@ const DataGridV2: React.FC<DataGridProps> = ({
                       <th key={`${String(col.id)}-filter`} className="p-1 border-b border-slate-200 border-r border-slate-100 bg-slate-50/80">
                           {col.id === 'actions' || col.id === 'treeControl' ? null 
                            : col.filterType === 'multi-select' 
-                             ? (<MultiSelectFilter label={col.label} options={col.filterOptions || []} selected={filters[String(col.id)] || []} onChange={(vals) => handleMultiFilterChange(String(col.id), vals)}/>) 
+                             ? (<MultiSelectFilter label={col.label} options={col.filterOptions || []} selected={filters[String(col.id)] || []} onChange={(vals) => onFilterChange(String(col.id), vals)}/>) 
                              : (
                                 <div className="relative">
-                                    <input 
-                                        className={`w-full text-xs px-2 py-1.5 bg-white border border-slate-200 rounded outline-none focus:border-leaf-300 focus:ring-1 focus:ring-leaf-200 font-normal ${col.id === 'taxonName' ? 'pl-7 border-leaf-300 ring-1 ring-leaf-100' : ''}`} 
-                                        placeholder={col.id === 'taxonName' ? 'Search DB...' : 'Filter...'}
-                                        value={localTextFilters[String(col.id)] || ''} 
-                                        onChange={e => handleTextFilterChange(String(col.id), e.target.value)}
-                                    />
-                                    {col.id === 'taxonName' && (
-                                        <Search size={12} className="absolute left-2 top-2 text-leaf-500" />
-                                    )}
+                                    <input className={`w-full text-xs px-2 py-1.5 bg-white border border-slate-200 rounded outline-none focus:border-leaf-300 focus:ring-1 focus:ring-leaf-200 font-normal ${col.id === 'taxonName' ? 'pl-7 border-leaf-300 ring-1 ring-leaf-100' : ''}`} placeholder={col.id === 'taxonName' ? 'Search DB...' : 'Filter...'} value={localTextFilters[String(col.id)] || ''} onChange={e => handleTextFilterChange(String(col.id), e.target.value)}/>
+                                    {col.id === 'taxonName' && (<Search size={12} className="absolute left-2 top-2 text-leaf-500" />)}
                                 </div>
                              )
                           }
@@ -521,122 +427,42 @@ const DataGridV2: React.FC<DataGridProps> = ({
                   const rankKey = String(tr.taxonRank).toLowerCase(); 
                   const baseColor = activeColorMap[rankKey] || 'slate';
                   const isHybrid = tr.genusHybrid === '×' || tr.genusHybrid === 'x' || tr.speciesHybrid === '×' || tr.speciesHybrid === 'x' || rankKey === 'hybrid';
-                  const rowBgClass = baseColor === 'slate' ? (isHybrid ? 'bg-slate-50 saturate-50' : '') : `bg-${baseColor}-50 ${isHybrid ? 'saturate-50' : ''}`;
-                  const finalRowBg = isExpanded ? 'bg-blue-50/50' : rowBgClass;
-
+                  const finalRowBg = isExpanded ? 'bg-blue-50/50' : (baseColor === 'slate' ? (isHybrid ? 'bg-slate-50 saturate-50' : '') : `bg-${baseColor}-50 ${isHybrid ? 'saturate-50' : ''}`);
                   return (
                      <React.Fragment key={String(tr.id)}>
                         <tr className={`hover:bg-blue-50/50 transition-colors ${finalRowBg} ${tr.isTreeHeader ? 'cursor-pointer group/header border-b-2 border-slate-200' : ''}`} onClick={tr.isTreeHeader ? () => toggleGroup(tr.treePath || '') : undefined}>
-                           {activeColumns.map((col, idx) => {
-                               if (col.id === 'treeControl') {
-                                   if (tr.isTreeHeader) {
-                                       const isCollapsed = !tr.treeExpanded;
-                                       return (
-                                          <td key={String(col.id)} className="p-2 border-r border-slate-200" style={{ paddingLeft: `${(tr.depth || 0) * 20}px` }}>
-                                              <div className="flex items-center gap-1 font-bold text-slate-600">
-                                                  <span className={`transform transition-transform ${!isCollapsed ? 'rotate-90' : ''}`}><ChevronRight size={14} /></span>
-                                              </div>
-                                          </td>
-                                       );
-                                   }
-                                   return <td key={String(col.id)} className="p-2 border-r border-slate-50"></td>;
-                               }
-                               if (col.id === 'childCount') {
-                                   const count = tr.isTreeHeader ? tr.childCount : getDescendantCount(tr);
-                                   return <td key={String(col.id)} className="p-2 border-r border-slate-200 text-xs text-center text-slate-400 font-mono">{count || ''}</td>;
-                               }
-
+                           {activeColumns.map((col) => {
+                               if (col.id === 'treeControl') return <td key={String(col.id)} className="p-2 border-r border-slate-200" style={{ paddingLeft: `${(tr.depth || 0) * 20}px` }}>{tr.isTreeHeader && <span className={`transform transition-transform ${tr.treeExpanded ? 'rotate-90' : ''}`}><ChevronRight size={14} /></span>}</td>;
+                               if (col.id === 'childCount') return <td key={String(col.id)} className="p-2 border-r border-slate-200 text-xs text-center text-slate-400 font-mono">{ (tr.isTreeHeader ? tr.childCount : getDescendantCount(tr)) || ''}</td>;
                                const val = getRowValue(tr, String(col.id));
                                let displayVal: React.ReactNode = val || '';
                                if ((col.id === 'genusHybrid' || col.id === 'speciesHybrid') && (val === 'x' || val === 'X')) displayVal = '×';
-                               
                                let isBold = false;
-                               const r = String(tr.taxonRank).toLowerCase(); 
                                const coreCols = ['genus', 'species', 'cultivar', 'infraspecies', 'infraspecificRank', 'taxonName', 'genusHybrid', 'speciesHybrid'];
-                               if (coreCols.includes(String(col.id))) {
-                                    if (r === String(col.id)) isBold = true;
-                                    if ((String(col.id) === 'infraspecies' || String(col.id) === 'infraspecificRank') && ['variety','subspecies','form'].includes(r)) isBold = true;
-                                    if (String(col.id) === 'taxonName') isBold = true;
-                                    if (String(col.id) === 'genusHybrid' && r === 'genus') isBold = true;
-                                    if (String(col.id) === 'speciesHybrid' && r === 'species') isBold = true;
-                               }
-
-                               let isDimmed = false;
-                               let rowRankLevel = RANK_HIERARCHY[r] || 99;
-                               if (['subspecies', 'variety', 'form'].includes(r)) rowRankLevel = 5;
-                               const colRankLevel = COLUMN_RANK_MAP[String(col.id)];
-                               if (colRankLevel && colRankLevel < rowRankLevel) isDimmed = true;
-                               
-                               if (col.id === 'taxonRank') { 
-                                   const rankStyle = `bg-${baseColor}-100 ${getTextClass(baseColor)} border-${baseColor}-200`;
-                                   displayVal = <span className={`px-2 py-0.5 text-[10px] rounded border uppercase font-bold ${rankStyle}`}>{val as string}</span>;
-                               } else if (col.id === 'taxonName') {
-                                   displayVal = formatFullScientificName(tr, preferences);
-                               } else if (col.id === 'taxonStatus') {
-                                    const s = val as string;
-                                    let badgeColor = 'bg-slate-100 text-slate-500'; // Default (Synonym, etc)
-                                    if (s === 'Accepted') badgeColor = 'bg-green-50 text-green-700 border-green-200 border';
-                                    else if (s === 'Artificial Hybrid') badgeColor = 'bg-amber-50 text-amber-700 border-amber-200 border';
-                                    else if (['Illegitimate', 'Invalid', 'Misapplied'].includes(s)) badgeColor = 'bg-red-50 text-red-700 border-red-200 border';
-                                    else if (s === 'Unplaced' || s === 'Unresolved') badgeColor = 'bg-orange-50 text-orange-700 border-orange-200 border';
-                                    else if (s === 'Local Biotype') badgeColor = 'bg-blue-50 text-blue-700 border-blue-200 border';
-                                    
-                                    displayVal = <span className={`px-2 py-0.5 text-[10px] rounded uppercase font-bold ${badgeColor}`}>{s || '-'}</span>;
+                               if (coreCols.includes(String(col.id))) { if (rankKey === String(col.id) || (String(col.id) === 'infraspecies' && ['variety','subspecies','form'].includes(rankKey)) || String(col.id) === 'taxonName') isBold = true; }
+                               let isDimmed = false; let rowRankLevel = RANK_HIERARCHY[rankKey] || 99; if (['subspecies', 'variety', 'form'].includes(rankKey)) rowRankLevel = 5;
+                               if (COLUMN_RANK_MAP[String(col.id)] && COLUMN_RANK_MAP[String(col.id)] < rowRankLevel) isDimmed = true;
+                               if (col.id === 'taxonRank') displayVal = <span className={`px-2 py-0.5 text-[10px] rounded border uppercase font-bold bg-${baseColor}-100 ${getTextClass(baseColor)} border-${baseColor}-200`}>{val as string}</span>;
+                               else if (col.id === 'taxonName') displayVal = formatFullScientificName(tr, preferences);
+                               else if (col.id === 'taxonStatus') {
+                                    let badgeColor = 'bg-slate-100 text-slate-500'; if (val === 'Accepted') badgeColor = 'bg-green-50 text-green-700 border-green-200 border';
+                                    displayVal = <span className={`px-2 py-0.5 text-[10px] rounded uppercase font-bold ${badgeColor}`}>{val || '-'}</span>;
                                } else if (col.id === 'actions') {
-                                   const isMineable = ['genus', 'species', 'subspecies', 'variety', 'form', 'hybrid', 'grex'].includes(r);
-                                   displayVal = (
-                                       <div className="flex items-center justify-center gap-1">
-                                           <button type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); setExpandedRows(prev => { const n = new Set(prev); if(n.has(tr.id)) n.delete(tr.id); else n.add(tr.id); return n; }); }} className={`p-1.5 rounded transition-colors cursor-pointer relative z-50 shadow-sm ${isExpanded ? 'bg-slate-800 text-white' : 'bg-white border border-slate-200 text-slate-500 hover:text-slate-800 hover:bg-slate-50'}`} title={isExpanded ? "Collapse Details" : "Show Details"}>{isExpanded ? <ChevronUp size={14}/> : <ChevronDown size={14}/>}</button>
-                                           {isMineable ? (
-                                               <button type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); onAction && onAction('mine', tr); }} className="p-1.5 bg-indigo-50 border border-indigo-200 rounded text-indigo-600 hover:text-indigo-800 hover:bg-indigo-100 transition-colors cursor-pointer relative z-50 active:scale-95 shadow-sm" title={`Deep Mine Cultivars`}><Pickaxe size={14} className="pointer-events-none" /></button>
-                                           ) : (<div className="p-1.5 bg-slate-50 border border-slate-100 rounded text-slate-300 cursor-not-allowed"><Pickaxe size={14} /></div>)}
-                                           <button type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); onAction && onAction('enrich', tr); }} className="p-1.5 bg-amber-50 border border-amber-200 rounded text-amber-600 hover:text-amber-800 hover:bg-amber-100 transition-colors cursor-pointer relative z-50 active:scale-95 shadow-sm" title={`Enrich details`}><Wand2 size={14} className="pointer-events-none" /></button>
-                                       </div>
-                                   );
+                                   displayVal = <div className="flex items-center justify-center gap-1"><button onClick={(e) => { e.stopPropagation(); setExpandedRows(prev => { const n = new Set(prev); n.has(tr.id) ? n.delete(tr.id) : n.add(tr.id); return n; }); }} className={`p-1.5 rounded shadow-sm ${isExpanded ? 'bg-slate-800 text-white' : 'bg-white border border-slate-200 text-slate-500 hover:text-slate-800'}`}>{isExpanded ? <ChevronUp size={14}/> : <ChevronDown size={14}/>}</button><button onClick={(e) => { e.stopPropagation(); onAction?.('enrich', tr); }} className="p-1.5 bg-amber-50 border border-amber-200 rounded text-amber-600 hover:bg-amber-100 shadow-sm"><Wand2 size={14} /></button></div>;
                                }
-                               
-                               let textColorClass = "";
-                               if (isBold) textColorClass = baseColor === 'slate' ? "text-slate-900" : `text-${baseColor}-900`;
-                               if (isDimmed) textColorClass = "text-slate-400";
-                               const textAlignClass = col.headerAlign === 'center' ? 'text-center' : '';
-
-                               return <td key={String(col.id)} className={`p-2 border-r border-slate-50 truncate overflow-hidden max-w-0 ${textAlignClass}`} title={String(val || '')}><span className={`${isBold ? "font-bold" : ""} ${isDimmed ? "font-normal" : ""} ${textColorClass}`}>{displayVal}</span></td>;
+                               return <td key={String(col.id)} className={`p-2 border-r border-slate-50 truncate overflow-hidden max-w-0 ${col.headerAlign === 'center' ? 'text-center' : ''}`} title={String(val || '')}><span className={`${isBold ? "font-bold" : ""} ${isDimmed ? "font-normal" : ""} ${isBold ? (baseColor === 'slate' ? "text-slate-900" : `text-${baseColor}-900`) : (isDimmed ? "text-slate-400" : "")}`}>{displayVal}</span></td>;
                            })}
                         </tr>
-                        {isExpanded && !tr.isTreeHeader && (
-                             <tr>
-                                 <td colSpan={activeColumns.length} className="bg-slate-50/50 p-0 border-b border-slate-200 shadow-inner">
-                                     <div className="p-4 border-l-4 border-slate-500 bg-white m-2 rounded-r-lg shadow-sm">
-                                         <DetailsPanel 
-                                             title={tr.taxonName}
-                                             description={tr.description}
-                                             synonyms={tr.synonyms}
-                                             referenceLinks={tr.referenceLinks}
-                                             onUpdate={(updates) => onUpdate && onUpdate(tr.id, updates)}
-                                         />
-                                     </div>
-                                 </td>
-                             </tr>
-                        )}
+                        {isExpanded && !tr.isTreeHeader && (<tr><td colSpan={activeColumns.length} className="bg-slate-50/50 p-0 border-b border-slate-200 shadow-inner"><div className="p-4 border-l-4 border-slate-500 bg-white m-2 rounded-r-lg shadow-sm"><DetailsPanel title={tr.taxonName} description={tr.description} synonyms={tr.synonyms} referenceLinks={tr.referenceLinks} onUpdate={(updates) => onUpdate && onUpdate(tr.id, updates)} /></div></td></tr>)}
                      </React.Fragment>
                   );
               })}
-              {isLoadingMore && (
-                  <tr>
-                      <td colSpan={activeColumns.length} className="p-4 text-center">
-                          <div className="flex justify-center items-center gap-2 text-slate-400 text-xs">
-                              <Loader2 size={16} className="animate-spin" />
-                              Loading more records...
-                          </div>
-                      </td>
-                  </tr>
-              )}
-              {gridRows.length === 0 && !isLoadingMore && (<tr><td colSpan={activeColumns.length} className="p-8 text-center text-slate-400 italic">No records found matching filters.</td></tr>)}
+              {isLoadingMore && (<tr><td colSpan={activeColumns.length} className="p-4 text-center"><div className="flex justify-center items-center gap-2 text-slate-400 text-xs"><Loader2 size={16} className="animate-spin" />Loading more records...</div></td></tr>)}
+              {gridRows.length === 0 && !isLoadingMore && (<tr><td colSpan={activeColumns.length} className="p-8 text-center text-slate-400 italic">No matching records.</td></tr>)}
            </tbody>
         </table>
       </div>
     </div>
   );
 };
-
 export default DataGridV2;
