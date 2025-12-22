@@ -24,7 +24,7 @@ A "Tree Grid" that renders a flat list but groups records visually using virtual
 
 ### 4.1 Stability & State Persistence
 *   **Input Retention:** Text filter inputs are debounced and synchronized. The grid remains mounted during "Loading" states if filtering is active to prevent focus loss.
-*   **Load Status Display:** A dynamic status bar in the grid header shows the number of records currently held in the browser vs. the total count returned by the database (e.g., "200 of 5,000 records loaded").
+*   **Load Status Display:** A dynamic status bar in the grid header shows the number of records currently held in the browser instance vs. the total count returned by the database filters (e.g., "200 of 5,000 records loaded"). This provides feedback for the infinite scroll mechanism.
 
 ### 4.2 Virtual Tree Logic
 *   **Holistic Path Calculation:** The `expandTreeLevel` function performs a full recursive walk of all loaded `Taxon` records, even those hidden within collapsed nodes.
@@ -32,11 +32,11 @@ A "Tree Grid" that renders a flat list but groups records visually using virtual
 
 ### 4.3 Visual Rules
 *   **Dimming/Bolding:** Applied to columns matching the row's specific rank. Higher-rank columns are dimmed on lower-rank rows.
-*   **Hybrid Styling:** Uses CSS `saturate-50` to distinguish hybrids from standard species.
+*   **Hybrid Styling:** Uses CSS `saturate-50` and `opacity-80` to visually distinguish hybrids from standard species.
 
 ## 5. UI: Activity & Process Panel
 *   **Async Management:** A cancellation system allows users to stop long-running AI processes immediately.
-*   **Resolution UI:** Embedded workflows for "Did you mean?" corrections or synonym resolution.
+*   **Resolution UI:** Embedded workflows for "Did you mean?" corrections or duplicate name detection.
 
 ## 6. Visual Style
 *   **Typography:** `Playfair Display` (Serif) for botanical names; `Inter` (Sans) for data.
