@@ -113,20 +113,20 @@ const COLUMN_GROUPS: ColumnGroup[] = [
         id: 'system',
         label: 'System',
         columns: [
-            { id: 'id', label: 'Internal ID', tooltip: 'Internal UUID', defaultWidth: 100, filterType: 'text', defaultOn: false },
-            { id: 'parentId', label: 'Parent ID', tooltip: 'Parent UUID', defaultWidth: 100, filterType: 'text', defaultOn: false },
+            { id: 'id', label: 'Internal ID', tooltip: 'Internal ID', defaultWidth: 100, filterType: 'text', defaultOn: false },
+            { id: 'parentId', label: 'Parent ID', tooltip: 'Parent ID', defaultWidth: 100, filterType: 'text', defaultOn: false },
             { id: 'treeControl', label: 'Tree', tooltip: 'Tree Control', defaultWidth: 55, disableSorting: true, lockWidth: true, hideHeaderIcons: true, headerAlign: 'center', defaultOn: true },
             { id: 'childCount', label: '#', tooltip: 'Child Count', defaultWidth: 50, filterType: 'text', hideHeaderIcons: true, headerAlign: 'center', lockWidth: true, defaultOn: true },
-            { id: 'actions', label: 'Actions', tooltip: 'Record Actions', defaultWidth: 90, disableSorting: true, lockWidth: true, hideHeaderIcons: true, headerAlign: 'center', defaultOn: false },
+            { id: 'actions', label: 'Actions', tooltip: 'Actions', defaultWidth: 90, disableSorting: true, lockWidth: true, hideHeaderIcons: true, headerAlign: 'center', defaultOn: false },
         ]
     },
     {
         id: 'taxonomy',
         label: 'Taxonomy',
         columns: [
-            { id: 'taxonName', label: 'Taxon Name', tooltip: 'Full Scientific Name', defaultWidth: 220, filterType: 'text', defaultOn: true },
+            { id: 'taxonName', label: 'Taxon Name', tooltip: 'Taxon Name', defaultWidth: 220, filterType: 'text', defaultOn: true },
             { id: 'taxonRank', label: 'Rank', tooltip: 'Taxon Rank', defaultWidth: 110, filterType: 'multi-select', filterOptions: ['Family', 'Genus', 'Species', 'Subspecies', 'Variety', 'Form', 'Hybrid', 'Cultivar', 'Grex', 'Unranked'], lockWidth: true, defaultOn: false },
-            { id: 'taxonStatus', label: 'Status', tooltip: 'Taxonomic Status', defaultWidth: 110, filterType: 'multi-select', filterOptions: ['Accepted', 'Synonym', 'Unplaced', 'Artificial Hybrid', 'Illegitimate', 'Invalid', 'Misapplied', 'Orthographic', 'Provisionally Accepted', 'Unresolved', 'Local Biotype'], defaultOn: true },
+            { id: 'taxonStatus', label: 'Status', tooltip: 'Taxonomic Status', defaultWidth: 110, filterType: 'multi-select', filterOptions: ['Accepted', 'Synonym', 'Unplaced', 'Artificial Hybrid', 'Illegitimate', 'Invalid', 'Misapplied', 'Orthographic', 'Provisionally Accepted', 'Unresolved', 'Local Biotype'], defaultOn: false },
             { id: 'family', label: 'Family', tooltip: 'Family', defaultWidth: 120, filterType: 'text', defaultOn: false },
             { id: 'hybridFormula', label: 'Hybrid Formula', tooltip: 'Hybrid Formula', defaultWidth: 180, filterType: 'text', defaultOn: false },
         ]
@@ -136,23 +136,23 @@ const COLUMN_GROUPS: ColumnGroup[] = [
         label: 'Nomenclature',
         columns: [
             { id: 'genus', label: 'Genus', tooltip: 'Genus', defaultWidth: 120, filterType: 'text', defaultOn: true },
-            { id: 'genusHybrid', label: 'GH', tooltip: 'Genus Hybrid Indicator', defaultWidth: 40, filterType: 'multi-select', filterOptions: ['\u00D7', '+', 'NULL'], disableSorting: true, hideHeaderIcons: true, headerAlign: 'center', lockWidth: true, defaultOn: true },
-            { id: 'species', label: 'Species', tooltip: 'Species Epithet', defaultWidth: 120, filterType: 'text', defaultOn: true },
-            { id: 'speciesHybrid', label: 'SH', tooltip: 'Species Hybrid Indicator', defaultWidth: 40, filterType: 'multi-select', filterOptions: ['\u00D7', '+', 'NULL'], disableSorting: true, hideHeaderIcons: true, headerAlign: 'center', lockWidth: true, defaultOn: true },
+            { id: 'genusHybrid', label: 'GH', tooltip: 'Genus Hybrid', defaultWidth: 40, filterType: 'multi-select', filterOptions: ['\u00D7', '+', 'NULL'], disableSorting: true, hideHeaderIcons: true, headerAlign: 'center', lockWidth: true, defaultOn: true },
+            { id: 'species', label: 'Species', tooltip: 'Species', defaultWidth: 120, filterType: 'text', defaultOn: true },
+            { id: 'speciesHybrid', label: 'SH', tooltip: 'Species Hybrid', defaultWidth: 40, filterType: 'multi-select', filterOptions: ['\u00D7', '+', 'NULL'], disableSorting: true, hideHeaderIcons: true, headerAlign: 'center', lockWidth: true, defaultOn: true },
             { 
                 id: 'infraspecificRank', 
                 label: 'I Rank', 
                 tooltip: 'Infraspecific Rank', 
                 defaultWidth: 80, 
                 filterType: 'multi-select', 
-                filterOptions: ['NULL', 'subsp.', 'var.', 'f.', 'agamosp.', 'convar.', 'ecas.', 'grex', 'lusus', 'microf.', 'microg\u00E8ne', 'micromorphe', 'modif.', 'monstr.', 'mut.', 'nid', 'nothof.', 'nothosubsp.', 'nothovar.', 'positio', 'proles', 'provar.', 'psp.', 'stirps', 'subap.', 'subf.', 'sublusus', 'subproles', 'subspecioid', 'subsubsp.', 'subvar.'],
+                filterOptions: ['NULL', 'subsp.', 'var.', 'f.', 'agamosp.', 'convar.', 'ecas.', 'grex', 'group', 'lusus', 'microf.', 'microg\u00E8ne', 'micromorphe', 'modif.', 'monstr.', 'mut.', 'nid', 'nothof.', 'nothosubsp.', 'nothovar.', 'positio', 'proles', 'provar.', 'psp.', 'stirps', 'subap.', 'subf.', 'sublusus', 'subproles', 'subspecioid', 'subsubsp.', 'subvar.'],
                 hideHeaderIcons: true, 
                 headerAlign: 'center', 
                 lockWidth: true, 
                 defaultOn: true 
             },
-            { id: 'infraspecies', label: 'Infraspecies', tooltip: 'Infraspecific Epithet', defaultWidth: 120, filterType: 'text', defaultOn: true },
-            { id: 'cultivar', label: 'Cultivar', tooltip: 'Cultivar Name', defaultWidth: 150, filterType: 'text', defaultOn: true },
+            { id: 'infraspecies', label: 'Infraspecies', tooltip: 'Infraspecies', defaultWidth: 120, filterType: 'text', defaultOn: true },
+            { id: 'cultivar', label: 'Cultivar', tooltip: 'Cultivar', defaultWidth: 150, filterType: 'text', defaultOn: true },
         ]
     },
     {
@@ -214,7 +214,7 @@ const COLUMN_GROUPS: ColumnGroup[] = [
             { 
                 id: 'reviewed', 
                 label: 'Reviewed', 
-                tooltip: 'Reviewed Status', 
+                tooltip: 'Reviewed', 
                 defaultWidth: 80, 
                 filterType: 'multi-select', 
                 filterOptions: ['N', 'Y', 'NULL'], 
@@ -228,7 +228,7 @@ const COLUMN_GROUPS: ColumnGroup[] = [
         id: 'related',
         label: 'Related Plants',
         columns: [
-            { id: 'homotypicSynonym', label: 'Homotypic Syn.', tooltip: 'Homotypic Synonym ID', defaultWidth: 100, filterType: 'text', defaultOn: false },
+            { id: 'homotypicSynonym', label: 'Homotypic Syn.', tooltip: 'Homotypic Synonym', defaultWidth: 100, filterType: 'text', defaultOn: false },
             { id: 'acceptedPlantNameId', label: 'Accepted ID', tooltip: 'Accepted Plant Name ID', defaultWidth: 100, filterType: 'text', defaultOn: false },
             { id: 'parentheticalAuthor', label: 'Paren. Author', tooltip: 'Parenthetical Author', defaultWidth: 150, filterType: 'text', defaultOn: false },
             { id: 'replacedSynonymAuthor', label: 'Syn. Author', tooltip: 'Replaced Synonym Author', defaultWidth: 150, filterType: 'text', defaultOn: false },
@@ -251,13 +251,13 @@ const DataGrid: React.FC<DataGridProps> = ({
   };
 
   const [visibleColumns, setVisibleColumns] = useState<Set<string>>(() => {
-      const saved = loadState<string[]>('grid_visible_cols_rev9', []);
+      const saved = loadState<string[]>('grid_visible_cols_rev10', []);
       if (saved.length > 0) return new Set(saved);
       return new Set(ALL_COLUMNS.filter(c => c.defaultOn).map(c => c.id));
   });
   
-  const [columnOrder, setColumnOrder] = useState<string[]>(() => loadState('grid_col_order_rev9', ALL_COLUMNS.map(c => c.id)));
-  const [colWidths, setColWidths] = useState<Record<string, number>>(() => loadState('grid_col_widths_rev9', Object.fromEntries(ALL_COLUMNS.map(c => [c.id, c.defaultWidth]))));
+  const [columnOrder, setColumnOrder] = useState<string[]>(() => loadState('grid_col_order_rev10', ALL_COLUMNS.map(c => c.id)));
+  const [colWidths, setColWidths] = useState<Record<string, number>>(() => loadState('grid_col_widths_rev10', Object.fromEntries(ALL_COLUMNS.map(c => [c.id, c.defaultWidth]))));
   const [isHierarchyMode, setIsHierarchyMode] = useState<boolean>(true);
   const [groupBy, setGroupBy] = useState<string[]>([]);
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
@@ -294,9 +294,9 @@ const DataGrid: React.FC<DataGridProps> = ({
       }
   }, [isHierarchyMode, visibleColumns]);
 
-  useEffect(() => localStorage.setItem('grid_visible_cols_rev9', JSON.stringify(Array.from(visibleColumns))), [visibleColumns]);
-  useEffect(() => localStorage.setItem('grid_col_order_rev9', JSON.stringify(columnOrder)), [columnOrder]);
-  useEffect(() => localStorage.setItem('grid_col_widths_rev9', JSON.stringify(colWidths)), [colWidths]);
+  useEffect(() => localStorage.setItem('grid_visible_cols_rev10', JSON.stringify(Array.from(visibleColumns))), [visibleColumns]);
+  useEffect(() => localStorage.setItem('grid_col_order_rev10', JSON.stringify(columnOrder)), [columnOrder]);
+  useEffect(() => localStorage.setItem('grid_col_widths_rev10', JSON.stringify(colWidths)), [colWidths]);
 
   useEffect(() => {
       const handleClickOutside = (event: MouseEvent) => {
@@ -391,14 +391,10 @@ const DataGrid: React.FC<DataGridProps> = ({
   
   const expandTreeLevel = (targetDepth: number) => {
       const newCollapsed = new Set<string>();
-      
-      // Holistic walk to find ALL possible paths in the current dataset,
-      // even if they are currently inside collapsed parents.
       const allPathsWithDepths: {path: string, depth: number}[] = [];
       const walk = (subset: Taxon[], depth: number, parentPath: string) => {
           if (depth >= groupBy.length) return;
           const field = groupBy[depth];
-          
           const groups: Record<string, Taxon[]> = {};
           subset.forEach(row => {
               const val = String(getRowValue(row, field) || '');
@@ -406,27 +402,14 @@ const DataGrid: React.FC<DataGridProps> = ({
               if (!groups[val]) groups[val] = [];
               groups[val].push(row);
           });
-
           Object.keys(groups).forEach(key => {
               const path = `${parentPath}/${key}`;
               allPathsWithDepths.push({ path, depth });
-              
-              // Only walk further if we aren't already at the target depth to collapse
-              if (depth < groupBy.length) {
-                  walk(groups[key], depth + 1, path);
-              }
+              if (depth < groupBy.length) walk(groups[key], depth + 1, path);
           });
       };
-
       walk(taxa, 0, 'root');
-
-      // Decide which paths should be collapsed
-      allPathsWithDepths.forEach(item => {
-          if (item.depth >= targetDepth) {
-              newCollapsed.add(item.path);
-          }
-      });
-
+      allPathsWithDepths.forEach(item => { if (item.depth >= targetDepth) newCollapsed.add(item.path); });
       setCollapsedGroups(newCollapsed);
   };
 
@@ -492,41 +475,21 @@ const DataGrid: React.FC<DataGridProps> = ({
   const handleDrop = (e: React.DragEvent, targetId: string) => { e.preventDefault(); if (!draggedColumn || draggedColumn === targetId) return; const newOrder = [...columnOrder]; const sIdx = newOrder.indexOf(draggedColumn); const tIdx = newOrder.indexOf(targetId); newOrder.splice(sIdx, 1); newOrder.splice(tIdx, 0, draggedColumn); setColumnOrder(newOrder); setDraggedColumn(null); };
 
   const isAnyGroupCollapsed = collapsedGroups.size > 0;
-  const toggleAllGroups = () => {
-    if (isAnyGroupCollapsed) {
-        setCollapsedGroups(new Set());
-    } else {
-        expandTreeLevel(0);
-    }
-  };
+  const toggleAllGroups = () => { if (isAnyGroupCollapsed) setCollapsedGroups(new Set()); else expandTreeLevel(0); };
 
   return (
     <div className="bg-white rounded-xl shadow border border-slate-200 overflow-hidden flex flex-col h-full relative">
       <div className="p-2 border-b border-slate-200 bg-slate-50 flex justify-between items-center z-20 relative flex-shrink-0">
          <div className="text-xs text-slate-500 font-medium px-2 flex items-center gap-4">
-             <span>
-                {taxa.length.toLocaleString()} of {totalRecords >= 0 ? totalRecords.toLocaleString() : 'many'} records loaded
-             </span>
+             <span>{taxa.length.toLocaleString()} of {totalRecords >= 0 ? totalRecords.toLocaleString() : 'many'} records loaded</span>
              {isLoadingMore && <span className="flex items-center gap-1 text-leaf-600"><Loader2Icon size={12} className="animate-spin"/> Loading...</span>}
              {isHierarchyMode && (
                  <div className="flex items-center gap-1 bg-white border border-slate-200 rounded p-0.5 ml-2 shadow-sm">
                      {groupBy.map((level, idx) => (
-                        <button 
-                            key={level}
-                            onClick={() => expandTreeLevel(idx)} 
-                            className="px-2 py-0.5 text-[10px] font-bold text-slate-600 hover:bg-slate-100 rounded" 
-                            title={`Collapse all at Level ${idx + 1}: ${level.charAt(0).toUpperCase() + level.slice(1)}`}
-                        >
-                            {idx + 1}
-                        </button>
+                        <button key={level} onClick={() => expandTreeLevel(idx)} className="px-2 py-0.5 text-[10px] font-bold text-slate-600 hover:bg-slate-100 rounded" title={`Collapse all at Level ${idx + 1}: ${level.charAt(0).toUpperCase() + level.slice(1)}`}>{idx + 1}</button>
                      ))}
                      <div className="w-px h-3 bg-slate-200 mx-1"></div>
-                     <button 
-                        onClick={toggleAllGroups} 
-                        className="px-2 py-0.5 text-[10px] font-bold text-leaf-600 hover:bg-leaf-50 rounded"
-                     >
-                        {isAnyGroupCollapsed ? 'Expand All' : 'Collapse All'}
-                     </button>
+                     <button onClick={toggleAllGroups} className="px-2 py-0.5 text-[10px] font-bold text-leaf-600 hover:bg-leaf-50 rounded">{isAnyGroupCollapsed ? 'Expand All' : 'Collapse All'}</button>
                  </div>
              )}
          </div>
@@ -538,10 +501,7 @@ const DataGrid: React.FC<DataGridProps> = ({
                  <button onClick={() => setShowColPicker(!showColPicker)} className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-300 rounded text-xs text-slate-600 hover:bg-slate-50 shadow-sm"><SettingsIcon size={14} /> Columns</button>
                  {showColPicker && (
                     <div className="absolute right-0 top-full mt-2 w-72 bg-white border border-slate-200 rounded-lg shadow-2xl z-50 p-3 max-h-[70vh] overflow-y-auto origin-top-right animate-in fade-in zoom-in-95 duration-150">
-                        <div className="flex justify-between items-center mb-4 px-1">
-                            <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Configure Grid</div>
-                            <button onClick={() => setVisibleColumns(new Set(ALL_COLUMNS.map(c=>c.id)))} className="text-[10px] text-blue-600 hover:underline">Show All</button>
-                        </div>
+                        <div className="flex justify-between items-center mb-4 px-1"><div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Configure Grid</div><button onClick={() => setVisibleColumns(new Set(ALL_COLUMNS.map(c=>c.id)))} className="text-[10px] text-blue-600 hover:underline">Show All</button></div>
                         <div className="space-y-4">
                             {COLUMN_GROUPS.map(group => {
                                 const allInGroupVisible = group.columns.every(c => visibleColumns.has(c.id));
@@ -550,18 +510,14 @@ const DataGrid: React.FC<DataGridProps> = ({
                                     <div key={group.id} className="space-y-1">
                                         <div className="flex items-center justify-between group/grp px-1 mb-1">
                                             <div className="flex items-center gap-2 cursor-pointer" onClick={() => toggleColumnGroup(group.id)}>
-                                                <div className={`text-leaf-600`}>
-                                                    {allInGroupVisible ? <CheckSquareIcon size={14} /> : someInGroupVisible ? <SquareIcon size={14} className="opacity-50" /> : <SquareIcon size={14} className="text-slate-300" />}
-                                                </div>
+                                                <div className={`text-leaf-600`}>{allInGroupVisible ? <CheckSquareIcon size={14} /> : someInGroupVisible ? <SquareIcon size={14} className="opacity-50" /> : <SquareIcon size={14} className="text-slate-300" />}</div>
                                                 <span className="text-[10px] font-extrabold uppercase text-slate-500 tracking-wide">{group.label}</span>
                                             </div>
                                         </div>
                                         <div className="grid grid-cols-1 gap-0.5 ml-5">
                                             {group.columns.map(col => (
                                                 <div key={col.id} onClick={() => toggleColumn(col.id)} className="flex items-center gap-2 px-2 py-1 hover:bg-slate-50 cursor-pointer rounded transition-colors group/col" title={col.tooltip}>
-                                                    <div className={`w-3 h-3 rounded flex items-center justify-center border flex-shrink-0 ${visibleColumns.has(col.id) ? 'bg-leaf-500 border-leaf-500' : 'border-slate-300'}`}>
-                                                        {visibleColumns.has(col.id) && <CheckIcon size={10} className="text-white"/>}
-                                                    </div>
+                                                    <div className={`w-3 h-3 rounded flex items-center justify-center border flex-shrink-0 ${visibleColumns.has(col.id) ? 'bg-leaf-500 border-leaf-500' : 'border-slate-300'}`}>{visibleColumns.has(col.id) && <CheckIcon size={10} className="text-white"/>}</div>
                                                     <span className="text-xs text-slate-600 group-hover/col:text-slate-900 truncate">{col.label}</span>
                                                 </div>
                                             ))}
@@ -607,15 +563,8 @@ const DataGrid: React.FC<DataGridProps> = ({
                              ? (<MultiSelectFilter label={col.label} options={col.filterOptions || []} selected={filters[col.id] || []} onChange={(vals) => onFilterChange(col.id, vals)}/>) 
                              : (
                                 <div className="relative">
-                                    <input 
-                                        className={`w-full text-xs px-2 py-1.5 bg-white border border-slate-200 rounded outline-none focus:border-leaf-300 focus:ring-1 focus:ring-leaf-200 font-normal ${col.id === 'taxonName' ? 'pl-7 border-leaf-300 ring-1 ring-leaf-100' : ''}`} 
-                                        placeholder={col.id === 'taxonName' ? 'Search DB...' : 'Filter...'}
-                                        value={localTextFilters[col.id] || ''} 
-                                        onChange={e => handleTextFilterChange(col.id, e.target.value)}
-                                    />
-                                    {col.id === 'taxonName' && (
-                                        <SearchIcon size={12} className="absolute left-2 top-2 text-leaf-500" />
-                                    )}
+                                    <input className={`w-full text-xs px-2 py-1.5 bg-white border border-slate-200 rounded outline-none focus:border-leaf-300 focus:ring-1 focus:ring-leaf-200 font-normal ${col.id === 'taxonName' ? 'pl-7 border-leaf-300 ring-1 ring-leaf-100' : ''}`} placeholder={col.id === 'taxonName' ? 'Search DB...' : 'Filter...'} value={localTextFilters[col.id] || ''} onChange={e => handleTextFilterChange(col.id, e.target.value)}/>
+                                    {col.id === 'taxonName' && (<SearchIcon size={12} className="absolute left-2 top-2 text-leaf-500" />)}
                                 </div>
                              )
                           }
@@ -641,23 +590,11 @@ const DataGrid: React.FC<DataGridProps> = ({
                                if (col.id === 'taxonRank') displayVal = <span className={`px-2 py-0.5 text-[10px] rounded border uppercase font-bold bg-${baseColor}-100 ${getTextClass(baseColor)} border-${baseColor}-200`}>{val as string}</span>;
                                else if (col.id === 'taxonName') displayVal = formatFullScientificName(tr, preferences);
                                else if (col.id === 'taxonStatus') { let b = 'bg-slate-100 text-slate-500'; if (val === 'Accepted') b = 'bg-green-50 text-green-700 border-green-200 border'; displayVal = <span className={`px-2 py-0.5 text-[10px] rounded uppercase font-bold ${b}`}>{val || '-'}</span>; }
-                               else if (col.id === 'actions') displayVal = <div className="flex items-center justify-center gap-1">
-                                   <button onClick={(e) => { e.stopPropagation(); setExpandedRows(prev => { const n = new Set(prev); n.has(tr.id) ? n.delete(tr.id) : n.add(tr.id); return n; }); }} className={`p-1.5 rounded shadow-sm ${isExpanded ? 'bg-slate-800 text-white' : 'bg-white border border-slate-200 text-slate-500 hover:text-slate-800'}`}>{isExpanded ? <ChevronUpIcon size={14}/> : <ChevronDownIcon size={14}/>}</button>
-                                   {['genus', 'species', 'subspecies', 'variety', 'form'].includes(r) && <button onClick={(e) => { e.stopPropagation(); onAction?.('mine', tr); }} className="p-1.5 bg-indigo-50 border border-indigo-200 rounded text-indigo-600 hover:bg-indigo-100 shadow-sm"><PickaxeIcon size={14} /></button>}
-                                   <button onClick={(e) => { e.stopPropagation(); onAction?.('enrich', tr); }} className="p-1.5 bg-amber-50 border border-amber-200 rounded text-amber-600 hover:bg-amber-100 shadow-sm"><Wand2Icon size={14} /></button>
-                               </div>;
+                               else if (col.id === 'actions') displayVal = <div className="flex items-center justify-center gap-1"><button onClick={(e) => { e.stopPropagation(); setExpandedRows(prev => { const n = new Set(prev); n.has(tr.id) ? n.delete(tr.id) : n.add(tr.id); return n; }); }} className={`p-1.5 rounded shadow-sm ${isExpanded ? 'bg-slate-800 text-white' : 'bg-white border border-slate-200 text-slate-500 hover:text-slate-800'}`}>{isExpanded ? <ChevronUpIcon size={14}/> : <ChevronDownIcon size={14}/>}</button>{['genus', 'species', 'subspecies', 'variety', 'form'].includes(r) && <button onClick={(e) => { e.stopPropagation(); onAction?.('mine', tr); }} className="p-1.5 bg-indigo-50 border border-indigo-200 rounded text-indigo-600 hover:bg-indigo-100 shadow-sm"><PickaxeIcon size={14} /></button>}<button onClick={(e) => { e.stopPropagation(); onAction?.('enrich', tr); }} className="p-1.5 bg-amber-50 border border-amber-200 rounded text-amber-600 hover:bg-amber-100 shadow-sm"><Wand2Icon size={14} /></button></div>;
                                return <td key={col.id} className={`p-2 border-r border-slate-50 truncate overflow-hidden max-w-0 ${col.headerAlign === 'center' ? 'text-center' : ''}`} title={String(val || '')}><span className={`${isBold ? "font-bold" : ""} ${isDimmed ? "font-normal" : ""} ${isBold ? (baseColor === 'slate' ? "text-slate-900" : `text-${baseColor}-900`) : (isDimmed ? "text-slate-400" : "")}`}>{displayVal}</span></td>;
                            })}
                         </tr>
-                        {isExpanded && !tr.isTreeHeader && (
-                             <tr>
-                                 <td colSpan={activeColumns.length} className="bg-slate-50/50 p-0 border-b border-slate-200 shadow-inner">
-                                     <div className="p-4 border-l-4 border-slate-500 bg-white m-2 rounded-r-lg shadow-sm">
-                                         <DetailsPanel title={tr.taxonName} description={tr.description} synonyms={tr.synonyms} referenceLinks={tr.referenceLinks} onUpdate={(updates) => onUpdate && onUpdate(tr.id, updates)} />
-                                     </div>
-                                 </td>
-                             </tr>
-                        )}
+                        {isExpanded && !tr.isTreeHeader && (<tr><td colSpan={activeColumns.length} className="bg-slate-50/50 p-0 border-b border-slate-200 shadow-inner"><div className="p-4 border-l-4 border-slate-500 bg-white m-2 rounded-r-lg shadow-sm"><DetailsPanel title={tr.taxonName} description={tr.description} synonyms={tr.synonyms} referenceLinks={tr.referenceLinks} onUpdate={(updates) => onUpdate && onUpdate(tr.id, updates)} /></div></td></tr>)}
                      </React.Fragment>
                   );
               })}
