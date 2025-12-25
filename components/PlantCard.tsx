@@ -1,7 +1,5 @@
-
-
 import React, { useState } from 'react';
-import { Taxon, TaxonRank, UserPreferences } from '../types';
+import { Taxon, UserPreferences } from '../types';
 import { ChevronDown, ChevronUp, Trash2 } from 'lucide-react';
 import DetailsPanel from './DetailsPanel';
 import { formatScientificName } from '../utils/formatters';
@@ -18,22 +16,22 @@ const TaxonRow: React.FC<TaxonRowProps> = ({ taxon, onDelete, onUpdate, depth, p
   const [expanded, setExpanded] = useState(false);
 
   // Indentation logic based on rank or depth
-  const isGenus = taxon.taxonRank === 'genus';
-  const isSpecies = taxon.taxonRank === 'species';
+  const isGenus = taxon.taxonRank === 'Genus';
+  const isSpecies = taxon.taxonRank === 'Species';
   
   // Style adjustments
   let nameStyle = "font-serif text-slate-700";
   if (isGenus) nameStyle = "font-serif font-bold text-slate-800 text-lg italic";
   else if (isSpecies) nameStyle = "font-serif font-semibold text-slate-600 italic";
-  else if (taxon.taxonRank === 'cultivar') nameStyle = "font-sans font-medium text-slate-800";
+  else if (taxon.taxonRank === 'Cultivar') nameStyle = "font-sans font-medium text-slate-800";
   else nameStyle = "font-serif text-slate-500 italic"; // var, subsp
 
   // Use Formatter for the specific epithet/name
   let displayName = formatScientificName(taxon, preferences);
-  if (taxon.taxonRank === 'cultivar') displayName = `'${taxon.name}'`;
+  if (taxon.taxonRank === 'Cultivar') displayName = `'${taxon.name}'`;
   
   // Rank badge
-  const showRankBadge = !isGenus && !isSpecies && taxon.taxonRank !== 'cultivar';
+  const showRankBadge = !isGenus && !isSpecies && taxon.taxonRank !== 'Cultivar';
 
   return (
     <>

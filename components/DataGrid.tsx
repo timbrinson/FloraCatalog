@@ -1,6 +1,5 @@
 import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { Taxon, UserPreferences, ColorTheme } from '../types';
-// Fixed: Removed incorrect imports of icons from formatters.ts
 import { formatFullScientificName } from '../utils/formatters';
 import DetailsPanel from './DetailsPanel';
 import { 
@@ -29,7 +28,7 @@ interface DataGridProps {
 }
 
 const RANK_HIERARCHY: Record<string, number> = {
-    'family': 1, 'genus': 2, 'species': 3, 'subspecies': 4, 'variety': 5, 'form': 6, 'hybrid': 7, 'grex': 8, 'cultivar': 9,
+    'family': 1, 'genus': 2, 'species': 3, 'subspecies': 4, 'variety': 5, 'form': 6, 'grex': 8, 'cultivar': 9,
 };
 
 const COLUMN_RANK_MAP: Record<string, number> = {
@@ -45,10 +44,10 @@ const COLUMN_RANK_MAP: Record<string, number> = {
 
 type ThemeMap = Record<string, string>;
 const THEMES: Record<ColorTheme, ThemeMap> = {
-    'option1a': { 'family': 'red', 'genus': 'orange', 'species': 'amber', 'subspecies': 'green', 'variety': 'green', 'form': 'green', 'hybrid': 'amber', 'cultivar': 'sky', 'grex': 'sky' },
-    'option1b': { 'family': 'red', 'genus': 'sky', 'species': 'green', 'subspecies': 'amber', 'variety': 'amber', 'form': 'amber', 'hybrid': 'green', 'cultivar': 'orange', 'grex': 'orange' },
-    'option2a': { 'family': 'red', 'genus': 'green', 'species': 'amber', 'subspecies': 'orange', 'variety': 'orange', 'form': 'orange', 'hybrid': 'amber', 'cultivar': 'sky', 'grex': 'sky' },
-    'option2b': { 'family': 'red', 'genus': 'sky', 'species': 'orange', 'subspecies': 'amber', 'variety': 'amber', 'form': 'amber', 'hybrid': 'orange', 'cultivar': 'green', 'grex': 'green' }
+    'option1a': { 'family': 'red', 'genus': 'orange', 'species': 'amber', 'subspecies': 'green', 'variety': 'green', 'form': 'green', 'cultivar': 'sky', 'grex': 'sky' },
+    'option1b': { 'family': 'red', 'genus': 'sky', 'species': 'green', 'subspecies': 'amber', 'variety': 'amber', 'form': 'amber', 'cultivar': 'orange', 'grex': 'orange' },
+    'option2a': { 'family': 'red', 'genus': 'green', 'species': 'amber', 'subspecies': 'orange', 'variety': 'orange', 'form': 'orange', 'cultivar': 'sky', 'grex': 'sky' },
+    'option2b': { 'family': 'red', 'genus': 'sky', 'species': 'orange', 'subspecies': 'amber', 'variety': 'amber', 'form': 'amber', 'cultivar': 'green', 'grex': 'green' }
 };
 
 const getTextClass = (color: string) => color === 'slate' ? 'text-slate-600' : `text-${color}-700`;
@@ -71,7 +70,7 @@ const MultiSelectFilter = ({ options, selected, onChange, label }: { options: st
                 <span className="truncate">{selected.length === 0 ? `All ${label}s` : `${selected.length} selected`}</span>
                 <ChevronDownIcon size={12} className="opacity-50"/>
             </button>
-            {isOpen && (<div className="absolute top-full left-0 right-0 mt-1 bg-white border border-slate-200 shadow-lg rounded-md z-50 max-h-48 overflow-y-auto min-w-[150px]"><div className="px-2 py-1.5 text-xs text-slate-500 hover:bg-slate-50 cursor-pointer border-b border-slate-50" onClick={() => { onChange([]); setIsOpen(false); }}>Clear Filter</div>{options.map(opt => (<div key={opt} className="flex items-center gap-2 px-2 py-1.5 hover:bg-leaf-50 cursor-pointer" onClick={() => toggleOption(opt)}><div className={`w-3 h-3 rounded border flex items-center justify-center flex-shrink-0 ${selected.includes(opt) ? 'bg-leaf-500 border-leaf-500' : 'border-slate-300 bg-white'}`}>{selected.includes(opt) && <CheckIcon size={10} className="text-white"/>}</div><span className="text-xs text-slate-700 capitalize whitespace-normal">{opt === 'NULL' || opt === 'null' ? <span className="italic opacity-60">None / Empty</span> : opt}</span></div>))}</div>)}
+            {isOpen && (<div className="absolute top-full left-0 right-0 mt-1 bg-white border border-slate-200 shadow-lg rounded-md z-50 max-h-48 overflow-y-auto min-w-[150px]"><div className="px-2 py-1.5 text-xs text-slate-500 hover:bg-slate-50 cursor-pointer border-b border-slate-50" onClick={() => { onChange([]); setIsOpen(false); }}>Clear Filter</div>{options.map(opt => (<div key={opt} className="flex items-center gap-2 px-2 py-1.5 hover:bg-leaf-50 cursor-pointer" onClick={() => toggleOption(opt)}><div className={`w-3 h-3 rounded border flex items-center justify-center flex-shrink-0 ${selected.includes(opt) ? 'bg-leaf-500 border-leaf-500' : 'border-slate-300 bg-white'}`}>{selected.includes(opt) && <CheckIcon size={10} className="text-white"/>}</div><span className="text-xs text-slate-700 whitespace-normal">{opt === 'NULL' || opt === 'null' ? <span className="italic opacity-60">None / Empty</span> : opt}</span></div>))}</div>)}
         </div>
     );
 };
@@ -113,8 +112,8 @@ const COLUMN_GROUPS: ColumnGroup[] = [
         id: 'system',
         label: 'System',
         columns: [
-            { id: 'id', label: 'Internal ID', tooltip: 'Internal ID', defaultWidth: 100, filterType: 'text', defaultOn: false },
-            { id: 'parentId', label: 'Parent ID', tooltip: 'Parent ID', defaultWidth: 100, filterType: 'text', defaultOn: false },
+            { id: 'id', label: 'Internal ID', tooltip: 'Internal UUID', defaultWidth: 100, filterType: 'text', defaultOn: false },
+            { id: 'parentId', label: 'Parent ID', tooltip: 'Parent UUID', defaultWidth: 100, filterType: 'text', defaultOn: false },
             { id: 'treeControl', label: 'Tree', tooltip: 'Tree Control', defaultWidth: 55, disableSorting: true, lockWidth: true, hideHeaderIcons: true, headerAlign: 'center', defaultOn: true },
             { id: 'childCount', label: '#', tooltip: 'Child Count', defaultWidth: 50, filterType: 'text', hideHeaderIcons: true, headerAlign: 'center', lockWidth: true, defaultOn: true },
             { id: 'actions', label: 'Actions', tooltip: 'Actions', defaultWidth: 90, disableSorting: true, lockWidth: true, hideHeaderIcons: true, headerAlign: 'center', defaultOn: false },
@@ -124,35 +123,35 @@ const COLUMN_GROUPS: ColumnGroup[] = [
         id: 'taxonomy',
         label: 'Taxonomy',
         columns: [
-            { id: 'taxonName', label: 'Taxon Name', tooltip: 'Taxon Name', defaultWidth: 220, filterType: 'text', defaultOn: true },
-            { id: 'taxonRank', label: 'Rank', tooltip: 'Taxon Rank', defaultWidth: 110, filterType: 'multi-select', filterOptions: ['Family', 'Genus', 'Species', 'Subspecies', 'Variety', 'Form', 'Hybrid', 'Cultivar', 'Grex', 'Unranked'], lockWidth: true, defaultOn: false },
-            { id: 'taxonStatus', label: 'Status', tooltip: 'Taxonomic Status', defaultWidth: 110, filterType: 'multi-select', filterOptions: ['Accepted', 'Synonym', 'Unplaced', 'Artificial Hybrid', 'Illegitimate', 'Invalid', 'Misapplied', 'Orthographic', 'Provisionally Accepted', 'Unresolved', 'Local Biotype'], defaultOn: false },
-            { id: 'family', label: 'Family', tooltip: 'Family', defaultWidth: 120, filterType: 'text', defaultOn: false },
-            { id: 'hybridFormula', label: 'Hybrid Formula', tooltip: 'Hybrid Formula', defaultWidth: 180, filterType: 'text', defaultOn: false },
+            { id: 'taxonName', label: 'Plant Name', tooltip: 'Scientific Name', defaultWidth: 220, filterType: 'text', defaultOn: true },
+            { id: 'taxonRank', label: 'Rank', tooltip: 'Taxonomic Rank', defaultWidth: 110, filterType: 'multi-select', filterOptions: ['Convariety', 'Form', 'Genus', 'proles', 'Species', 'Subform', 'Subspecies', 'Subvariety', 'Variety'], lockWidth: true, defaultOn: false },
+            { id: 'taxonStatus', label: 'Status', tooltip: 'Taxonomic Status', defaultWidth: 110, filterType: 'multi-select', filterOptions: ['Accepted', 'Artificial Hybrid', 'Illegitimate', 'Invalid', 'Local Biotype', 'Misapplied', 'Orthographic', 'Synonym', 'Unplaced', 'Provisionally Accepted'], defaultOn: false },
+            { id: 'family', label: 'Family', tooltip: 'Family Name', defaultWidth: 120, filterType: 'text', defaultOn: false },
+            { id: 'hybridFormula', label: 'Hybrid Formula', tooltip: 'Parents of hybrid', defaultWidth: 180, filterType: 'text', defaultOn: false },
         ]
     },
     {
         id: 'nomenclature',
         label: 'Nomenclature',
         columns: [
-            { id: 'genus', label: 'Genus', tooltip: 'Genus', defaultWidth: 120, filterType: 'text', defaultOn: true },
-            { id: 'genusHybrid', label: 'GH', tooltip: 'Genus Hybrid', defaultWidth: 40, filterType: 'multi-select', filterOptions: ['\u00D7', '+', 'NULL'], disableSorting: true, hideHeaderIcons: true, headerAlign: 'center', lockWidth: true, defaultOn: true },
-            { id: 'species', label: 'Species', tooltip: 'Species', defaultWidth: 120, filterType: 'text', defaultOn: true },
-            { id: 'speciesHybrid', label: 'SH', tooltip: 'Species Hybrid', defaultWidth: 40, filterType: 'multi-select', filterOptions: ['\u00D7', '+', 'NULL'], disableSorting: true, hideHeaderIcons: true, headerAlign: 'center', lockWidth: true, defaultOn: true },
+            { id: 'genus', label: 'Genus', tooltip: 'Genus Designation', defaultWidth: 120, filterType: 'text', defaultOn: true },
+            { id: 'genusHybrid', label: 'GH', tooltip: 'Genus Hybrid Indicator (+, ×)', defaultWidth: 40, filterType: 'multi-select', filterOptions: ['+', '×', 'NULL'], disableSorting: true, hideHeaderIcons: true, headerAlign: 'center', lockWidth: true, defaultOn: true },
+            { id: 'species', label: 'Species', tooltip: 'Species Designation', defaultWidth: 120, filterType: 'text', defaultOn: true },
+            { id: 'speciesHybrid', label: 'SH', tooltip: 'Species Hybrid Indicator (+, ×)', defaultWidth: 40, filterType: 'multi-select', filterOptions: ['+', '×', 'NULL'], disableSorting: true, hideHeaderIcons: true, headerAlign: 'center', lockWidth: true, defaultOn: true },
             { 
                 id: 'infraspecificRank', 
                 label: 'I Rank', 
                 tooltip: 'Infraspecific Rank', 
                 defaultWidth: 80, 
                 filterType: 'multi-select', 
-                filterOptions: ['NULL', 'subsp.', 'var.', 'f.', 'agamosp.', 'convar.', 'ecas.', 'grex', 'group', 'lusus', 'microf.', 'microg\u00E8ne', 'micromorphe', 'modif.', 'monstr.', 'mut.', 'nid', 'nothof.', 'nothosubsp.', 'nothovar.', 'positio', 'proles', 'provar.', 'psp.', 'stirps', 'subap.', 'subf.', 'sublusus', 'subproles', 'subspecioid', 'subsubsp.', 'subvar.'],
+                filterOptions: ['NULL', 'agamosp.', 'convar.', 'ecas.', 'f.', 'grex', 'group', 'lusus', 'microf.', 'microgene', 'micromorphe', 'modif.', 'monstr.', 'mut.', 'nid', 'nothof.', 'nothosubsp.', 'nothovar.', 'positio', 'proles', 'provar.', 'psp.', 'stirps', 'subf.', 'sublusus', 'subproles', 'subsp.', 'subspecioid', 'subvar.', 'unterrasse', 'var.'],
                 hideHeaderIcons: true, 
                 headerAlign: 'center', 
                 lockWidth: true, 
                 defaultOn: true 
             },
-            { id: 'infraspecies', label: 'Infraspecies', tooltip: 'Infraspecies', defaultWidth: 120, filterType: 'text', defaultOn: true },
-            { id: 'cultivar', label: 'Cultivar', tooltip: 'Cultivar', defaultWidth: 150, filterType: 'text', defaultOn: true },
+            { id: 'infraspecies', label: 'Infraspecies', tooltip: 'Infraspecific Designation', defaultWidth: 120, filterType: 'text', defaultOn: true },
+            { id: 'cultivar', label: 'Cultivar', tooltip: 'Cultivar Name', defaultWidth: 150, filterType: 'text', defaultOn: true },
         ]
     },
     {
@@ -161,34 +160,9 @@ const COLUMN_GROUPS: ColumnGroup[] = [
         columns: [
             { id: 'commonName', label: 'Common Name', tooltip: 'Common Name', defaultWidth: 150, filterType: 'text', defaultOn: false },
             { id: 'description', label: 'Description', tooltip: 'Description', defaultWidth: 250, filterType: 'text', defaultOn: false },
-            { 
-                id: 'geographicArea', 
-                label: 'Geography', 
-                tooltip: 'Geographic Area', 
-                defaultWidth: 180, 
-                filterType: 'text', 
-                defaultOn: false 
-            },
-            { 
-                id: 'lifeformDescription', 
-                label: 'Lifeform', 
-                tooltip: 'Lifeform Description', 
-                defaultWidth: 150, 
-                filterType: 'multi-select', 
-                filterOptions: [
-                    'annual', 'annual bamboo', 'annual or biennial', 'annual or helophyte', 'annual or lithophyte', 'annual or perennial', 'annual or rhizomatous geophyte', 'annual or shrub', 'annual or subshrub', 'annual or tuberous geophyte', 'annual, biennial or perennial', 'annual, biennial or subshrub', 'annual, perennial or subshrub', 'annual, subshrub or shrub', 'bamboo', 'biennial', 'biennial or perennial', 'biennial or shrub', 'biennial or subshrub', 'bulbous geophyte', 'bulbous geophyte or epiphyte', 'bulbous geophyte or helophyte', 'bulbous hydrogeophyte', 'caudex geophyte', 'caudex pachycaul shrub', 'caudex shrub', 'caudex shrub or tree', 'caudex subshrub', 'caudex subshrub or shrub', 'caudex tree', 'climber', 'climbing annual', 'climbing annual or biennial', 'climbing annual or perennial', 'climbing bamboo', 'climbing biennial', 'climbing bulbous geophyte', 'climbing caudex geophyte', 'climbing caudex tree', 'climbing epiphyte', 'climbing epiphyte or lithophyte', 'climbing helophyte', 'climbing hemiparasite', 'climbing herbaceous tree', 'climbing herbaceous tree or liana', 'climbing holomycotroph', 'climbing holoparasite', 'climbing lithophyte', 'climbing perennial', 'climbing perennial or climbing chamaephyte', 'climbing perennial or herbaceous tree', 'climbing perennial or shrub', 'climbing perennial or subshrub', 'climbing rhizomatous geophyte', 'climbing shrub', 'climbing shrub or liana', 'climbing shrub or tree', 'climbing subshrub', 'climbing subshrub or climbing shrub', 'climbing subshrub or epiphyte', 'climbing subshrub or shrub', 'climbing subshrub or tree', 'climbing succulent', 'climbing succulent shrub', 'climbing succulent subshrub', 'climbing succulent subshrub or shrub', 'climbing succulent tuberous shrub', 'climbing tree', 'climbing tuberous geophyte', 'climbing, sometimes tuberous shrub', 'epiphyte', 'epiphyte or lithophyte', 'epiphyte or perennial', 'epiphyte or subshrub', 'epiphyte or tuberous geophyte', 'epiphytic annual or subshrub', 'epiphytic bulb geophyte', 'epiphytic caudex subshrub', 'epiphytic climbing shrub', 'epiphytic climbing subshrub', 'epiphytic liana', 'epiphytic or lithophytic chamaephyte', 'epiphytic or lithophytic shrub', 'epiphytic or lithophytic tuberous geophyte', 'epiphytic perennial or subshrub', 'epiphytic rhizomatous geophyte', 'epiphytic rhizomatous subshrub', 'epiphytic scrambling subshrub', 'epiphytic shrub', 'epiphytic shrub or tree', 'epiphytic subshrub', 'epiphytic subshrub or shrub', 'epiphytic tuberous chamaephyte', 'epiphytic tuberous geophyte', 'geophyte', 'helophyte', 'helophyte or annual', 'helophyte or hydroperennial', 'helophyte or hydrosubshrub', 'helophyte or lithophyte', 'helophyte or perennial', 'helophyte or rhizomatous hydrogeophyte', 'helophyte or subshrub', 'helophyte or tree', 'helophyte or tuberous geophyte', 'hemiepiphyte', 'hemiepiphytic Caudex geophyte', 'hemiepiphytic liana', 'hemiepiphytic perennial', 'hemiepiphytic shrub', 'hemiepiphytic shrub or tree', 'hemiepiphytic subshrub', 'hemiepiphytic subshrub or shrub', 'hemiepiphytic tree', 'hemillithophytic shrub', 'hemillithophytic subshrub', 'hemimycotrophic annual', 'hemimycotrophic rhizomatous geophyte', 'hemimycotrophic tuberous geophyte', 'hemiparasite', 'hemiparasitic annual', 'hemiparasitic annual or biennial', 'hemiparasitic annual or perennial', 'hemiparasitic biennial', 'hemiparasitic biennial or perennial', 'hemiparasitic climber', 'hemiparasitic epiphyte', 'hemiparasitic perennial', 'hemiparasitic shrub', 'hemiparasitic subshrub', 'hemiparasitic subshrub or shrub', 'hemiparasitic tree', 'herbaceous bamboo', 'herbaceous shrub', 'herbaceous tree', 'holomycotroph', 'holomycotrophic annual', 'holomycotrophic geophyte', 'holomycotrophic perennial', 'holomycotrophic rhizomatous geophyte', 'holomycotrophic tuberous geophyte', 'holoparasite', 'holoparasitic annual', 'holoparasitic annual or biennial', 'holoparasitic annual or perennial', 'holoparasitic biennial', 'holoparasitic chamaephyte', 'holoparasitic epiphyte', 'holoparasitic geophyte', 'holoparasitic perennial', 'holoparasitic perennial or biennial', 'holoparasitic tuberous geophyte', 'hydroannual', 'hydroannual or helophyte', 'hydroannual or hydroperennial', 'hydroannual or hydrosubshrub', 'hydroannual or tuberous geophyte', 'hydroperennial', 'hydroperennial or tuberous geophyte', 'hydroshrub', 'hydrosubshrub', 'hydrosubshrub or perennial', 'hydrosubshrub or subshrub', 'liana', 'liana or rhizomatous geophyte', 'liana or shrub', 'liana or subshrub', 'liana or tree', 'lithophyte', 'lithophyte or annual', 'lithophyte or epiphyte', 'lithophyte or helophyte', 'lithophyte or perennial', 'lithophyte or subshrub', 'lithophytic annual', 'lithophytic subshrub', 'lithophytic tuberous geophyte', 'monocarpic lithophyte', 'monocarpic perennial', 'monocarpic perennial or epiphyte', 'monocarpic perennial or lithophyte', 'monocarpic perennial or subshrub', 'monocarpic shrub', 'monocarpic shrub or tree', 'monocarpic tree', 'pachycaul tree', 'parasitic', 'perennial', 'perennial or annual', 'perennial or bulbous geophyte', 'perennial or climbing perennial', 'perennial or epiphyte', 'perennial or geophyte', 'perennial or helophyte', 'perennial or lithophyte', 'perennial or monocarpic perennial', 'perennial or pseudobulb subshrub', 'perennial or rhizomatous geophyte', 'perennial or shrub', 'perennial or subshrub', 'perennial or tree', 'perennial or tuberous geophyte', 'perennial, lithophyte or epiphyte', 'perennial, subshrub or shrub', 'pseudobulbous epiphyte', 'pseudobulbous epiphyte or geophyte', 'pseudobulbous epiphyte or lithophyte', 'pseudobulbous epiphyte or perennial', 'pseudobulbous geophyte', 'pseudobulbous geophyte or epiphyte', 'pseudobulbous geophyte or lithophyte', 'pseudobulbous lithophyte', 'pseudobulbous lithophyte or epiphyte', 'pseudobulbous or rhizomatous geophyte', 'pseudobulbous subshrub', 'rhizomatous epiphyte', 'rhizomatous epiphyte or lithophyte', 'rhizomatous geophyte', 'rhizomatous geophyte or epiphyte', 'rhizomatous geophyte or helophyte', 'rhizomatous geophyte or lithophyte', 'rhizomatous geophyte or subshrub', 'rhizomatous hydrogeophyte', 'rhizomatous hydrogeophyte or helophyte', 'rhizomatous lithophyte', 'rhizomatous or pseudobulbous epiphyte', 'rhizomatous or tuberous geophyte', 'rhizomatous perennial', 'rhizomatous shrub', 'rhizomatous subshrub', 'rhizome lithophyte or epiphyte', 'scrambling annual', 'scrambling annual or perennial', 'scrambling annual or subshrub', 'scrambling bamboo', 'scrambling caudex geophyte', 'scrambling caudex shrub', 'scrambling epiphyte', 'scrambling geophyte', 'scrambling herbaceous tree', 'scrambling perennial', 'scrambling perennial or annual', 'scrambling perennial or epiphyte', 'scrambling perennial or subshrub', 'scrambling perennial or tuberous geophyte', 'scrambling rhizomatous geophyte', 'scrambling semisucculent subshrub or shrub', 'scrambling shrub', 'scrambling shrub or liana', 'scrambling shrub or tree', 'scrambling subshrub', 'scrambling subshrub or climbing shrub', 'scrambling subshrub or liana', 'scrambling subshrub or lithophyte', 'scrambling subshrub or shrub', 'scrambling subshrub or tree', 'scrambling subshrub or tuberous geophyte', 'scrambling succulent', 'scrambling succulent shrub', 'scrambling succulent subshrub', 'scrambling succulent subshrub or shrub', 'scrambling succulent tuberous shrub', 'scrambling tree', 'scrambling tuberous geophyte', 'semiaquatic annual', 'semiaquatic subshrub', 'semisucculent annual', 'semisucculent annual or biennial', 'semisucculent annual or subshrub', 'semisucculent climber', 'semisucculent epiphyte', 'semisucculent liana', 'semisucculent perennial', 'semisucculent shrub', 'semisucculent shrub or tree', 'semisucculent subshrub', 'semisucculent subshrub or epiphyte', 'semisucculent subshrub or shrub', 'semisucculent tree', 'semisucculent tuberous geophyte', 'semisucculent tuberous shrub', 'semisucculent tuberous subshrub', 'shrub', 'shrub or liana', 'shrub or tree', 'sometimes tuberous perennial', 'sometimes tuberous subshrub', 'sometimes tuberous subshrub or shrub', 'subshrub', 'subshrub or climbing shrub', 'subshrub or epiphyte', 'subshrub or helophyte', 'subshrub or lithophyte', 'subshrub or perennial', 'subshrub or rhizomatous geophyte', 'subshrub or rhizomatous subshrub', 'subshrub or shrub', 'subshrub or tree', 'subshrub or tuberous geophyte', 'subshrub, shrub or tree', 'succulent', 'succulent annual', 'succulent annual or biennial', 'succulent annual or subshrub', 'succulent biennial', 'succulent biennial or subshrub', 'succulent bulbous geophyte', 'succulent epiphyte', 'succulent epiphyte or lithophyte', 'succulent epiphytic subshrub', 'succulent lithophyte', 'succulent lithophyte or epiphyte', 'succulent perennial', 'succulent perennial or bulbous geophyte', 'succulent perennial or chamaephyte', 'succulent perennial or epiphyte', 'succulent rhizomatous geophyte', 'succulent shrub', 'succulent shrub or tree', 'succulent subshrub', 'succulent subshrub or epiphyte', 'succulent subshrub or lithophyte', 'succulent subshrub or shrub', 'succulent subshrub or tree', 'succulent tree', 'succulent tuberous geophyte', 'succulent tuberous shrub', 'succulent tuberous subshrub', 'succulent tuberous subshrub or shrub', 'succulent, somewhat tuberous subshrub', 'tree', 'tuberous epiphyte', 'tuberous epiphyte or lithophyte', 'tuberous geophyte', 'tuberous geophyte or annual', 'tuberous geophyte or epiphyte', 'tuberous geophyte or helophyte', 'tuberous geophyte or lithophyte', 'tuberous geophyte or perennial', 'tuberous geophyte or subshrub', 'tuberous helophyte', 'tuberous hydrogeophyte', 'tuberous lithophyte', 'tuberous lithophyte or epiphyte', 'tuberous or rhizomatous geophyte', 'tuberous perennial', 'tuberous perennial or subshrub', 'tuberous shrub', 'tuberous shrub or tree', 'tuberous subshrub', 'tuberous subshrub or shrub', 'tuberous tree', 'NULL'
-                ],
-                defaultOn: false 
-            },
-            { 
-                id: 'climateDescription', 
-                label: 'Climate', 
-                tooltip: 'Climate Description', 
-                defaultWidth: 180, 
-                filterType: 'multi-select', 
-                filterOptions: ['desert or dry shrubland', 'montane tropical', 'seasonally dry tropical', 'subalpine or subarctic', 'subtropical', 'subtropical or tropical', 'temperate', 'temperate, subtropical or tropical', 'wet tropical', 'NULL'],
-                defaultOn: false 
-            },
+            { id: 'geographicArea', label: 'Geography', tooltip: 'Geographic Area', defaultWidth: 180, filterType: 'text', defaultOn: false },
+            { id: 'lifeformDescription', label: 'Lifeform', tooltip: 'Raunkiær Lifeform Description', defaultWidth: 150, filterType: 'multi-select', filterOptions: ['annual', 'perennial', 'shrub', 'tree', 'epiphyte', 'geophyte', 'succulent', 'climber', 'bamboo', 'NULL'], defaultOn: false },
+            { id: 'climateDescription', label: 'Climate', tooltip: 'Climate Description', defaultWidth: 180, filterType: 'multi-select', filterOptions: ['Desert and Dry Shrubland', 'Desert or Dry Shrubland', 'Montane Tropical', 'Seasonally Dry Tropical', 'Subalpine or Subarctic', 'Subtropical', 'Subtropical and Tropical', 'Temperate', 'Temperate and Tropical', 'Wet Tropical', 'NULL'], defaultOn: false },
         ]
     },
     {
@@ -211,24 +185,14 @@ const COLUMN_GROUPS: ColumnGroup[] = [
             { id: 'volumeAndPage', label: 'Vol/Page', tooltip: 'Volume And Page', defaultWidth: 120, filterType: 'text', defaultOn: false },
             { id: 'firstPublished', label: 'First Published', tooltip: 'First Published Date', defaultWidth: 120, filterType: 'text', defaultOn: false },
             { id: 'nomenclaturalRemarks', label: 'Nom. Remarks', tooltip: 'Nomenclatural Remarks', defaultWidth: 200, filterType: 'text', defaultOn: false },
-            { 
-                id: 'reviewed', 
-                label: 'Reviewed', 
-                tooltip: 'Reviewed', 
-                defaultWidth: 80, 
-                filterType: 'multi-select', 
-                filterOptions: ['N', 'Y', 'NULL'], 
-                lockWidth: true, 
-                headerAlign: 'center', 
-                defaultOn: false 
-            },
+            { id: 'reviewed', label: 'Reviewed', tooltip: 'Reviewed Status', defaultWidth: 80, filterType: 'multi-select', filterOptions: ['N', 'Y', 'NULL'], lockWidth: true, headerAlign: 'center', defaultOn: false },
         ]
     },
     {
         id: 'related',
         label: 'Related Plants',
         columns: [
-            { id: 'homotypicSynonym', label: 'Homotypic Syn.', tooltip: 'Homotypic Synonym', defaultWidth: 100, filterType: 'text', defaultOn: false },
+            { id: 'homotypicSynonym', label: 'Homotypic Syn.', tooltip: 'Homotypic Synonym Flag', defaultWidth: 100, filterType: 'text', defaultOn: false },
             { id: 'acceptedPlantNameId', label: 'Accepted ID', tooltip: 'Accepted Plant Name ID', defaultWidth: 100, filterType: 'text', defaultOn: false },
             { id: 'parentheticalAuthor', label: 'Paren. Author', tooltip: 'Parenthetical Author', defaultWidth: 150, filterType: 'text', defaultOn: false },
             { id: 'replacedSynonymAuthor', label: 'Syn. Author', tooltip: 'Replaced Synonym Author', defaultWidth: 150, filterType: 'text', defaultOn: false },
@@ -251,13 +215,13 @@ const DataGrid: React.FC<DataGridProps> = ({
   };
 
   const [visibleColumns, setVisibleColumns] = useState<Set<string>>(() => {
-      const saved = loadState<string[]>('grid_visible_cols_rev10', []);
+      const saved = loadState<string[]>('grid_visible_cols_rev11', []);
       if (saved.length > 0) return new Set(saved);
       return new Set(ALL_COLUMNS.filter(c => c.defaultOn).map(c => c.id));
   });
   
-  const [columnOrder, setColumnOrder] = useState<string[]>(() => loadState('grid_col_order_rev10', ALL_COLUMNS.map(c => c.id)));
-  const [colWidths, setColWidths] = useState<Record<string, number>>(() => loadState('grid_col_widths_rev10', Object.fromEntries(ALL_COLUMNS.map(c => [c.id, c.defaultWidth]))));
+  const [columnOrder, setColumnOrder] = useState<string[]>(() => loadState('grid_col_order_rev11', ALL_COLUMNS.map(c => c.id)));
+  const [colWidths, setColWidths] = useState<Record<string, number>>(() => loadState('grid_col_widths_rev11', Object.fromEntries(ALL_COLUMNS.map(c => [c.id, c.defaultWidth]))));
   const [isHierarchyMode, setIsHierarchyMode] = useState<boolean>(true);
   const [groupBy, setGroupBy] = useState<string[]>([]);
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
@@ -272,7 +236,6 @@ const DataGrid: React.FC<DataGridProps> = ({
   const legendRef = useRef<HTMLDivElement>(null);
   const colPickerRef = useRef<HTMLDivElement>(null);
 
-  // Sync local text filters from props when they change (e.g. on external clear or remount)
   useEffect(() => {
       const newLocalFilters: Record<string, string> = {};
       Object.keys(filters).forEach(key => {
@@ -294,9 +257,9 @@ const DataGrid: React.FC<DataGridProps> = ({
       }
   }, [isHierarchyMode, visibleColumns]);
 
-  useEffect(() => localStorage.setItem('grid_visible_cols_rev10', JSON.stringify(Array.from(visibleColumns))), [visibleColumns]);
-  useEffect(() => localStorage.setItem('grid_col_order_rev10', JSON.stringify(columnOrder)), [columnOrder]);
-  useEffect(() => localStorage.setItem('grid_col_widths_rev10', JSON.stringify(colWidths)), [colWidths]);
+  useEffect(() => localStorage.setItem('grid_visible_cols_rev11', JSON.stringify(Array.from(visibleColumns))), [visibleColumns]);
+  useEffect(() => localStorage.setItem('grid_col_order_rev11', JSON.stringify(columnOrder)), [columnOrder]);
+  useEffect(() => localStorage.setItem('grid_col_widths_rev11', JSON.stringify(colWidths)), [colWidths]);
 
   useEffect(() => {
       const handleClickOutside = (event: MouseEvent) => {
@@ -314,7 +277,7 @@ const DataGrid: React.FC<DataGridProps> = ({
 
   const getRowValue = (row: Taxon, colId: string) => {
        if (colId === 'childCount') { const tr = row as TreeRow; return tr.isTreeHeader ? tr.childCount : getDescendantCount(tr); }
-       if (colId === 'cultivar' && row.taxonRank === 'cultivar') return row.name;
+       if (colId === 'cultivar' && row.taxonRank === 'Cultivar') return row.name;
        // @ts-ignore
        return row[colId];
   };
@@ -574,7 +537,7 @@ const DataGrid: React.FC<DataGridProps> = ({
            </thead>
            <tbody className="divide-y divide-slate-100">
               {gridRows.map(row => {
-                  const tr = row as TreeRow; const isExpanded = expandedRows.has(tr.id); const rankKey = String(tr.taxonRank).toLowerCase(); const baseColor = activeColorMap[rankKey] || 'slate'; const isHybrid = tr.genusHybrid === '\u00D7' || tr.genusHybrid === 'x' || tr.speciesHybrid === '\u00D7' || tr.speciesHybrid === 'x' || rankKey === 'hybrid';
+                  const tr = row as TreeRow; const isExpanded = expandedRows.has(tr.id); const rankKey = String(tr.taxonRank).toLowerCase(); const baseColor = activeColorMap[rankKey] || 'slate'; const isHybrid = tr.genusHybrid === '×' || tr.genusHybrid === 'x' || tr.speciesHybrid === '×' || tr.speciesHybrid === 'x';
                   return (
                      <React.Fragment key={tr.id}>
                         <tr className={`hover:bg-blue-50/50 transition-colors ${isExpanded ? 'bg-blue-50/50' : (baseColor === 'slate' ? (isHybrid ? 'bg-slate-50 saturate-50' : '') : `bg-${baseColor}-50 ${isHybrid ? 'saturate-50' : ''}`)} ${tr.isTreeHeader ? 'cursor-pointer group/header border-b-2 border-slate-200' : ''}`} onClick={tr.isTreeHeader ? () => toggleGroup(tr.treePath || '') : undefined}>
@@ -582,7 +545,7 @@ const DataGrid: React.FC<DataGridProps> = ({
                                if (col.id === 'treeControl') return <td key={col.id} className={`p-2 border-r border-slate-200 ${tr.isTreeHeader ? '' : 'border-slate-50'}`} style={{ paddingLeft: `${(tr.depth || 0) * 20}px` }}>{tr.isTreeHeader && <span className={`transform transition-transform inline-block ${tr.treeExpanded ? 'rotate-90' : ''}`}><ChevronRightIcon size={14} /></span>}</td>;
                                if (col.id === 'childCount') return <td key={col.id} className="p-2 border-r border-slate-200 text-xs text-center text-slate-400 font-mono">{tr.isTreeHeader ? tr.childCount : getDescendantCount(tr) || ''}</td>;
                                const val = getRowValue(tr, col.id); let displayVal: React.ReactNode = val || '';
-                               if ((col.id === 'genusHybrid' || col.id === 'speciesHybrid') && (val === 'x' || val === 'X' || val === '\u00D7')) displayVal = '\u00D7';
+                               if ((col.id === 'genusHybrid' || col.id === 'speciesHybrid') && (val === 'x' || val === 'X' || val === '×')) displayVal = '×';
                                let isBold = false; const r = rankKey; const coreCols = ['genus', 'species', 'cultivar', 'infraspecies', 'infraspecificRank', 'taxonName', 'genusHybrid', 'speciesHybrid'];
                                if (coreCols.includes(col.id)) { if (r === col.id) isBold = true; if ((col.id === 'infraspecies' || col.id === 'infraspecificRank') && ['variety','subspecies','form'].includes(r)) isBold = true; if (col.id === 'taxonName') isBold = true; if (col.id === 'genusHybrid' && r === 'genus') isBold = true; if (col.id === 'speciesHybrid' && r === 'species') isBold = true; }
                                let isDimmed = false; let rowRankLevel = RANK_HIERARCHY[r] || 99; if (['subspecies', 'variety', 'form'].includes(r)) rowRankLevel = 5;
@@ -594,7 +557,7 @@ const DataGrid: React.FC<DataGridProps> = ({
                                return <td key={col.id} className={`p-2 border-r border-slate-50 truncate overflow-hidden max-w-0 ${col.headerAlign === 'center' ? 'text-center' : ''}`} title={String(val || '')}><span className={`${isBold ? "font-bold" : ""} ${isDimmed ? "font-normal" : ""} ${isBold ? (baseColor === 'slate' ? "text-slate-900" : `text-${baseColor}-900`) : (isDimmed ? "text-slate-400" : "")}`}>{displayVal}</span></td>;
                            })}
                         </tr>
-                        {isExpanded && !tr.isTreeHeader && (<tr><td colSpan={activeColumns.length} className="bg-slate-50/50 p-0 border-b border-slate-200 shadow-inner"><div className="p-4 border-l-4 border-slate-500 bg-white m-2 rounded-r-lg shadow-sm"><DetailsPanel title={tr.taxonName} description={tr.description} synonyms={tr.synonyms} referenceLinks={tr.referenceLinks} onUpdate={(updates) => onUpdate && onUpdate(tr.id, updates)} /></div></td></tr>)}
+                        {isExpanded && !tr.isTreeHeader && (<tr><td colSpan={activeColumns.length} className="bg-slate-50/50 p-0 border-b border-slate-200 shadow-inner"><div className="p-4 border-l-4 border-slate-500 bg-white m-2 rounded-r-lg shadow-sm"><DetailsPanel title={tr.taxonName} description={tr.description} synonyms={tr.synonyms} referenceLinks={tr.referenceLinks} onUpdate={(updates) => onUpdate(tr.id, updates)} /></div></td></tr>)}
                      </React.Fragment>
                   );
               })}

@@ -1,8 +1,5 @@
 {
   "name": "FloraCatalog",
   "description": "A smart plant cataloging application that uses AI to standardize botanical names, find synonyms, and curate reference links.",
-  "requestFramePermissions": [
-    "camera",
-    "geolocation"
-  ]
+  "requestFramePermissions": []
 }

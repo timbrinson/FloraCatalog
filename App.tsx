@@ -1,7 +1,8 @@
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Loader2, Leaf, Plus, RotateCcw, Table, Network, Upload, X, Settings as SettingsIcon, Wrench, Activity, AlertCircle } from 'lucide-react';
-import { Taxon, LoadingState, TaxonomicStatus, UserPreferences, BackgroundProcess, ActivityItem, SearchCandidate, ActivityStatus } from './types';
+// Fixed: Removed non-existent TaxonomicStatus import
+import { Taxon, LoadingState, UserPreferences, BackgroundProcess, ActivityItem, SearchCandidate, ActivityStatus } from './types';
 import { identifyTaxonomy, enrichTaxon, deepScanTaxon, parseBulkText, searchTaxonCandidates } from './services/geminiService';
 import { dataService } from './services/dataService';
 import { getIsOffline } from './services/supabaseClient';

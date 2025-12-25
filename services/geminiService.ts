@@ -1,6 +1,5 @@
-
 import { GoogleGenAI, Type } from "@google/genai";
-import { Taxon, TaxonRank, Link, Synonym, TaxonomicStatus, SearchCandidate } from "../types";
+import { Taxon, Link, Synonym, SearchCandidate } from "../types";
 
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 

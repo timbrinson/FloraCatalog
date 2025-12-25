@@ -32,7 +32,7 @@ DROP INDEX IF EXISTS idx_app_taxa_parent_id;
 DROP INDEX IF EXISTS idx_app_taxa_parent;
 DROP INDEX IF EXISTS idx_app_taxa_accepted_id;
 DROP INDEX IF EXISTS idx_app_taxa_accepted_wcvp;
-DROP INDEX IF EXISTS idx_app_taxa_parent_wcvp_id;
+DROP INDEX IF EXISTS idx_app_taxa_parent_plant_name_id;
 DROP INDEX IF EXISTS idx_app_taxa_parent_wcvp;
 DROP INDEX IF EXISTS idx_app_taxa_basionym_id;
 DROP INDEX IF EXISTS idx_app_taxa_basionym_wcvp;
@@ -68,7 +68,7 @@ CREATE INDEX IF NOT EXISTS idx_app_taxa_ipni ON app_taxa(ipni_id);
 CREATE INDEX IF NOT EXISTS idx_app_taxa_powo ON app_taxa(powo_id);
 CREATE INDEX IF NOT EXISTS idx_app_taxa_parent ON app_taxa(parent_id);
 CREATE INDEX IF NOT EXISTS idx_app_taxa_accepted_wcvp ON app_taxa(accepted_plant_name_id);
-CREATE INDEX IF NOT EXISTS idx_app_taxa_parent_wcvp ON app_taxa(parent_plant_name_id);
+CREATE INDEX IF NOT EXISTS idx_app_taxa_parent_plant_name_id ON app_taxa(parent_plant_name_id);
 CREATE INDEX IF NOT EXISTS idx_app_taxa_basionym_wcvp ON app_taxa(basionym_plant_name_id);
 
 -- 6. GEOGRAPHIC & PATHS

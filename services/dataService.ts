@@ -1,5 +1,5 @@
 import { getSupabase, getIsOffline } from './supabaseClient';
-import { Taxon, TaxonRank, TaxonomicStatus, Synonym, Link } from '../types';
+import { Taxon, Synonym, Link } from '../types';
 
 /**
  * Service to handle interaction with the Supabase PostgreSQL Database.
@@ -14,22 +14,19 @@ const mapFromDB = (row: any): Taxon => {
   return {
     id: row.id,
     parentId: row.parent_id,
-    // Fix: Changed 'hierarchy_path' to 'hierarchyPath' to match Taxon interface
     hierarchyPath: row.hierarchy_path ? row.hierarchy_path.replace(/_/g, '-') : undefined,
     
     wcvpId: row.wcvp_id,
     ipniId: row.ipni_id,
     powoId: row.powo_id,
-    // Fix: Changed 'accepted_plant_name_id' to 'acceptedPlantNameId' to match Taxon interface
     acceptedPlantNameId: row.accepted_plant_name_id,
     parentPlantNameId: row.parent_plant_name_id,
-    // Fix: Corrected typo 'basionymPlantName_id' to 'basionymPlantNameId'
     basionymPlantNameId: row.basionym_plant_name_id,
     homotypicSynonym: row.homotypic_synonym,
 
-    taxonRank: row.taxon_rank as TaxonRank,
+    taxonRank: row.taxon_rank as string,
     taxonName: row.taxon_name,
-    taxonStatus: row.taxon_status as TaxonomicStatus,
+    taxonStatus: row.taxon_status as string,
     family: row.family,
     commonName: row.common_name,
     
@@ -47,13 +44,11 @@ const mapFromDB = (row: any): Taxon => {
     primaryAuthor: row.primary_author,
     parentheticalAuthor: row.parenthetical_author,
     publicationAuthor: row.publication_author,
-    // Fix: Corrected typo 'replaced_synonym_author' to 'replacedSynonymAuthor'
     replacedSynonymAuthor: row.replaced_synonym_author,
 
     placeOfPublication: row.place_of_publication,
     volumeAndPage: row.volume_and_page,
     firstPublished: row.first_published,
-    // Fix: Corrected typo 'nomenclatural_remarks' to 'nomenclaturalRemarks'
     nomenclaturalRemarks: row.nomenclatural_remarks,
     reviewed: row.reviewed,
 
@@ -93,16 +88,13 @@ const mapToDB = (taxon: Taxon) => {
     taxon_name: taxon.taxonName,
     taxon_status: taxon.taxonStatus,
     family: taxon.family,
-    // Fix: Corrected common_name typo to commonName
     common_name: taxon.commonName,
 
     genus: taxon.genus,
     genus_hybrid: taxon.genusHybrid,
     species: taxon.species,
-    // Fix: Corrected species_hybrid typo to speciesHybrid
     species_hybrid: taxon.speciesHybrid,
     infraspecies: taxon.infraspecies,
-    // Fix: Changed 'infraspecific_rank' to 'infraspecificRank' to match Taxon interface
     infraspecific_rank: taxon.infraspecificRank,
     cultivar: taxon.cultivar,
     
@@ -121,9 +113,7 @@ const mapToDB = (taxon: Taxon) => {
     reviewed: taxon.reviewed,
 
     geographic_area: taxon.geographicArea,
-    // Fix: Changed 'lifeform_description' to 'lifeformDescription' to match Taxon interface
     lifeform_description: taxon.lifeformDescription,
-    // Fix: Changed 'climate_description' to 'climateDescription' to match Taxon interface
     climate_description: taxon.climateDescription,
 
     updated_at: new Date().toISOString()
@@ -138,7 +128,7 @@ export interface FetchOptions {
     filters?: Record<string, any>; 
     sortBy?: string;
     sortDirection?: 'asc' | 'desc';
-    shouldCount?: boolean; // NEW: Prevent redundant expensive counts
+    shouldCount?: boolean;
 }
 
 export const dataService = {
@@ -165,13 +155,12 @@ export const dataService = {
         
         let dbKey = key.replace(/([A-Z])/g, "_$1").toLowerCase();
         if (key === 'wcvpId') dbKey = 'wcvp_id'; 
+        if (key === 'ipniId') dbKey = 'ipni_id';
+        if (key === 'powoId') dbKey = 'powo_id';
         
         if (key === 'taxonName') {
-            // OPTIMIZATION: Use LIKE (Case Sensitive) for prefix matching.
             const rawSearch = (value as string).trim();
-            if (!rawSearch) return; // SAFETY: Ignore empty strings after trim
-            
-            // Ensure first letter is capitalized for the index
+            if (!rawSearch) return;
             const cleanSearch = rawSearch.charAt(0).toUpperCase() + rawSearch.slice(1);
             query = query.like('taxon_name', `${cleanSearch}%`);
         } else if (Array.isArray(value)) {
@@ -198,7 +187,6 @@ export const dataService = {
         }
     });
 
-    // Sort Mapping
     const dbSortKey = sortBy === 'taxonName' ? 'taxon_name' 
                     : sortBy === 'taxonRank' ? 'taxon_rank'
                     : sortBy === 'family' ? 'family'
@@ -217,8 +205,8 @@ export const dataService = {
 
     if (error) {
       if (error.code === '57014') {
-          console.warn("Database timeout (57014) - Row count/fetch taking too long.");
-          return { data: [], count: -1 }; // -1 indicates "Unknown"
+          console.warn("Database timeout (57014)");
+          return { data: [], count: -1 }; 
       }
       throw error;
     }
