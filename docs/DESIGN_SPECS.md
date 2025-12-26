@@ -40,10 +40,15 @@ A "Tree Grid" that renders a flat list but groups records visually using virtual
 *   **Dimming/Bolding:** Applied to columns matching the row's specific rank. Higher-rank columns are dimmed on lower-rank rows.
 *   **Hybrid Styling:** Uses CSS `saturate-50` and `opacity-80` to visually distinguish hybrids from standard species.
 
-## 5. UI: Activity & Process Panel
+## 5. Botanical Standards (Literals)
+**CRITICAL:** Do NOT use Unicode escape sequences (e.g., `\u00D7`). Use literal characters for better developer legibility:
+*   **Hybrid:** `×` (Multiplication sign, not the letter x).
+*   **Spacing:** Managed via `UserPreferences.hybridSpacing`.
+
+## 6. UI: Activity & Process Panel
 *   **Async Management:** A cancellation system allows users to stop long-running AI processes immediately.
 *   **Resolution UI:** Embedded workflows for "Did you mean?" corrections or duplicate name detection.
 
-## 6. Visual Style
+## 7. Visual Style
 *   **Typography:** `Playfair Display` (Serif) for botanical names; `Inter` (Sans) for data.
 *   **Theme:** "Leaf" (Emerald/Slate). High-density layout (p-2 padding).
