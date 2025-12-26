@@ -26,3 +26,7 @@ Whenever the conversation history is cleared, the AI MUST:
 
 ## 5. Documentation Maintenance
 - When a major logic shift is agreed upon, the user or AI should update the relevant doc in `docs/` to ensure the "Contextual Baseline" is accurate for the next session.
+
+## 6. Permanent Guardrails
+- **Guardrail A (Backlog Status)**: The `TASK_BACKLOG.md` file is **read-only context**. The AI is strictly forbidden from implementing any task listed in the backlog unless the user explicitly names that specific task in the current prompt and provides a direct "Go."
+- **Guardrail B (Post-Error Grounding)**: After any "Internal Error," session timeout, or environment reset, the AI must provide a "Grounding Statement" listing exactly what it believes the *current* objective is (based only on the last valid user instruction) *before* proposing any code changes or plans.

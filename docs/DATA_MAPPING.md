@@ -6,30 +6,30 @@ This document provides the definitive mapping between the World Checklist of Vas
 
 | Group | Grid Column(DataGridV2) | Grid Column Filter Type | Grid Column Default Setting | Grid Column Default Value | Grid Label | Grid Label Tooltip | App Attribute(Taxon) | Database Column(App_Taxa) | WCVP Column | WCVP Value | WCVP Class | WCVP Description | WCVP Remark (Notes) |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| **System** | id | Text | unselected | (none) | Internal ID | Internal ID | id | id | — | — | — | — | — |
-| | parentId | Text | unselected | (none) | Parent ID | Parent ID | parentId | parent_id | — | — | — | — | — |
+| **System** | id | Text | unselected | (none) | Internal ID | Internal UUID | id | id | — | — | — | — | — |
+| | parentId | Text | unselected | (none) | Parent ID | Parent UUID | parentId | parent_id | — | — | — | — | — |
 | | treeControl | — | selected | tree | Tree | Tree Control | — | — | — | — | — | — | — |
 | | childCount | Text | selected | (none) | # | Child Count | childCount | child_count | — | — | — | — | — |
 | | actions | — | unselected | — | Actions | Actions | — | — | — | — | — | — | — |
-| **Taxonomy** | taxonName | Text | selected | (none) | Taxon Name | Taxon Name | taxonName | taxon_name | taxon_name | | chr | Concatenation of genus with species and, where applicable, infraspecific epithets to make a binomial or trinomial name. | |
-| | taxonRank | Multi-select | unselected | (none) | Rank | Taxon Rank | taxonRank | taxon_rank | taxon_rank | Convariety, Form, Genus, proles, Species, Subform, Subspecies, Subvariety, Variety | chr | The level in the taxonomic hierarchy where the taxon name fits. | |
+| **Taxonomy** | taxonName | Text | selected | (none) | Plant Name | Scientific Name | taxonName | taxon_name | taxon_name | | chr | Concatenation of genus with species and, where applicable, infraspecific epithets to make a binomial or trinomial name. | |
+| | taxonRank | Multi-select | unselected | (none) | Rank | Taxonomic Rank | taxonRank | taxon_rank | taxon_rank | Convariety, Form, Genus, proles, Species, Subform, Subspecies, Subvariety, Variety | chr | The level in the taxonomic hierarchy where the taxon name fits. | |
 | | taxonStatus | Multi-select | unselected | Accepted | Status | Taxonomic Status | taxonStatus | taxon_status | taxon_status | Accepted, Artificial Hybrid, Illegitimate, Invalid, Local Biotype, Misapplied, Orthographic, Synonym, Unplaced, Provisionally Accepted | chr | Indication of nomenclatural status and taxonomic opinion re the name. | |
 | | family | Text | unselected | (none) | Family | Family | family | family | family | | chr | The name of the family to which the taxon belongs. | |
 | | hybridFormula | Text | unselected | (none) | Hybrid Formula | Hybrid Formula | hybridFormula | hybrid_formula | hybrid_formula | | chr | parents of hybrid | |
-| **Nomenclature** | genus | Text | selected | (none) | Genus | Genus | genus | genus | genus | 0 | chr | The name of the genus to which the record refers. | |
-| | genusHybrid | Multi-select | selected | (none) | GH | Genus Hybrid | genusHybrid | genus_hybrid | genus_hybrid | +, × | chr | Indication of hybrid status at genus level. | |
-| | species | Text | selected | (none) | Species | Species | species | species | species | 0 | chr | The species epithet. | |
-| | speciesHybrid | Multi-select | selected | (none) | SH | Species Hybrid | speciesHybrid | species_hybrid | species_hybrid | +, × | chr | Indication of hybrid status at species level. | |
+| **Nomenclature** | genus | Text | selected | (none) | Genus | Genus Designation | genus | genus | genus | 0 | chr | The name of the genus to which the record refers. | |
+| | genusHybrid | Multi-select | selected | (none) | GH | Genus Hybrid Indicator | genusHybrid | genus_hybrid | genus_hybrid | +, × | chr | Indication of hybrid status at genus level. | |
+| | species | Text | selected | (none) | Species | Species Designation | species | species | species | 0 | chr | The species epithet. | |
+| | speciesHybrid | Multi-select | selected | (none) | SH | Species Hybrid Indicator | speciesHybrid | species_hybrid | species_hybrid | +, × | chr | Indication of hybrid status at species level. | |
 | | infraspecificRank | Multi-select | selected | (none) | I Rank | Infraspecific Rank | infraspecificRank | infraspecific_rank | infraspecific_rank | agamosp., convar., ecas., f., grex, group, lusus, microf., microgene, micromorphe, modif., monstr., mut., nid, nothof., nothosubsp., nothovar., positio, proles, provar., psp., stirps, subf., sublusus, subproles, subsp., subspecioid, subvar., unterrasse, var. | chr | Taxonomic rank of the infraspecific epithet. | See Tech Notes |
-| | infraspecies | Text | selected | (none) | Infraspecies | Infraspecies | infraspecies | infraspecies | infraspecies | 0 | chr | The infraspecific epithet. | |
-| | cultivar | Text | selected | (none) | Cultivar | Cultivar | cultivar | cultivar | — | — | — | — | — |
+| | infraspecies | Text | selected | (none) | Infraspecies | Infraspecific Designation | infraspecies | infraspecies | infraspecies | 0 | chr | The infraspecific epithet. | |
+| | cultivar | Text | selected | (none) | Cultivar | Cultivar Name | cultivar | cultivar | — | — | — | — | — |
 | **Descriptive** | commonName | Text | unselected | (none) | Common Name | Common Name | commonName | common_name | — | — | — | — | — |
 | | description | Text | unselected | (none) | Description | Description | description | description | — | — | — | — | — |
 | | — | | unselected | (none) | — | — | referenceLinks | reference_links | — | — | — | — | — |
 | | — | | unselected | (none) | — | — | synonyms | synonyms | — | — | — | — | — |
 | | geographicArea | Text | unselected | (none) | Geography | Geographic Area | geographicArea | geographic_area | geographic_area | 0 | chr | Geographic distribution of the taxon. | See Tech Notes |
-| | lifeformDescription| Multi-select | unselected | (none) | Lifeform | Lifeform Description | lifeformDescription | lifeform_description | lifeform_description| 0 | chr | Lifeform (or lifeforms) of the taxon. | Raunkiær system |
-| | climateDescription | Multi-select | unselected | (none) | Climate | Climate Description | climateDescription | climate_description | climate_description | Desert and Dry Shrubland, Montane Tropical, etc. | chr | Habitat type of the taxon. | |
+| | lifeformDescription| Text | unselected | (none) | Lifeform | Lifeform Description | lifeformDescription | lifeform_description | lifeform_description| 0 | chr | Lifeform (or lifeforms) of the taxon. | Raunkiær system |
+| | climateDescription | Multi-select | unselected | (none) | Climate | Climate Description | climateDescription | climate_description | climate_description | desert or dry shrubland, montane tropical, etc. | chr | Habitat type of the taxon. | |
 | **Standard Identifiers**| wcvpId | Text | unselected | (none) | WCVP ID | WCVP Plant Name ID | wcvpId | wcvp_id | plant_name_id | | chr | World Checklist of Vascular Plants identifier | |
 | | ipniId | Text | unselected | (none) | IPNI ID | IPNI ID | ipniId | ipni_id | ipni_id | | chr | International Plant Name Index identifier | |
 | | powoId | Text | unselected | (none) | POWO ID | POWO ID | powoId | powo_id | powo_id | | chr | POWO lookup identifier | |
@@ -40,8 +40,8 @@ This document provides the definitive mapping between the World Checklist of Vas
 | | volumeAndPage | Text | unselected | (none) | Vol/Page | Volume And Page | volumeAndPage | volume_and_page | volume_and_page | | chr | Volume and page numbers. | |
 | | firstPublished | Text | unselected | (none) | First Published | First Published Date | firstPublished | first_published | first_published | | chr | Year of publication. | |
 | | nomenclaturalRemarks| Text | unselected | (none) | Nom. Remarks | Nomenclatural Remarks | nomenclaturalRemarks| nomenclatural_remarks| nomenclatural_remarks| | chr | Remarks on nomenclature. | |
-| | reviewed | Multi-select | unselected | (none) | Reviewed | Reviewed | reviewed | reviewed | reviewed | | chr | Peer review flag. | |
-| **Related Plants** | homotypicSynonym | Text | unselected | (none) | Homotypic Syn. | Homotypic Synonym | homotypicSynonym | homotypic_synonym | homotypic_synonym | 0 | logical | TRUE if homotypic synonym. | ICN Link |
+| | reviewed | Multi-select | unselected | (none) | Reviewed | Reviewed Status | reviewed | reviewed | reviewed | | chr | Peer review flag. | |
+| **Related Plants** | homotypicSynonym | Text | unselected | (none) | Homotypic Syn. | Homotypic Synonym Flag | homotypicSynonym | homotypic_synonym | homotypic_synonym | 0 | logical | TRUE if homotypic synonym. | ICN Link |
 | | acceptedPlantNameId | Text | unselected | (none) | Accepted ID | Accepted Plant Name ID | acceptedPlantNameId | accepted_plant_name_id| accepted_plant_name_id| | chr | ID of the accepted name. | |
 | | parentheticalAuthor | Text | unselected | (none) | Paren. Author | Parenthetical Author | parentheticalAuthor | parenthetical_author | parenthetical_author | | chr | Author of the basionym. | |
 | | replacedSynonymAuthor| Text | unselected | (none) | Syn. Author | Replaced Synonym Author| replacedSynonymAuthor| replaced_synonym_author| replaced_synonym_author| | chr | Author of replaced synonym. | |
@@ -61,7 +61,7 @@ See https://wcsp.science.kew.org/about.do#geography for details on narrative dis
 Terms refer to a modified version of the Raunkiær system. See https://wcsp.science.kew.org/about.do#lifeforms for a glossary of terms used.
 
 ### Climate (Value)
-**Categories:** `Desert and Dry Shrubland, Desert or Dry Shrubland, Montane Tropical, Seasonally Dry Tropical, Subalpine or Subarctic, Subtropical, Subtropical and Tropical, Temperate, Temperate and Tropical, Wet Tropical`
+**Categories:** `desert or dry shrubland, montane tropical, seasonally dry tropical, subalpine or subarctic, subtropical, subtropical or tropical, temperate, temperate, subtropical or tropical, wet tropical`
 
 ### Homotypic Synonym (Remark)
 The synonym type - TRUE if homotypic synonym, otherwise NA. See ICN for algae, fungi and plants: https://www.iapt-taxon.org/nomen/main.php

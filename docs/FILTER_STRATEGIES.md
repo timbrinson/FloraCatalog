@@ -122,8 +122,16 @@ This document defines the logic and valid values for multi-select filters in the
 |	wet tropical	|	WCVP - Primary	|	Wet Tropical	|	wet tropical	|		|		|
 |		|	WCVP - Obsolete	|	Desert and Dry Shrubland	|		|		|	Mentioned in the docs but not found in WCVP data	|
 
+## 5. Lifeform Description (`lifeformDescription`)
+**Strategy:** Text Search Strategy. Because the WCVP dataset frequently uses concatenated Raunkiær descriptors (e.g., "bulb geophyte", "climbing phanerophyte"), a free-text prefix search is used to ensure maximum record visibility.
+
+**Usage Notes:**
+- Terms refer to a modified version of the Raunkiær system.
+- Common terms include: phanerophyte, geophyte, therophyte, chamaephyte, hemicryptophyte.
+- Use prefix matching (e.g., typing "phanerophyte" will find "climbing phanerophyte").
+
 ## Technical Note: Case Sensitivity & Capitalization
 Database filters in `dataService.ts` are strictly case-sensitive for these specific columns.
-- **Filter Values**: All options in multi-select dropdowns MUST match the database strings exactly (including small case for climate literals).
+- **Filter Values**: All options in multi-select dropdowns MUST match the database strings exactly (including small case for climate and lifeform literals).
 - **Grid Display**: The UI components must NOT transform values to ALL CAPS (e.g., using `.toUpperCase()` or the `uppercase` CSS class). Rank and Status should be rendered using the natural capitalization stored in the database (e.g., "Genus", "Species", "Accepted") to maintain consistency for data validation and debugging.
 - **CSS Inheritance**: Since filters are often located within `thead` (which typically has `uppercase`), UI components must use `normal-case` classes to ensure database literals are displayed with their original capitalization and are not distorted visually.

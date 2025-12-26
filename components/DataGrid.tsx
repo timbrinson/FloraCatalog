@@ -144,8 +144,8 @@ const COLUMN_GROUPS: ColumnGroup[] = [
                 filterOptions: ['Accepted', 'Synonym', 'Unplaced', 'Artificial Hybrid', 'Illegitimate', 'Invalid', 'Local Biotype', 'Misapplied', 'Orthographic', 'Provisionally Accepted', 'External to WCVP'], 
                 defaultOn: false 
             },
-            { id: 'family', label: 'Family', tooltip: 'Family Name', defaultWidth: 120, filterType: 'text', defaultOn: false },
-            { id: 'hybridFormula', label: 'Hybrid Formula', tooltip: 'Parents of hybrid', defaultWidth: 180, filterType: 'text', defaultOn: false },
+            { id: 'family', label: 'Family', tooltip: 'Family', defaultWidth: 120, filterType: 'text', defaultOn: false },
+            { id: 'hybridFormula', label: 'Hybrid Formula', tooltip: 'Hybrid Formula', defaultWidth: 180, filterType: 'text', defaultOn: false },
         ]
     },
     {
@@ -153,9 +153,9 @@ const COLUMN_GROUPS: ColumnGroup[] = [
         label: 'Nomenclature',
         columns: [
             { id: 'genus', label: 'Genus', tooltip: 'Genus Designation', defaultWidth: 120, filterType: 'text', defaultOn: true },
-            { id: 'genusHybrid', label: 'GH', tooltip: 'Genus Hybrid Indicator (+, ×)', defaultWidth: 40, filterType: 'multi-select', filterOptions: ['+', '×', 'NULL'], disableSorting: true, hideHeaderIcons: true, headerAlign: 'center', lockWidth: true, defaultOn: true },
+            { id: 'genusHybrid', label: 'GH', tooltip: 'Genus Hybrid Indicator', defaultWidth: 40, filterType: 'multi-select', filterOptions: ['+', '×', 'NULL'], disableSorting: true, hideHeaderIcons: true, headerAlign: 'center', lockWidth: true, defaultOn: true },
             { id: 'species', label: 'Species', tooltip: 'Species Designation', defaultWidth: 120, filterType: 'text', defaultOn: true },
-            { id: 'speciesHybrid', label: 'SH', tooltip: 'Species Hybrid Indicator (+, ×)', defaultWidth: 40, filterType: 'multi-select', filterOptions: ['+', '×', 'NULL'], disableSorting: true, hideHeaderIcons: true, headerAlign: 'center', lockWidth: true, defaultOn: true },
+            { id: 'speciesHybrid', label: 'SH', tooltip: 'Species Hybrid Indicator', defaultWidth: 40, filterType: 'multi-select', filterOptions: ['+', '×', 'NULL'], disableSorting: true, hideHeaderIcons: true, headerAlign: 'center', lockWidth: true, defaultOn: true },
             { 
                 id: 'infraspecificRank', 
                 label: 'I Rank', 
@@ -182,7 +182,7 @@ const COLUMN_GROUPS: ColumnGroup[] = [
             { 
                 id: 'lifeformDescription', 
                 label: 'Lifeform', 
-                tooltip: 'Raunkiær Lifeform Description', 
+                tooltip: 'Lifeform Description', 
                 defaultWidth: 150, 
                 filterType: 'text', 
                 defaultOn: false 
@@ -253,7 +253,7 @@ const DataGrid: React.FC<DataGridProps> = ({
       return new Set(ALL_COLUMNS.filter(c => c.defaultOn).map(c => c.id));
   });
   
-  const [columnOrder, setColumnOrder] = useState<string[]>(() => loadState('grid_col_order_rev11', ALL_COLUMNS.map(c => c.id)));
+  const [columnOrder, setColumnOrder] = useState<string[]>(() => loadState('grid_col_order_rev11', ALL_COLUMNS.map(c => [c.id, c.defaultWidth])) && loadState('grid_col_order_rev11', ALL_COLUMNS.map(c => c.id)));
   const [colWidths, setColWidths] = useState<Record<string, number>>(() => loadState('grid_col_widths_rev11', Object.fromEntries(ALL_COLUMNS.map(c => [c.id, c.defaultWidth]))));
   const [isHierarchyMode, setIsHierarchyMode] = useState<boolean>(true);
   const [groupBy, setGroupBy] = useState<string[]>([]);
@@ -375,7 +375,8 @@ const DataGrid: React.FC<DataGridProps> = ({
               if (headerRow.treeExpanded) processLevel(itemsWithoutHeader, depth + 1, path);
           });
       };
-      processLevel(taxa, 0, 'root');
+      const rootPath = 'root';
+      processLevel(taxa, 0, rootPath);
       return outputRows;
   }, [taxa, groupBy, collapsedGroups]);
 

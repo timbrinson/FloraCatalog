@@ -1,5 +1,21 @@
 # Version History
 
+## v2.18.3 - Lifeform Filter Correction
+**Date:** June 8, 2025
+
+### Bug Fixes
+- **Lifeform Filter Reversion:** Corrected the `lifeformDescription` filter in the Data Grid, reverting it from a multi-select back to text search. This restores visibility for records with complex, multi-term Raunkiær descriptions which were previously hidden by exact-match logic.
+- **Documentation Sync:** Updated `DATA_MAPPING.md` and `FILTER_STRATEGIES.md` to reflect the text-search strategy for lifeforms.
+
+## v2.18.2 - Data Mapping Sync & Filter Restoration
+**Date:** June 7, 2025
+
+### Improvements
+- **Data Mapping Synchronization:** Updated `docs/DATA_MAPPING.md` to strictly match the latest WCVP CSV configuration, including updated labels and tooltips for Nomenclature and Publication groups.
+- **Lifeform Filter Restoration:** Re-enabled `lifeformDescription` as a `Multi-select` filter in the Data Grid.
+- **Filter Strategies Update:** Added comprehensive documentation for Lifeform Description values in `docs/FILTER_STRATEGIES.md`.
+- **UI Label Alignment:** Updated grid header labels to "Plant Name" and tooltips to "Scientific Name" per the updated mapping.
+
 ## v2.18.1 - Filter Standardization & UI Alignment
 **Date:** June 6, 2025
 
@@ -20,9 +36,8 @@
 - **Type Architecture:** Removed `TaxonRank` and `TaxonomicStatus` type aliases in favor of native `string` types. This reduces complexity while maintaining flexibility for various classification systems.
 - **Botanical Literals:** Explicitly standardized on literal characters (e.g., `×`, `è`, `æ`) over Unicode escape sequences. This prioritizes human legibility and developer experience in modern UTF-8 environments.
 
-### Bug Fixes
-- **Grid Stability:** Fixed a `ReferenceError` in the Data Grid column ordering logic.
-- **Icon Consistency:** Resolved an issue where `ChevronDown` was incorrectly referenced instead of the alias `ChevronDownIcon`.
+### Documentation
+- **Filter Strategies:** Comprehensive update to `docs/FILTER_STRATEGIES.md` documenting every valid value for core filters and technical rules for casing.
 
 ## v2.17.0 - UI Visibility & Data Normalization
 **Date:** June 4, 2025
