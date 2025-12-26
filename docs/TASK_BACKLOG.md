@@ -3,15 +3,12 @@
 This document tracks planned features and technical improvements to ensure continuity across development sessions.
 
 ## High Priority
-- [ ] **Fix Core Filter Dropdowns:** Update ranks, status and infraspecific ranks used in grid filter to a list of actual valued from WCVP, plus extensions we haved beyond WCVP (e.g. Ranks Family and Cultivar, Status External, etc). These should be ordered logically with the primary values first and secondary values afterwards. Maybe they should be in groups. Document in the project, along with justification.
-- [ ] **Fix Lifeform Filter:** AI Studio shortend the long list of lifeformDescription filter values with []'annual', 'perennial', 'shrub', 'tree', 'epiphyte', 'geophyte', 'succulent', 'climber', 'bamboo', 'NULL']. The original list was based on what is actually in the Database. The shortened list only works for those exact strings which prevents filtering that will find the others. These are pretty generic but this makes a good point they could be simplified but still allow fuller expression by grouping subtypes and using multiple choice instead of listing all the values that include 'or'. Some of the terms used are also just descriptors of other terms, such as 'climbing'.
-- [ ] **Fix Climate Filter:** AI Studio capitalized climateDescription filter values and now they don't work. The DB is case sensetive and these values need to stay consistent. Add Documentation reminding the AI Studio agent to not modify the capitalization.
-
-## Medium Priority
-- [ ] **Optimize Filtering:** Review the rules used for dynamic filtering in dataService.ts, for different columns. Some use 'like', some use 'is', some use 'in', some convert to lower case, some capitalize the first letter, etc. Optimize which method to use for each column.
 - [ ] **Stop Grid Flash:** When a column is filtered such that there are no rows, then when it is changed so rows show up again there is a grid refresh that moves it to it's default position, which breaks the context with what the user is doing. The grid should stay where it is located and the column filter drop down should still be shown, so the user can select another option.
+- [ ] **Optimize Filtering:** Review the rules used for dynamic filtering in dataService.ts, for different columns. Some use 'like', some use 'is', some use 'in', some convert to lower case, some capitalize the first letter, etc. Optimize which method to use for each column.
 - [ ] **Unselect All Columns:** In the Columns menu change the Select all to also Unselect all.
 - [ ] **Fix Genus Column for Family:** In the Family row leave the Genus blank.
+
+## Medium Priority
 - [ ] **How To Reset Cultivars:** As we start experimenting with adding Cultivars we will likely need to remove them and try something different. We need an easy way to reset the DB back to the state after WCVP was loaded and before we add non-WCVP plants, such as Cultivars.
 - [ ] **Cache Limits:** If we keep scrolling in the grid it will continue to load more and more plants. We should have a caching scheme that can expire earlier loaded plants at some point. If the user scrolls back to to the top it would recache those that expired so that from the user's perspective it is continuous.
 - [ ] **Fetch During Collapsed Tree View** When the grid is in tree view and it is collapsed to a partular level (1,2,3,etc.) where only a few plans are displayed then fetch more plants to ayt least fill the display and allow scrolling to fetch/load even more. 
@@ -24,6 +21,7 @@ This document tracks planned features and technical improvements to ensure conti
 - [ ] **Physical Description:**  Include as a section in the Details Panel. Include things like plant size-Height/width, growth rate, Plant shape, plant overall texture, floliage shape, foliage size, foliage texture, foliage color, variation throughout the year, Flowering period, flower color and description, description of base/rooting system- type (bulb, rhizonme, etc.), size, shape, etc. Also include special characteristics for the type of plant it is.
 
 ## Low Priority
+- [ ] **Lifeform Multiselect Filter:** Create a multiselect filter for the lifeform_description column (which uses the Raunkiær terminology). The multiselect would include each term that shows up in the lifeform data and when selected it would show all rows that have any of those terms selected (logical OR). This will likely require a special index that supports searching by 'like'. Nice to have would be an extension to allow logical AND. Another nice to have extension would handle filtering based on logical subtypes and descritptive terms.
 - [ ] **User Authentication:** Use the Supabase Authentication for end users. Turn on RLS. Use correct API Key (not anon).
 - [ ] **Create Role Based Access:** Start with at least a readonly and a read/write (or admin) role. In future expand role to allow adding Cultivars and editing those that you add. Possibly this would be a role tied to particular plant types (e.g. conifers or succulents) or specific taxon layers (Acer palmatum or Hosta). Possibly another future role to add Genus, Species and Infraspecies.
 - [ ] **Architect as 3 Tier App:** Makre sure this can run as a 3 tier app, even though testing in AI Studio would be running both a server and client tiers. What are options for where to run the server tier for a web application? What is the path to production? Automate as much as possible.
@@ -40,3 +38,10 @@ This document tracks planned features and technical improvements to ensure conti
 - [ ] **Mobile Responsiveness:** The Data Grid is currently optimized for desktop; implement a "Card View" fallback for mobile screens.
 - [ ] **Query Optimization:** Move the "Hierarchy Path" calculation to a Postgres Trigger to remove the need for Step 7 in the manual build process.
 - [ ] **Error Handling:** Add a global Error Boundary and more granular toast notifications for AI service timeouts.
+
+
+## Archive
+- [x] (Done) **Fix Core Filter Dropdowns:** Standardized ranks, status and infraspecific ranks used in grid filter. Documented in `docs/FILTER_STRATEGIES.md`. Options and UI elements now match database capitalization exactly, utilizing `normal-case` to override header inheritance.
+- [x] (Done) **Fix Climate Filter:** Restored specific small-case literals to match DB data. Added documentation regarding case sensitivity and capitalization standards.
+- [x] (Done) **Lifeform Filter as Text:** Change the Lifeform filter back to just text instead of a multi-select.
+

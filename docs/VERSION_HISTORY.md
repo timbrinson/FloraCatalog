@@ -1,5 +1,17 @@
 # Version History
 
+## v2.18.1 - Filter Standardization & UI Alignment
+**Date:** June 6, 2025
+
+### Improvements
+- **Filter Value Standardization:** Updated all multi-select filters (`taxonRank`, `taxonStatus`, `infraspecificRank`, `climateDescription`) to strictly match database literals defined in `docs/FILTER_STRATEGIES.md`.
+- **UI Casing Alignment:** Removed global uppercase transformations from the Data Grid. Ranks and Statuses now render with their natural database capitalization (e.g., "Genus", "Accepted").
+- **CSS Inheritance Fix:** Applied `normal-case` to filter components to prevent them from inheriting `thead` uppercase styles, ensuring database literals are displayed accurately.
+- **Descriptive Filter Reversion:** Reverted `lifeformDescription` from a multi-select to a standard text filter to better handle complex Raunkiær strings until a more robust 'LIKE' based multi-select index is implemented.
+
+### Documentation
+- **Filter Strategies:** Comprehensive update to `docs/FILTER_STRATEGIES.md` documenting every valid value for core filters and technical rules for casing.
+
 ## v2.18.0 - Protocol & Type Simplification
 **Date:** June 5, 2025
 

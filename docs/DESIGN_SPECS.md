@@ -19,7 +19,10 @@ The app is a "Smart Spreadsheet" for plants. It allows users to input natural la
 The central data unit is a `Taxon`. It is recursive (has a `parentId`).
 *   **Rank Hierarchy:** Family, Genus, Species, Subspecies, Variety, Form, Cultivar, Hybrid, Grex.
 *   **Type Simplification:** `taxonRank` and `taxonStatus` are stored as native `string` types to allow for diverse botanical classification schemes without constant type refactoring.
-*   **Casing Note:** While types are generic strings, the values in the database and code logic are **Capitalized** (e.g., "Genus", "Species", "Accepted"). 
+*   **Casing Note:** 
+    *   **Nomenclature/Status:** Values for `taxonRank`, `taxonStatus`, and `infraspecificRank` are **Title Case** (e.g., "Genus", "Species", "Accepted") or specific abbreviations (e.g., "subsp.", "var.").
+    *   **Climate:** The `climateDescription` column uses **small case literals** (e.g., "temperate", "wet tropical") to match WCVP database standards. 
+    *   **UI Standard:** The UI must display these values exactly as stored. Avoid CSS `uppercase` transformations on these data fields.
 
 ## 3. AI Service Layer (`geminiService.ts`)
 *   **Model:** `gemini-3-flash-preview` for core parsing; `gemini-3-pro-preview` for deep mining.

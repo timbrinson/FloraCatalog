@@ -1,3 +1,4 @@
+// DO NOT add any new files, classes, or namespaces.
 import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { Taxon, UserPreferences, ColorTheme } from '../types';
 import { formatFullScientificName } from '../utils/formatters';
@@ -66,11 +67,11 @@ const MultiSelectFilter = ({ options, selected, onChange, label }: { options: st
     };
     return (
         <div className="relative w-full" ref={ref}>
-            <button onClick={() => setIsOpen(!isOpen)} className="w-full text-left text-xs bg-white border border-slate-200 rounded px-2 py-1.5 text-slate-600 focus:border-leaf-300 focus:ring-1 focus:ring-leaf-200 flex justify-between items-center">
+            <button onClick={() => setIsOpen(!isOpen)} className="w-full text-left text-xs bg-white border border-slate-200 rounded px-2 py-1.5 text-slate-600 focus:border-leaf-300 focus:ring-1 focus:ring-leaf-200 flex justify-between items-center normal-case">
                 <span className="truncate">{selected.length === 0 ? `All ${label}s` : `${selected.length} selected`}</span>
                 <ChevronDownIcon size={12} className="opacity-50"/>
             </button>
-            {isOpen && (<div className="absolute top-full left-0 right-0 mt-1 bg-white border border-slate-200 shadow-lg rounded-md z-50 max-h-48 overflow-y-auto min-w-[150px]"><div className="px-2 py-1.5 text-xs text-slate-500 hover:bg-slate-50 cursor-pointer border-b border-slate-50" onClick={() => { onChange([]); setIsOpen(false); }}>Clear Filter</div>{options.map(opt => (<div key={opt} className="flex items-center gap-2 px-2 py-1.5 hover:bg-leaf-50 cursor-pointer" onClick={() => toggleOption(opt)}><div className={`w-3 h-3 rounded border flex items-center justify-center flex-shrink-0 ${selected.includes(opt) ? 'bg-leaf-500 border-leaf-500' : 'border-slate-300 bg-white'}`}>{selected.includes(opt) && <CheckIcon size={10} className="text-white"/>}</div><span className="text-xs text-slate-700 whitespace-normal">{opt === 'NULL' || opt === 'null' ? <span className="italic opacity-60">None / Empty</span> : opt}</span></div>))}</div>)}
+            {isOpen && (<div className="absolute top-full left-0 right-0 mt-1 bg-white border border-slate-200 shadow-lg rounded-md z-50 max-h-48 overflow-y-auto min-w-[150px]"><div className="px-2 py-1.5 text-xs text-slate-500 hover:bg-slate-50 cursor-pointer border-b border-slate-50 normal-case" onClick={() => { onChange([]); setIsOpen(false); }}>Clear Filter</div>{options.map(opt => (<div key={opt} className="flex items-center gap-2 px-2 py-1.5 hover:bg-leaf-50 cursor-pointer" onClick={() => toggleOption(opt)}><div className={`w-3 h-3 rounded border flex items-center justify-center flex-shrink-0 ${selected.includes(opt) ? 'bg-leaf-500 border-leaf-500' : 'border-slate-300 bg-white'}`}>{selected.includes(opt) && <CheckIcon size={10} className="text-white"/>}</div><span className="text-xs text-slate-700 whitespace-normal normal-case">{opt === 'NULL' || opt === 'null' ? <span className="italic opacity-60">None / Empty</span> : opt}</span></div>))}</div>)}
         </div>
     );
 };
@@ -124,8 +125,25 @@ const COLUMN_GROUPS: ColumnGroup[] = [
         label: 'Taxonomy',
         columns: [
             { id: 'taxonName', label: 'Plant Name', tooltip: 'Scientific Name', defaultWidth: 220, filterType: 'text', defaultOn: true },
-            { id: 'taxonRank', label: 'Rank', tooltip: 'Taxonomic Rank', defaultWidth: 110, filterType: 'multi-select', filterOptions: ['Convariety', 'Form', 'Genus', 'proles', 'Species', 'Subform', 'Subspecies', 'Subvariety', 'Variety'], lockWidth: true, defaultOn: false },
-            { id: 'taxonStatus', label: 'Status', tooltip: 'Taxonomic Status', defaultWidth: 110, filterType: 'multi-select', filterOptions: ['Accepted', 'Artificial Hybrid', 'Illegitimate', 'Invalid', 'Local Biotype', 'Misapplied', 'Orthographic', 'Synonym', 'Unplaced', 'Provisionally Accepted'], defaultOn: false },
+            { 
+                id: 'taxonRank', 
+                label: 'Rank', 
+                tooltip: 'Taxonomic Rank', 
+                defaultWidth: 110, 
+                filterType: 'multi-select', 
+                filterOptions: ['Family', 'Genus', 'Species', 'Subspecies', 'Variety', 'Subvariety', 'Form', 'Subform', 'Cultivar', 'Unranked', 'agamosp.', 'Convariety', 'ecas.', 'grex', 'lusus', 'microf.', 'microgène', 'micromorphe', 'modif.', 'monstr.', 'mut.', 'nid', 'nothof.', 'nothosubsp.', 'nothovar.', 'positio', 'proles', 'provar.', 'psp.', 'stirps', 'subap.', 'sublusus', 'subproles', 'subspecioid', 'subsubsp.'], 
+                lockWidth: true, 
+                defaultOn: false 
+            },
+            { 
+                id: 'taxonStatus', 
+                label: 'Status', 
+                tooltip: 'Taxonomic Status', 
+                defaultWidth: 110, 
+                filterType: 'multi-select', 
+                filterOptions: ['Accepted', 'Synonym', 'Unplaced', 'Artificial Hybrid', 'Illegitimate', 'Invalid', 'Local Biotype', 'Misapplied', 'Orthographic', 'Provisionally Accepted', 'External to WCVP'], 
+                defaultOn: false 
+            },
             { id: 'family', label: 'Family', tooltip: 'Family Name', defaultWidth: 120, filterType: 'text', defaultOn: false },
             { id: 'hybridFormula', label: 'Hybrid Formula', tooltip: 'Parents of hybrid', defaultWidth: 180, filterType: 'text', defaultOn: false },
         ]
@@ -144,7 +162,7 @@ const COLUMN_GROUPS: ColumnGroup[] = [
                 tooltip: 'Infraspecific Rank', 
                 defaultWidth: 80, 
                 filterType: 'multi-select', 
-                filterOptions: ['NULL', 'agamosp.', 'convar.', 'ecas.', 'f.', 'grex', 'group', 'lusus', 'microf.', 'microgene', 'micromorphe', 'modif.', 'monstr.', 'mut.', 'nid', 'nothof.', 'nothosubsp.', 'nothovar.', 'positio', 'proles', 'provar.', 'psp.', 'stirps', 'subf.', 'sublusus', 'subproles', 'subsp.', 'subspecioid', 'subvar.', 'unterrasse', 'var.'],
+                filterOptions: ['NULL', 'subsp.', 'var.', 'subvar.', 'f.', 'subf.', 'agamosp.', 'convar.', 'ecas.', 'grex', 'lusus', 'microf.', 'microgène', 'micromorphe', 'modif.', 'monstr.', 'mut.', 'nid', 'nothof.', 'nothosubsp.', 'nothovar.', 'positio', 'proles', 'provar.', 'psp.', 'stirps', 'subap.', 'sublusus', 'subproles', 'subspecioid', 'subsubsp.', 'group', 'unterrasse'],
                 hideHeaderIcons: true, 
                 headerAlign: 'center', 
                 lockWidth: true, 
@@ -161,8 +179,23 @@ const COLUMN_GROUPS: ColumnGroup[] = [
             { id: 'commonName', label: 'Common Name', tooltip: 'Common Name', defaultWidth: 150, filterType: 'text', defaultOn: false },
             { id: 'description', label: 'Description', tooltip: 'Description', defaultWidth: 250, filterType: 'text', defaultOn: false },
             { id: 'geographicArea', label: 'Geography', tooltip: 'Geographic Area', defaultWidth: 180, filterType: 'text', defaultOn: false },
-            { id: 'lifeformDescription', label: 'Lifeform', tooltip: 'Raunkiær Lifeform Description', defaultWidth: 150, filterType: 'multi-select', filterOptions: ['annual', 'perennial', 'shrub', 'tree', 'epiphyte', 'geophyte', 'succulent', 'climber', 'bamboo', 'NULL'], defaultOn: false },
-            { id: 'climateDescription', label: 'Climate', tooltip: 'Climate Description', defaultWidth: 180, filterType: 'multi-select', filterOptions: ['Desert and Dry Shrubland', 'Desert or Dry Shrubland', 'Montane Tropical', 'Seasonally Dry Tropical', 'Subalpine or Subarctic', 'Subtropical', 'Subtropical and Tropical', 'Temperate', 'Temperate and Tropical', 'Wet Tropical', 'NULL'], defaultOn: false },
+            { 
+                id: 'lifeformDescription', 
+                label: 'Lifeform', 
+                tooltip: 'Raunkiær Lifeform Description', 
+                defaultWidth: 150, 
+                filterType: 'text', 
+                defaultOn: false 
+            },
+            { 
+                id: 'climateDescription', 
+                label: 'Climate', 
+                tooltip: 'Climate Description', 
+                defaultWidth: 180, 
+                filterType: 'multi-select', 
+                filterOptions: ['NULL', 'desert or dry shrubland', 'montane tropical', 'seasonally dry tropical', 'subalpine or subarctic', 'subtropical', 'subtropical or tropical', 'temperate', 'temperate, subtropical or tropical', 'wet tropical'], 
+                defaultOn: false 
+            },
         ]
     },
     {
@@ -550,9 +583,9 @@ const DataGrid: React.FC<DataGridProps> = ({
                                if (coreCols.includes(col.id)) { if (r === col.id) isBold = true; if ((col.id === 'infraspecies' || col.id === 'infraspecificRank') && ['variety','subspecies','form'].includes(r)) isBold = true; if (col.id === 'taxonName') isBold = true; if (col.id === 'genusHybrid' && r === 'genus') isBold = true; if (col.id === 'speciesHybrid' && r === 'species') isBold = true; }
                                let isDimmed = false; let rowRankLevel = RANK_HIERARCHY[r] || 99; if (['subspecies', 'variety', 'form'].includes(r)) rowRankLevel = 5;
                                if (COLUMN_RANK_MAP[col.id] && COLUMN_RANK_MAP[col.id] < rowRankLevel) isDimmed = true;
-                               if (col.id === 'taxonRank') displayVal = <span className={`px-2 py-0.5 text-[10px] rounded border uppercase font-bold bg-${baseColor}-100 ${getTextClass(baseColor)} border-${baseColor}-200`}>{val as string}</span>;
+                               if (col.id === 'taxonRank') displayVal = <span className={`px-2 py-0.5 text-[10px] rounded border font-bold bg-${baseColor}-100 ${getTextClass(baseColor)} border-${baseColor}-200 normal-case`}>{val as string}</span>;
                                else if (col.id === 'taxonName') displayVal = formatFullScientificName(tr, preferences);
-                               else if (col.id === 'taxonStatus') { let b = 'bg-slate-100 text-slate-500'; if (val === 'Accepted') b = 'bg-green-50 text-green-700 border-green-200 border'; displayVal = <span className={`px-2 py-0.5 text-[10px] rounded uppercase font-bold ${b}`}>{val || '-'}</span>; }
+                               else if (col.id === 'taxonStatus') { let b = 'bg-slate-100 text-slate-500'; if (val === 'Accepted') b = 'bg-green-50 text-green-700 border-green-200 border'; displayVal = <span className={`px-2 py-0.5 text-[10px] rounded font-bold ${b} normal-case`}>{val || '-'}</span>; }
                                else if (col.id === 'actions') displayVal = <div className="flex items-center justify-center gap-1"><button onClick={(e) => { e.stopPropagation(); setExpandedRows(prev => { const n = new Set(prev); n.has(tr.id) ? n.delete(tr.id) : n.add(tr.id); return n; }); }} className={`p-1.5 rounded shadow-sm ${isExpanded ? 'bg-slate-800 text-white' : 'bg-white border border-slate-200 text-slate-500 hover:text-slate-800'}`}>{isExpanded ? <ChevronUpIcon size={14}/> : <ChevronDownIcon size={14}/>}</button>{['genus', 'species', 'subspecies', 'variety', 'form'].includes(r) && <button onClick={(e) => { e.stopPropagation(); onAction?.('mine', tr); }} className="p-1.5 bg-indigo-50 border border-indigo-200 rounded text-indigo-600 hover:bg-indigo-100 shadow-sm"><PickaxeIcon size={14} /></button>}<button onClick={(e) => { e.stopPropagation(); onAction?.('enrich', tr); }} className="p-1.5 bg-amber-50 border border-amber-200 rounded text-amber-600 hover:bg-amber-100 shadow-sm"><Wand2Icon size={14} /></button></div>;
                                return <td key={col.id} className={`p-2 border-r border-slate-50 truncate overflow-hidden max-w-0 ${col.headerAlign === 'center' ? 'text-center' : ''}`} title={String(val || '')}><span className={`${isBold ? "font-bold" : ""} ${isDimmed ? "font-normal" : ""} ${isBold ? (baseColor === 'slate' ? "text-slate-900" : `text-${baseColor}-900`) : (isDimmed ? "text-slate-400" : "")}`}>{displayVal}</span></td>;
                            })}
