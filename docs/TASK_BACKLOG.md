@@ -4,8 +4,6 @@ This document tracks planned features and technical improvements to ensure conti
 
 ## High Priority
 - [ ] **Optimize Filtering:** Review the rules used for dynamic filtering in dataService.ts, for different columns. Some use 'like', some use 'is', some use 'in', some convert to lower case, some capitalize the first letter, etc. Optimize which method to use for each column.
-- [ ] **Unselect All Columns:** In the Columns menu change the Select all to also Unselect all.
-- [ ] **Fix Genus Column for Family:** In the Family row leave the Genus blank.
 
 ## Medium Priority
 - [ ] **How To Reset Cultivars:** As we start experimenting with adding Cultivars we will likely need to remove them and try something different. We need an easy way to reset the DB back to the state after WCVP was loaded and before we add non-WCVP plants, such as Cultivars.
@@ -44,3 +42,5 @@ This document tracks planned features and technical improvements to ensure conti
 - [x] (Done) **Fix Climate Filter:** Restored specific small-case literals to match DB data. Added documentation regarding case sensitivity and capitalization standards.
 - [x] (Done) **Lifeform Filter as Text:** Change the Lifeform filter back to just text instead of a multi-select.
 - [x] (Done) **Stop Grid Flash** [AI Note: Stabilized DataGrid mounting logic in App.tsx to prevent unmounting when filters result in zero rows or when background fetches occur. Preservation of focus and dropdown state verified in code.]
+- [x] (Done) **Unselect All Columns:** (Fixed - Pending User Verification) [AI Note: Added "Hide All" button next to "Show All" in the Column Picker menu in DataGrid.tsx.]
+- [x] (Done) **Fix Genus Column for Family:** (Fixed - Pending User Verification) [AI Note: Updated getRowValue in DataGrid.tsx to return an empty string for the 'genus' column when taxonRank is 'Family'. Standardized virtual rank casing to Title Case (e.g., 'Family') for visual consistency in the Rank column.]

@@ -1,8 +1,19 @@
 # Version History
 
+## v2.18.5 - Grid Logic & Column Management
+**Date:** June 10, 2025
+**Status:** (Awaiting User Verification)
+
+### New Features
+- **Unselect All Columns:** Added a "Hide All" button to the Column Picker dropdown, allowing users to clear the grid for a fresh configuration with one click.
+
+### Bug Fixes
+- **Family Rank Consistency:** Fixed a logic error where the Genus column would incorrectly display for rows with the taxonomic rank of "Family". The Genus column is now explicitly blank for these records.
+- **Virtual Rank Casing:** Standardized the casing for virtual group headers (e.g., "Family", "Genus"). These now use Title Case to match the formatting of real database records, ensuring a unified look in the "Rank" column.
+
 ## v2.18.4 - UX Stability Fix (Grid Flash)
 **Date:** June 9, 2025
-**Status:** (Awaiting User Verification)
+**Status:** (Verified)
 
 ### Improvements
 - **Grid Persistence Overhaul:** Resolved the "Stop Grid Flash" issue by introducing an `isInitialized` state in `App.tsx`. The `DataGrid` now remains mounted during transitions between result states (including zero-result filtered states), ensuring focus is maintained and UI state (like scroll position and open filter dropdowns) is preserved.

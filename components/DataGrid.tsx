@@ -311,6 +311,11 @@ const DataGrid: React.FC<DataGridProps> = ({
   const getRowValue = (row: Taxon, colId: string) => {
        if (colId === 'childCount') { const tr = row as TreeRow; return tr.isTreeHeader ? tr.childCount : getDescendantCount(tr); }
        if (colId === 'cultivar' && row.taxonRank === 'Cultivar') return row.name;
+       
+       // Fix: For Family rows, leave Genus blank
+       const rank = (row.taxonRank || '').toLowerCase();
+       if (rank === 'family' && colId === 'genus') return '';
+       
        // @ts-ignore
        return row[colId];
   };
@@ -355,7 +360,7 @@ const DataGrid: React.FC<DataGridProps> = ({
               const headerRow: TreeRow = headerTaxon ? { ...headerTaxon } : {
                   id: `virtual-${path}`,
                   isVirtual: true,
-                  taxonRank: field as any, 
+                  taxonRank: field.charAt(0).toUpperCase() + field.slice(1) as any, // Standardize Rank to Title Case
                   name: key,
                   taxonName: key, 
                   taxonStatus: 'Accepted',
@@ -498,7 +503,7 @@ const DataGrid: React.FC<DataGridProps> = ({
                  <button onClick={() => setShowColPicker(!showColPicker)} className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-300 rounded text-xs text-slate-600 hover:bg-slate-50 shadow-sm"><SettingsIcon size={14} /> Columns</button>
                  {showColPicker && (
                     <div className="absolute right-0 top-full mt-2 w-72 bg-white border border-slate-200 rounded-lg shadow-2xl z-50 p-3 max-h-[70vh] overflow-y-auto origin-top-right animate-in fade-in zoom-in-95 duration-150">
-                        <div className="flex justify-between items-center mb-4 px-1"><div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Configure Grid</div><button onClick={() => setVisibleColumns(new Set(ALL_COLUMNS.map(c=>c.id)))} className="text-[10px] text-blue-600 hover:underline">Show All</button></div>
+                        <div className="flex justify-between items-center mb-4 px-1"><div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Configure Grid</div><div className="flex gap-2"><button onClick={() => setVisibleColumns(new Set())} className="text-[10px] text-blue-600 hover:underline">Hide All</button><button onClick={() => setVisibleColumns(new Set(ALL_COLUMNS.map(c=>c.id)))} className="text-[10px] text-blue-600 hover:underline">Show All</button></div></div>
                         <div className="space-y-4">
                             {COLUMN_GROUPS.map(group => {
                                 const allInGroupVisible = group.columns.every(c => visibleColumns.has(c.id));
