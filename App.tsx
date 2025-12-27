@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Loader2, Leaf, Plus, RotateCcw, Table, Network, Upload, X, Settings as SettingsIcon, Wrench, Activity, AlertCircle } from 'lucide-react';
 // Fixed: Removed non-existent TaxonomicStatus import
@@ -18,6 +17,7 @@ import { formatScientificName } from './utils/formatters';
 export default function App() {
   const [query, setQuery] = useState('');
   const [loadingState, setLoadingState] = useState<LoadingState>(LoadingState.IDLE);
+  const [isInitialized, setIsInitialized] = useState(false);
   const [errorDetails, setErrorDetails] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<'tree' | 'grid'>('grid');
   const [showImportModal, setShowImportModal] = useState(false);
@@ -97,6 +97,7 @@ export default function App() {
           
           setHasMore(data.length === limit);
           setLoadingState(LoadingState.SUCCESS);
+          setIsInitialized(true);
           setIsFetchingMore(false);
       } catch (e: any) {
           setErrorDetails(e.message || "Database error.");
@@ -132,6 +133,11 @@ export default function App() {
   const completeActivity = (id: string, message: string = "Completed") => { setActivities(prev => prev.map(a => a.id === id ? { ...a, status: 'completed' as ActivityStatus, message, timestamp: Date.now() } : a)); cancelledActivityIds.current.delete(id); };
   const failActivity = (id: string, errorMsg: string, canRetry: boolean = false) => setActivities(prev => prev.map(a => a.id === id ? { ...a, status: 'error' as ActivityStatus, message: errorMsg, canRetry } : a));
 
+  // main logical branches for rendering to prevent flashing
+  const isHardError = (isOffline || loadingState === LoadingState.ERROR) && taxa.length === 0;
+  const isActuallyEmpty = taxa.length === 0 && !isFiltering && loadingState === LoadingState.SUCCESS && totalRecords === 0;
+  const showInitialLoader = !isInitialized && loadingState === LoadingState.LOADING;
+
   return (
     <div className="h-screen bg-slate-50 flex flex-col overflow-hidden">
       <header className="p-4 bg-white border-b flex justify-between items-center shadow-sm z-30">
@@ -155,19 +161,11 @@ export default function App() {
       </header>
 
       <main className="flex-1 overflow-hidden p-4 relative">
-        {loadingState === LoadingState.LOADING && taxa.length === 0 && !isFiltering ? (
+        {showInitialLoader ? (
           <div className="h-full flex items-center justify-center">
             <Loader2 className="animate-spin text-leaf-600" size={48} />
           </div>
-        ) : (taxa.length === 0 && !isFiltering && !isOffline && loadingState !== LoadingState.ERROR) ? (
-          <EmptyState 
-            isOffline={isOffline} 
-            loadingState={loadingState} 
-            errorDetails={errorDetails}
-            onOpenSettings={() => setShowSettingsModal(true)}
-            onRetry={() => fetchBatch(0, true)}
-          />
-        ) : (isOffline || loadingState === LoadingState.ERROR) && taxa.length === 0 ? (
+        ) : isHardError || isActuallyEmpty ? (
           <EmptyState 
             isOffline={isOffline} 
             loadingState={loadingState} 
@@ -180,7 +178,7 @@ export default function App() {
             taxa={taxa}
             preferences={preferences}
             totalRecords={totalRecords}
-            isLoadingMore={isFetchingMore || (loadingState === LoadingState.LOADING && isFiltering)}
+            isLoadingMore={isFetchingMore || loadingState === LoadingState.LOADING}
             onLoadMore={handleLoadMore}
             sortConfig={sortConfig}
             onSortChange={(key, direction) => setSortConfig({ key, direction: direction as 'asc' | 'desc' })}

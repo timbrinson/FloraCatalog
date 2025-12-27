@@ -3,7 +3,6 @@
 This document tracks planned features and technical improvements to ensure continuity across development sessions.
 
 ## High Priority
-- [ ] **Stop Grid Flash:** When a column is filtered such that there are no rows, then when it is changed so rows show up again there is a grid refresh that moves it to it's default position, which breaks the context with what the user is doing. The grid should stay where it is located and the column filter drop down should still be shown, so the user can select another option.
 - [ ] **Optimize Filtering:** Review the rules used for dynamic filtering in dataService.ts, for different columns. Some use 'like', some use 'is', some use 'in', some convert to lower case, some capitalize the first letter, etc. Optimize which method to use for each column.
 - [ ] **Unselect All Columns:** In the Columns menu change the Select all to also Unselect all.
 - [ ] **Fix Genus Column for Family:** In the Family row leave the Genus blank.
@@ -44,3 +43,4 @@ This document tracks planned features and technical improvements to ensure conti
 - [x] (Done) **Fix Core Filter Dropdowns:** Standardized ranks, status and infraspecific ranks used in grid filter. Documented in `docs/FILTER_STRATEGIES.md`. Options and UI elements now match database capitalization exactly, utilizing `normal-case` to override header inheritance.
 - [x] (Done) **Fix Climate Filter:** Restored specific small-case literals to match DB data. Added documentation regarding case sensitivity and capitalization standards.
 - [x] (Done) **Lifeform Filter as Text:** Change the Lifeform filter back to just text instead of a multi-select.
+- [x] (Done) **Stop Grid Flash** [AI Note: Stabilized DataGrid mounting logic in App.tsx to prevent unmounting when filters result in zero rows or when background fetches occur. Preservation of focus and dropdown state verified in code.]

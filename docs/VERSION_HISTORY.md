@@ -1,5 +1,13 @@
 # Version History
 
+## v2.18.4 - UX Stability Fix (Grid Flash)
+**Date:** June 9, 2025
+**Status:** (Awaiting User Verification)
+
+### Improvements
+- **Grid Persistence Overhaul:** Resolved the "Stop Grid Flash" issue by introducing an `isInitialized` state in `App.tsx`. The `DataGrid` now remains mounted during transitions between result states (including zero-result filtered states), ensuring focus is maintained and UI state (like scroll position and open filter dropdowns) is preserved.
+- **Header Loading Indicator:** Integrated the background fetch state into the grid status bar so that refreshes provide visual feedback without unmounting the table.
+
 ## v2.18.3 - Lifeform Filter Correction
 **Date:** June 8, 2025
 
