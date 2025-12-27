@@ -129,6 +129,7 @@ export interface FetchOptions {
     sortBy?: string;
     sortDirection?: 'asc' | 'desc';
     shouldCount?: boolean;
+    searchMode?: 'prefix' | 'fuzzy'; // New option
 }
 
 export const dataService = {
@@ -140,7 +141,8 @@ export const dataService = {
         filters = {},
         sortBy = 'taxonName',
         sortDirection = 'asc',
-        shouldCount = false
+        shouldCount = false,
+        searchMode = 'prefix'
     } = options;
 
     if (getIsOffline()) return { data: [], count: 0 };
@@ -161,8 +163,15 @@ export const dataService = {
         if (key === 'taxonName') {
             const rawSearch = (value as string).trim();
             if (!rawSearch) return;
-            const cleanSearch = rawSearch.charAt(0).toUpperCase() + rawSearch.slice(1);
-            query = query.like('taxon_name', `${cleanSearch}%`);
+            
+            if (searchMode === 'fuzzy') {
+                // ILIKE %term% - Uses Trigram Index (gin_trgm_ops)
+                query = query.ilike('taxon_name', `%${rawSearch}%`);
+            } else {
+                // Default Optimized Prefix - Uses B-Tree Index (Collate "C")
+                const cleanSearch = rawSearch.charAt(0).toUpperCase() + rawSearch.slice(1);
+                query = query.like('taxon_name', `${cleanSearch}%`);
+            }
         } else if (Array.isArray(value)) {
             if (value.length > 0) {
                  const hasNull = value.includes('NULL');

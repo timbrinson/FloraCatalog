@@ -1,6 +1,5 @@
-
 import React, { useState } from 'react';
-import { X, Settings, Layout, Zap, Palette, Database, Save } from 'lucide-react';
+import { X, Settings, Layout, Zap, Palette, Database, Save, Search as SearchIcon, Cpu } from 'lucide-react';
 import { UserPreferences, ColorTheme } from '../types';
 import { reloadClient, MANUAL_URL, MANUAL_KEY } from '../services/supabaseClient';
 
@@ -111,6 +110,43 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, preferen
                     >
                         <Save size={14} /> Save & Connect
                     </button>
+                </div>
+            </div>
+
+            {/* Search Optimization Section */}
+            <div>
+                <h4 className="text-sm font-bold text-slate-700 uppercase tracking-wide mb-3 flex items-center gap-2">
+                    <SearchIcon size={14}/> Search Engine (Experimental)
+                </h4>
+                <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
+                    <p className="text-xs text-slate-500 mb-4">Choose how the Plant Name filter interacts with the database.</p>
+                    
+                    <div className="grid grid-cols-2 gap-2 p-1 bg-slate-100 rounded-lg border border-slate-200">
+                        <button 
+                            onClick={() => onUpdate({ ...preferences, searchMode: 'prefix' })}
+                            className={`p-2 text-[11px] rounded-md transition-all flex flex-col items-center gap-1 ${preferences.searchMode === 'prefix' ? 'bg-white shadow-sm font-bold text-leaf-700 border border-leaf-200' : 'text-slate-500 hover:bg-slate-200/50'}`}
+                        >
+                            <span>Prefix (Standard)</span>
+                            <span className="text-[9px] font-normal opacity-70">Starts with "Aga..."</span>
+                        </button>
+                        <button 
+                            onClick={() => onUpdate({ ...preferences, searchMode: 'fuzzy' })}
+                            className={`p-2 text-[11px] rounded-md transition-all flex flex-col items-center gap-1 ${preferences.searchMode === 'fuzzy' ? 'bg-white shadow-sm font-bold text-indigo-700 border border-indigo-200' : 'text-slate-500 hover:bg-slate-200/50'}`}
+                        >
+                            <span>Fuzzy (Flexible)</span>
+                            <span className="text-[9px] font-normal opacity-70">Matches "...marine..."</span>
+                        </button>
+                    </div>
+
+                    <div className="mt-4 flex items-start gap-2 p-2 bg-white/50 rounded border border-dashed border-slate-200">
+                        <Cpu size={14} className="text-slate-400 mt-0.5" />
+                        <div className="text-[10px] text-slate-500 leading-relaxed">
+                            {preferences.searchMode === 'prefix' 
+                                ? "Prefix mode uses optimized B-Tree indexing. Best for large-scale browsing and instant infinite scroll."
+                                : "Fuzzy mode uses Trigram GIN indexing. Allows mid-string matches and case-insensitivity at the cost of higher CPU usage."
+                            }
+                        </div>
+                    </div>
                 </div>
             </div>
 

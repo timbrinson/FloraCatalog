@@ -3,7 +3,7 @@
 This document tracks planned features and technical improvements to ensure continuity across development sessions.
 
 ## High Priority
-- [ ] **Optimize Filtering:** Review the rules used for dynamic filtering in dataService.ts, for different columns. Some use 'like', some use 'is', some use 'in', some convert to lower case, some capitalize the first letter, etc. Optimize which method to use for each column.
+- [ ] **Optimize Filtering:** Review the rules used for dynamic filtering in dataService.ts, for different columns. Some use 'like', some use 'is', some use 'in', some convert to lower case, some capitalize the first letter, etc. Optimize which method to use for each column. [AI Note: Implemented Hybrid Search Engine toggle in DataGrid.tsx and dataService.ts, allowing users to switch between optimized B-Tree Prefix search and Trigram GIN Fuzzy search. Standardized Rank, Status, and Climate filters to match exact database literals with 'normal-case' UI overrides to prevent case-mismatch errors.]
 
 ## Medium Priority
 - [ ] **How To Reset Cultivars:** As we start experimenting with adding Cultivars we will likely need to remove them and try something different. We need an easy way to reset the DB back to the state after WCVP was loaded and before we add non-WCVP plants, such as Cultivars.

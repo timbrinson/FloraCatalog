@@ -1,6 +1,7 @@
 import { Taxon, UserPreferences } from '../types';
 
-export const formatScientificName = (taxon: Taxon, prefs: UserPreferences = { hybridSpacing: 'space', autoEnrichment: false, colorTheme: 'option2a' }): string => {
+// Fix: Add missing searchMode to default UserPreferences to resolve TypeScript error
+export const formatScientificName = (taxon: Taxon, prefs: UserPreferences = { hybridSpacing: 'space', autoEnrichment: false, colorTheme: 'option2a', searchMode: 'prefix' }): string => {
   let name = taxon.name || ''; 
   
   // Clean potential dirty data double-prefixes if normalizing didn't catch them all

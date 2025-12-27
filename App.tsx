@@ -43,7 +43,8 @@ export default function App() {
       autoEnrichment: false,
       autoFitMaxWidth: 400,
       fitScreenMaxRatio: 4.0,
-      colorTheme: 'option2a'
+      colorTheme: 'option2a',
+      searchMode: 'prefix' // Default to optimized search
   });
   const [activities, setActivities] = useState<ActivityItem[]>([]);
   const cancelledActivityIds = useRef<Set<string>>(new Set());
@@ -84,7 +85,8 @@ export default function App() {
             filters: gridFilters, 
             sortBy: sortConfig.key, 
             sortDirection: sortConfig.direction,
-            shouldCount
+            shouldCount,
+            searchMode: preferences.searchMode // Pass the experimental setting
           });
           
           if (isNewSearch) { 
@@ -109,7 +111,7 @@ export default function App() {
   useEffect(() => { 
     setOffset(0); 
     fetchBatch(0, true); 
-  }, [gridFilters, sortConfig]);
+  }, [gridFilters, sortConfig, preferences.searchMode]); // Reload on mode change
 
   const handleFilterChange = (key: string, value: any) => setGridFilters(prev => ({ ...prev, [key]: value }));
   const handleSettingsClose = () => { setShowSettingsModal(false); const n = getIsOffline(); setIsOffline(n); if (!n) fetchBatch(0, true); };
@@ -177,6 +179,7 @@ export default function App() {
           <DataGrid 
             taxa={taxa}
             preferences={preferences}
+            onPreferenceChange={setPreferences}
             totalRecords={totalRecords}
             isLoadingMore={isFetchingMore || loadingState === LoadingState.LOADING}
             onLoadMore={handleLoadMore}

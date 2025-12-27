@@ -11,7 +11,7 @@ import {
   Network as NetworkIcon, ChevronRight as ChevronRightIcon,
   ChevronUp as ChevronUpIcon, Loader2 as Loader2Icon, 
   Search as SearchIcon, List as ListIcon, Square as SquareIcon, 
-  CheckSquare as CheckSquareIcon 
+  CheckSquare as CheckSquareIcon, ArrowRightToLine, AlignCenter
 } from 'lucide-react';
 
 interface DataGridProps {
@@ -19,6 +19,7 @@ interface DataGridProps {
   onAction?: (action: 'mine' | 'enrich', taxon: Taxon) => void;
   onUpdate?: (id: string, updates: Partial<Taxon>) => void;
   preferences: UserPreferences;
+  onPreferenceChange?: (newPrefs: UserPreferences) => void;
   totalRecords: number;
   isLoadingMore: boolean;
   onLoadMore: () => void;
@@ -238,7 +239,7 @@ const COLUMN_GROUPS: ColumnGroup[] = [
 const ALL_COLUMNS = COLUMN_GROUPS.flatMap(g => g.columns);
 
 const DataGrid: React.FC<DataGridProps> = ({ 
-    taxa, onAction, onUpdate, preferences, 
+    taxa, onAction, onUpdate, preferences, onPreferenceChange,
     totalRecords, isLoadingMore, onLoadMore, 
     sortConfig, onSortChange,
     filters, onFilterChange
@@ -427,7 +428,7 @@ const DataGrid: React.FC<DataGridProps> = ({
   };
 
   const handleResizeStart = (e: React.MouseEvent, colId: string) => { e.preventDefault(); e.stopPropagation(); resizingRef.current = { colId, startX: e.clientX, startWidth: colWidths[colId] || 100 }; document.addEventListener('mousemove', handleResizeMove); document.addEventListener('mouseup', handleResizeEnd); document.body.style.cursor = 'col-resize'; };
-  const handleResizeMove = useCallback((e: MouseEvent) => { if (!resizingRef.current) return; const { colId, startX, startWidth } = resizingRef.current; const diff = e.clientX - startX; setColWidths(prev => ({ ...prev, [colId]: Math.max(30, startWidth + diff) })); }, []);
+  const handleResizeMove = useCallback((e: MouseEvent) => { if (!resizingRef.current) return; const { colId, startX, startWidth } = resizingRef.current; const diff = e.clientX - startWidth; setColWidths(prev => ({ ...prev, [colId]: Math.max(30, startWidth + diff) })); }, []);
   const handleResizeEnd = useCallback(() => { resizingRef.current = null; document.removeEventListener('mousemove', handleResizeMove); document.removeEventListener('mouseup', handleResizeEnd); document.body.style.cursor = ''; }, [handleResizeMove]);
   
   const getIdealWidths = () => {
@@ -478,6 +479,14 @@ const DataGrid: React.FC<DataGridProps> = ({
 
   const isAnyGroupCollapsed = collapsedGroups.size > 0;
   const toggleAllGroups = () => { if (isAnyGroupCollapsed) setCollapsedGroups(new Set()); else expandTreeLevel(0); };
+
+  const toggleSearchMode = () => {
+      if (!onPreferenceChange) return;
+      onPreferenceChange({
+          ...preferences,
+          searchMode: preferences.searchMode === 'prefix' ? 'fuzzy' : 'prefix'
+      });
+  };
 
   return (
     <div className="bg-white rounded-xl shadow border border-slate-200 overflow-hidden flex flex-col h-full relative">
@@ -564,9 +573,18 @@ const DataGrid: React.FC<DataGridProps> = ({
                            : col.filterType === 'multi-select' 
                              ? (<MultiSelectFilter label={col.label} options={col.filterOptions || []} selected={filters[col.id] || []} onChange={(vals) => onFilterChange(col.id, vals)}/>) 
                              : (
-                                <div className="relative">
-                                    <input className={`w-full text-xs px-2 py-1.5 bg-white border border-slate-200 rounded outline-none focus:border-leaf-300 focus:ring-1 focus:ring-leaf-200 font-normal ${col.id === 'taxonName' ? 'pl-7 border-leaf-300 ring-1 ring-leaf-100' : ''}`} placeholder={col.id === 'taxonName' ? 'Search DB...' : 'Filter...'} value={localTextFilters[col.id] || ''} onChange={e => handleTextFilterChange(col.id, e.target.value)}/>
-                                    {col.id === 'taxonName' && (<SearchIcon size={12} className="absolute left-2 top-2 text-leaf-500" />)}
+                                <div className="relative group/filter">
+                                    <input className={`w-full text-xs px-2 py-1.5 bg-white border border-slate-200 rounded outline-none transition-all focus:ring-1 font-normal ${col.id === 'taxonName' ? 'pl-7 pr-8 border-leaf-300 ring-leaf-100 focus:border-leaf-500' : 'focus:border-leaf-300 focus:ring-leaf-200'}`} placeholder={col.id === 'taxonName' ? (preferences.searchMode === 'prefix' ? 'Starts with...' : 'Contains...') : 'Filter...'} value={localTextFilters[col.id] || ''} onChange={e => handleTextFilterChange(col.id, e.target.value)}/>
+                                    {col.id === 'taxonName' && (<SearchIcon size={12} className={`absolute left-2 top-2 ${preferences.searchMode === 'fuzzy' ? 'text-indigo-500' : 'text-leaf-500'}`} />)}
+                                    {col.id === 'taxonName' && (
+                                        <button 
+                                            onClick={toggleSearchMode}
+                                            className={`absolute right-1 top-1 p-1 rounded transition-colors ${preferences.searchMode === 'fuzzy' ? 'bg-indigo-50 text-indigo-600 hover:bg-indigo-100 ring-1 ring-indigo-200' : 'text-slate-300 hover:text-slate-500 hover:bg-slate-100'}`}
+                                            title={preferences.searchMode === 'prefix' ? "Prefix Search (Starts with) - Click to switch to Fuzzy" : "Fuzzy Search (Contains) - Click to switch to Prefix"}
+                                        >
+                                            {preferences.searchMode === 'prefix' ? <ArrowRightToLine size={12} /> : <AlignCenter size={12} />}
+                                        </button>
+                                    )}
                                 </div>
                              )
                           }

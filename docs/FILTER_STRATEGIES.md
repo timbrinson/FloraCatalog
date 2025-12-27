@@ -130,6 +130,37 @@ This document defines the logic and valid values for multi-select filters in the
 - Common terms include: phanerophyte, geophyte, therophyte, chamaephyte, hemicryptophyte.
 - Use prefix matching (e.g., typing "phanerophyte" will find "climbing phanerophyte").
 
+## 6. Search Engines & Performance (`taxonName`)
+**Strategy:** The application provides two distinct ways to query plant names via the `taxonName` column. Users can toggle between these modes using the icon inside the search input.
+
+| Mode | Icon | SQL Logic | Index Used | Use Case |
+| :--- | :--- | :--- | :--- | :--- |
+| **Prefix (Standard)** | `|A...` | `LIKE 'Term%'` | **B-Tree** | Fastest possible search. Best for large-scale browsing. Matches only the start of the plant name. |
+| **Fuzzy (Flexible)** | `...A...` | `ILIKE '%term%'`| **Trigram GIN** | Most flexible. Matches text anywhere in the name. Supports `%` wildcards for complex filtering. |
+
+### Technical Implementation Details
+
+#### Auto-Capitalization (Prefix Mode)
+In **Prefix Mode**, the application automatically capitalizes the first letter of the user's input before sending it to the database (e.g., typing `aga` becomes `Aga`).
+*   **Why:** Botanical nomenclature strictly dictates that higher-level ranks (Family, Genus) must always start with a capital letter.
+*   **Performance:** This transformation allows us to use a standard case-sensitive **B-Tree index** (configured with `COLLATE "C"`), which is significantly faster than a case-insensitive scan.
+
+#### Implicit Wildcard Wrapping (Fuzzy Mode)
+In **Fuzzy Mode**, the application automatically wraps the user's input in wildcards (`%`) before sending it to the database.
+*   **Logic:** Input `Ag%par` is transformed into the query `%Ag%par%`.
+*   **Effect:** This ensures the search behaves as a "Contains" logic, finding the string fragments anywhere in the plant name, even if they are not at the start.
+
+#### Index Selection & Query Optimization
+It is important to note that the application does not "choose" the index; it provides the query structure, and the **PostgreSQL Query Planner** determines the most efficient path:
+1.  **Prefix Queries (`LIKE 'Term%'`)**: The planner will prioritize the **B-Tree index**. This is an "Index Seek"—the fastest possible lookup method (<10ms).
+2.  **Middle-String Queries (`ILIKE '%term%'`)**: The planner will prioritize the **GIN Trigram index**. This is an "Index Scan"—it evaluates 3-character segments (trigrams) to find matches anywhere in the string.
+3.  **Fallback**: If the search term is too short (1-2 characters), the planner may determine that an index scan is more expensive than reading the table directly and opt for a **Sequential Table Scan**.
+
+### Advanced Wildcard Usage (Fuzzy Mode Only)
+In Fuzzy mode, users can manually insert the `%` symbol to find non-contiguous fragments. 
+- *Example:* Typing `Ag%par%` will find all *Agave parryi* records.
+- *Example:* Typing `%var. truncata` will find all varieties named *truncata* regardless of Genus or Species.
+
 ## Technical Note: Case Sensitivity & Capitalization
 Database filters in `dataService.ts` are strictly case-sensitive for these specific columns.
 - **Filter Values**: All options in multi-select dropdowns MUST match the database strings exactly (including small case for climate and lifeform literals).
