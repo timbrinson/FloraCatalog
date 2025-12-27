@@ -11,7 +11,8 @@ import {
   Network as NetworkIcon, ChevronRight as ChevronRightIcon,
   ChevronUp as ChevronUpIcon, Loader2 as Loader2Icon, 
   Search as SearchIcon, List as ListIcon, Square as SquareIcon, 
-  CheckSquare as CheckSquareIcon, ArrowRightToLine, AlignCenter
+  CheckSquare as CheckSquareIcon, ArrowRightToLine, AlignCenter,
+  AlertCircle
 } from 'lucide-react';
 
 interface DataGridProps {
@@ -27,6 +28,7 @@ interface DataGridProps {
   onSortChange: (key: string, direction: 'asc' | 'desc') => void;
   filters: Record<string, any>;
   onFilterChange: (key: string, value: any) => void;
+  error?: string | null;
 }
 
 const RANK_HIERARCHY: Record<string, number> = {
@@ -238,11 +240,15 @@ const COLUMN_GROUPS: ColumnGroup[] = [
 
 const ALL_COLUMNS = COLUMN_GROUPS.flatMap(g => g.columns);
 
+// Columns that require exact matches and shouldn't trigger expensive searches while typing
+const isTechnicalColumn = (colId: string) => colId === 'id' || colId.endsWith('Id') || colId === 'firstPublished';
+
 const DataGrid: React.FC<DataGridProps> = ({ 
     taxa, onAction, onUpdate, preferences, onPreferenceChange,
     totalRecords, isLoadingMore, onLoadMore, 
     sortConfig, onSortChange,
-    filters, onFilterChange
+    filters, onFilterChange,
+    error
 }) => {
   const loadState = <T,>(key: string, def: T): T => {
       try { const s = localStorage.getItem(key); return s ? JSON.parse(s) : def; } catch { return def; }
@@ -254,7 +260,12 @@ const DataGrid: React.FC<DataGridProps> = ({
       return new Set(ALL_COLUMNS.filter(c => c.defaultOn).map(c => c.id));
   });
   
-  const [columnOrder, setColumnOrder] = useState<string[]>(() => loadState('grid_col_order_rev11', ALL_COLUMNS.map(c => [c.id, c.defaultWidth])) && loadState('grid_col_order_rev11', ALL_COLUMNS.map(c => c.id)));
+  const [columnOrder, setColumnOrder] = useState<string[]>(() => {
+      const saved = loadState<string[]>('grid_col_order_rev11', []);
+      if (saved.length > 0) return saved;
+      return ALL_COLUMNS.map(c => c.id);
+  });
+  
   const [colWidths, setColWidths] = useState<Record<string, number>>(() => loadState('grid_col_widths_rev11', Object.fromEntries(ALL_COLUMNS.map(c => [c.id, c.defaultWidth]))));
   const [isHierarchyMode, setIsHierarchyMode] = useState<boolean>(true);
   const [groupBy, setGroupBy] = useState<string[]>([]);
@@ -313,7 +324,6 @@ const DataGrid: React.FC<DataGridProps> = ({
        if (colId === 'childCount') { const tr = row as TreeRow; return tr.isTreeHeader ? tr.childCount : getDescendantCount(tr); }
        if (colId === 'cultivar' && row.taxonRank === 'Cultivar') return row.name;
        
-       // Fix: For Family rows, leave Genus blank
        const rank = (row.taxonRank || '').toLowerCase();
        if (rank === 'family' && colId === 'genus') return '';
        
@@ -321,10 +331,20 @@ const DataGrid: React.FC<DataGridProps> = ({
        return row[colId];
   };
 
-  const handleTextFilterChange = (key: string, val: string) => {
+  const handleTextFilterChange = (key: string, val: string, forceCommit: boolean = false) => {
       setLocalTextFilters(prev => ({ ...prev, [key]: val }));
+      
+      // If it's a technical column, we only commit on 'forceCommit' (Enter or Blur)
+      // This prevents expensive prefix matches on non-indexed partial dates/IDs
+      if (isTechnicalColumn(key) && !forceCommit) return;
+
       if ((window as any).filterTimeout) clearTimeout((window as any).filterTimeout);
-      (window as any).filterTimeout = setTimeout(() => onFilterChange(key, val), 600);
+      
+      if (forceCommit) {
+          onFilterChange(key, val);
+      } else {
+          (window as any).filterTimeout = setTimeout(() => onFilterChange(key, val), 600);
+      }
   };
 
   const gridRows = useMemo((): TreeRow[] => {
@@ -361,7 +381,7 @@ const DataGrid: React.FC<DataGridProps> = ({
               const headerRow: TreeRow = headerTaxon ? { ...headerTaxon } : {
                   id: `virtual-${path}`,
                   isVirtual: true,
-                  taxonRank: field.charAt(0).toUpperCase() + field.slice(1) as any, // Standardize Rank to Title Case
+                  taxonRank: field.charAt(0).toUpperCase() + field.slice(1) as any, 
                   name: key,
                   taxonName: key, 
                   taxonStatus: 'Accepted',
@@ -428,7 +448,7 @@ const DataGrid: React.FC<DataGridProps> = ({
   };
 
   const handleResizeStart = (e: React.MouseEvent, colId: string) => { e.preventDefault(); e.stopPropagation(); resizingRef.current = { colId, startX: e.clientX, startWidth: colWidths[colId] || 100 }; document.addEventListener('mousemove', handleResizeMove); document.addEventListener('mouseup', handleResizeEnd); document.body.style.cursor = 'col-resize'; };
-  const handleResizeMove = useCallback((e: MouseEvent) => { if (!resizingRef.current) return; const { colId, startX, startWidth } = resizingRef.current; const diff = e.clientX - startWidth; setColWidths(prev => ({ ...prev, [colId]: Math.max(30, startWidth + diff) })); }, []);
+  const handleResizeMove = useCallback((e: MouseEvent) => { if (!resizingRef.current) return; const { colId, startWidth } = resizingRef.current; const diff = e.clientX - resizingRef.current.startX; setColWidths(prev => ({ ...prev, [colId]: Math.max(30, startWidth + diff) })); }, []);
   const handleResizeEnd = useCallback(() => { resizingRef.current = null; document.removeEventListener('mousemove', handleResizeMove); document.removeEventListener('mouseup', handleResizeEnd); document.body.style.cursor = ''; }, [handleResizeMove]);
   
   const getIdealWidths = () => {
@@ -491,9 +511,17 @@ const DataGrid: React.FC<DataGridProps> = ({
   return (
     <div className="bg-white rounded-xl shadow border border-slate-200 overflow-hidden flex flex-col h-full relative">
       <div className="p-2 border-b border-slate-200 bg-slate-50 flex justify-between items-center z-20 relative flex-shrink-0">
-         <div className="text-xs text-slate-500 font-medium px-2 flex items-center gap-4">
+         <div className="text-xs text-slate-500 font-medium px-2 flex items-center gap-4 flex-1">
              <span>{taxa.length.toLocaleString()} of {totalRecords >= 0 ? totalRecords.toLocaleString() : 'many'} records loaded</span>
              {isLoadingMore && <span className="flex items-center gap-1 text-leaf-600"><Loader2Icon size={12} className="animate-spin"/> Loading...</span>}
+             
+             {error && (
+                <div className="flex items-center gap-1.5 px-3 py-1 bg-red-50 text-red-600 rounded-full border border-red-100 animate-in fade-in duration-300 max-w-[300px] truncate" title={error}>
+                    <AlertCircle size={14} className="flex-shrink-0" />
+                    <span className="font-bold truncate">{error}</span>
+                </div>
+             )}
+
              {isHierarchyMode && (
                  <div className="flex items-center gap-1 bg-white border border-slate-200 rounded p-0.5 ml-2 shadow-sm">
                      {groupBy.map((level, idx) => (
@@ -574,7 +602,19 @@ const DataGrid: React.FC<DataGridProps> = ({
                              ? (<MultiSelectFilter label={col.label} options={col.filterOptions || []} selected={filters[col.id] || []} onChange={(vals) => onFilterChange(col.id, vals)}/>) 
                              : (
                                 <div className="relative group/filter">
-                                    <input className={`w-full text-xs px-2 py-1.5 bg-white border border-slate-200 rounded outline-none transition-all focus:ring-1 font-normal ${col.id === 'taxonName' ? 'pl-7 pr-8 border-leaf-300 ring-leaf-100 focus:border-leaf-500' : 'focus:border-leaf-300 focus:ring-leaf-200'}`} placeholder={col.id === 'taxonName' ? (preferences.searchMode === 'prefix' ? 'Starts with...' : 'Contains...') : 'Filter...'} value={localTextFilters[col.id] || ''} onChange={e => handleTextFilterChange(col.id, e.target.value)}/>
+                                    <input 
+                                        className={`w-full text-xs px-2 py-1.5 bg-white border border-slate-200 rounded outline-none transition-all focus:ring-1 font-normal ${col.id === 'taxonName' ? 'pl-7 pr-8 border-leaf-300 ring-leaf-100 focus:border-leaf-500' : 'focus:border-leaf-300 focus:ring-leaf-200'} ${isTechnicalColumn(col.id) ? 'border-amber-200 focus:border-amber-400 focus:ring-amber-100' : ''}`} 
+                                        placeholder={col.id === 'taxonName' ? (preferences.searchMode === 'prefix' ? 'Starts with...' : 'Contains...') : (isTechnicalColumn(col.id) ? 'Exact (Enter)...' : 'Filter...')} 
+                                        value={localTextFilters[col.id] || ''} 
+                                        onChange={e => handleTextFilterChange(col.id, e.target.value)}
+                                        onBlur={e => isTechnicalColumn(col.id) && handleTextFilterChange(col.id, e.target.value, true)}
+                                        onKeyDown={e => {
+                                            if (e.key === 'Enter') {
+                                                handleTextFilterChange(col.id, (e.target as HTMLInputElement).value, true);
+                                            }
+                                        }}
+                                        title={isTechnicalColumn(col.id) ? "Technical equality column. Type full value and press Enter to search." : undefined}
+                                    />
                                     {col.id === 'taxonName' && (<SearchIcon size={12} className={`absolute left-2 top-2 ${preferences.searchMode === 'fuzzy' ? 'text-indigo-500' : 'text-leaf-500'}`} />)}
                                     {col.id === 'taxonName' && (
                                         <button 

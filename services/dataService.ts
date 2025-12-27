@@ -91,10 +91,13 @@ const mapToDB = (taxon: Taxon) => {
     common_name: taxon.commonName,
 
     genus: taxon.genus,
+    // Fix: Using correct camelCase property from Taxon interface
     genus_hybrid: taxon.genusHybrid,
     species: taxon.species,
+    // Fix: Using correct camelCase property from Taxon interface
     species_hybrid: taxon.speciesHybrid,
     infraspecies: taxon.infraspecies,
+    // Fix: Using correct camelCase property from Taxon interface
     infraspecific_rank: taxon.infraspecificRank,
     cultivar: taxon.cultivar,
     
@@ -106,9 +109,9 @@ const mapToDB = (taxon: Taxon) => {
     publication_author: taxon.publicationAuthor,
     replaced_synonym_author: taxon.replacedSynonymAuthor,
 
-    placeOfPublication: taxon.placeOfPublication,
-    volumeAndPage: taxon.volumeAndPage,
-    firstPublished: taxon.firstPublished,
+    place_of_publication: taxon.placeOfPublication,
+    volume_and_page: taxon.volumeAndPage,
+    first_published: taxon.firstPublished,
     nomenclatural_remarks: taxon.nomenclaturalRemarks,
     reviewed: taxon.reviewed,
 
@@ -129,7 +132,7 @@ export interface FetchOptions {
     sortBy?: string;
     sortDirection?: 'asc' | 'desc';
     shouldCount?: boolean;
-    searchMode?: 'prefix' | 'fuzzy'; // New option
+    searchMode?: 'prefix' | 'fuzzy'; 
 }
 
 export const dataService = {
@@ -160,17 +163,37 @@ export const dataService = {
         if (key === 'ipniId') dbKey = 'ipni_id';
         if (key === 'powoId') dbKey = 'powo_id';
         
-        if (key === 'taxonName') {
-            const rawSearch = (value as string).trim();
+        if (typeof value === 'string') {
+            const rawSearch = value.trim();
             if (!rawSearch) return;
-            
-            if (searchMode === 'fuzzy') {
-                // ILIKE %term% - Uses Trigram Index (gin_trgm_ops)
-                query = query.ilike('taxon_name', `%${rawSearch}%`);
+
+            let cleanVal = rawSearch;
+            if (searchMode === 'prefix') {
+                if (key === 'family' || key === 'genus') {
+                    cleanVal = rawSearch.charAt(0).toUpperCase() + rawSearch.slice(1).toLowerCase();
+                } else if (key === 'species' || key === 'infraspecies') {
+                    cleanVal = rawSearch.toLowerCase();
+                } else if (key === 'taxonName' || key === 'cultivar') {
+                    cleanVal = rawSearch.charAt(0).toUpperCase() + rawSearch.slice(1);
+                }
+            }
+
+            // --- Filter Mode Dispatcher ---
+            const isTechnicalId = key === 'id' || key.endsWith('Id');
+            const isStrictMetadata = key === 'firstPublished';
+
+            if (key === 'taxonName') {
+                if (searchMode === 'fuzzy') {
+                    query = query.ilike('taxon_name', `%${rawSearch}%`);
+                } else {
+                    query = query.like('taxon_name', `${cleanVal}%`);
+                }
+            } else if (isTechnicalId || isStrictMetadata) {
+                // Technical Equality: Strict exact match (=)
+                query = query.eq(dbKey, cleanVal);
             } else {
-                // Default Optimized Prefix - Uses B-Tree Index (Collate "C")
-                const cleanSearch = rawSearch.charAt(0).toUpperCase() + rawSearch.slice(1);
-                query = query.like('taxon_name', `${cleanSearch}%`);
+                // Standard Prefix Search: Starts with (LIKE 'Val%')
+                query = query.like(dbKey, `${cleanVal}%`);
             }
         } else if (Array.isArray(value)) {
             if (value.length > 0) {
@@ -184,65 +207,78 @@ export const dataService = {
                      query = query.in(dbKey, value);
                  }
             }
-        } else {
-            const strVal = String(value).trim();
-            if(strVal) {
-                 if (key.endsWith('Id') || key === 'firstPublished') {
-                     query = query.eq(dbKey, strVal);
-                 } else {
-                     query = query.like(dbKey, `${strVal}%`);
-                 }
-            }
         }
     });
 
-    const dbSortKey = sortBy === 'taxonName' ? 'taxon_name' 
-                    : sortBy === 'taxonRank' ? 'taxon_rank'
-                    : sortBy === 'family' ? 'family'
-                    : sortBy === 'genus' ? 'genus'
-                    : sortBy === 'genusHybrid' ? 'genus_hybrid'
-                    : sortBy === 'species' ? 'species'
-                    : sortBy === 'speciesHybrid' ? 'species_hybrid'
-                    : sortBy === 'cultivar' ? 'cultivar'
-                    : sortBy === 'taxonStatus' ? 'taxon_status'
-                    : sortBy.replace(/([A-Z])/g, "_$1").toLowerCase(); 
-
-    query = query.order(dbSortKey, { ascending: sortDirection === 'asc' });
-
-    const to = offset + limit - 1;
-    const { data, error, count } = await query.range(offset, to);
-
-    if (error) {
-      if (error.code === '57014') {
-          console.warn("Database timeout (57014)");
-          return { data: [], count: -1 }; 
-      }
-      throw error;
+    // --- Sorting & Pagination ---
+    if (sortBy) {
+        let dbSortKey = sortBy.replace(/([A-Z])/g, "_$1").toLowerCase();
+        if (sortBy === 'wcvpId') dbSortKey = 'wcvp_id';
+        query = query.order(dbSortKey, { ascending: sortDirection === 'asc' });
     }
 
-    return { 
-        data: (data || []).map(mapFromDB), 
-        count: count ?? -1
-    };
+    const { data, count, error } = await query
+      .range(offset, offset + limit - 1);
+
+    if (error) throw error;
+    return { data: (data || []).map(mapFromDB), count: count || -1 };
   },
 
-  async upsertTaxon(taxon: Taxon) {
-    if (getIsOffline()) return;
-    const dbPayload = mapToDB(taxon);
-    const { error } = await getSupabase().from(DB_TABLE).upsert(dbPayload);
+  async getTaxonById(id: string): Promise<Taxon | null> {
+    if (getIsOffline()) return null;
+    const { data, error } = await getSupabase()
+      .from(DB_TABLE)
+      .select('*, details:app_taxon_details(*)')
+      .eq('id', id)
+      .single();
+
+    if (error) return null;
+    return mapFromDB(data);
+  },
+
+  async createTaxon(taxon: Taxon): Promise<Taxon> {
+    if (getIsOffline()) throw new Error("Cannot create in offline mode");
+    const dbRow = mapToDB(taxon);
+    const { data, error } = await getSupabase()
+      .from(DB_TABLE)
+      .insert(dbRow)
+      .select()
+      .single();
+
+    if (error) throw error;
+    return mapFromDB(data);
+  },
+
+  async updateTaxon(id: string, updates: Partial<Taxon>): Promise<void> {
+    if (getIsOffline()) throw new Error("Cannot update in offline mode");
+    
+    // We only update the core table fields here
+    const dbUpdates: any = {};
+    Object.entries(updates).forEach(([key, value]) => {
+      // Don't update complex UI-only fields or derived fields in this simplified method
+      if (['description', 'synonyms', 'referenceLinks', 'isDetailsLoaded'].includes(key)) return;
+      
+      const dbKey = key.replace(/([A-Z])/g, "_$1").toLowerCase();
+      dbUpdates[dbKey] = value;
+    });
+
+    if (Object.keys(dbUpdates).length === 0) return;
+
+    const { error } = await getSupabase()
+      .from(DB_TABLE)
+      .update(dbUpdates)
+      .eq('id', id);
+
     if (error) throw error;
   },
 
-  async deleteTaxon(id: string) {
-    if (getIsOffline()) return;
-    const { error } = await getSupabase().from(DB_TABLE).delete().eq('id', id);
+  async deleteTaxon(id: string): Promise<void> {
+    if (getIsOffline()) throw new Error("Cannot delete in offline mode");
+    const { error } = await getSupabase()
+      .from(DB_TABLE)
+      .delete()
+      .eq('id', id);
+
     if (error) throw error;
-  },
-  
-  async batchInsert(taxa: Taxon[]) {
-      if (getIsOffline() || taxa.length === 0) return;
-      const payloads = taxa.map(mapToDB);
-      const { error } = await getSupabase().from(DB_TABLE).insert(payloads);
-      if (error) throw error;
   }
 };

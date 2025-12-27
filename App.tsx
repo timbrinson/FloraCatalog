@@ -1,32 +1,20 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { Loader2, Leaf, Plus, RotateCcw, Table, Network, Upload, X, Settings as SettingsIcon, Wrench, Activity, AlertCircle } from 'lucide-react';
-// Fixed: Removed non-existent TaxonomicStatus import
-import { Taxon, LoadingState, UserPreferences, BackgroundProcess, ActivityItem, SearchCandidate, ActivityStatus } from './types';
-import { identifyTaxonomy, enrichTaxon, deepScanTaxon, parseBulkText, searchTaxonCandidates } from './services/geminiService';
+import { Loader2, Leaf, Activity, Settings } from 'lucide-react';
+import { Taxon, LoadingState, UserPreferences, ActivityItem, ActivityStatus } from './types';
 import { dataService } from './services/dataService';
 import { getIsOffline } from './services/supabaseClient';
-import TaxonRow from './components/PlantCard';
 import EmptyState from './components/EmptyState';
 import DataGrid from './components/DataGrid';
 import ConfirmDialog from './components/ConfirmDialog';
 import SettingsModal from './components/SettingsModal';
 import ActivityPanel from './components/ActivityPanel';
-import { formatScientificName } from './utils/formatters';
 
-// Added default export and completed truncated component logic
 export default function App() {
-  const [query, setQuery] = useState('');
   const [loadingState, setLoadingState] = useState<LoadingState>(LoadingState.IDLE);
   const [isInitialized, setIsInitialized] = useState(false);
   const [errorDetails, setErrorDetails] = useState<string | null>(null);
-  const [viewMode, setViewMode] = useState<'tree' | 'grid'>('grid');
-  const [showImportModal, setShowImportModal] = useState(false);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
-  const [showToolsMenu, setShowToolsMenu] = useState(false);
   const [showActivityPanel, setShowActivityPanel] = useState(false);
-  const [importText, setImportText] = useState('');
-  const toolsMenuRef = useRef<HTMLDivElement>(null);
-  const activityButtonRef = useRef<HTMLDivElement>(null);
   const [taxa, setTaxa] = useState<Taxon[]>([]);
   const [offset, setOffset] = useState(0);
   const [hasMore, setHasMore] = useState(true);
@@ -36,15 +24,13 @@ export default function App() {
   const [sortConfig, setSortConfig] = useState<{ key: string, direction: 'asc' | 'desc' }>({ key: 'taxonName', direction: 'asc' });
   const [gridFilters, setGridFilters] = useState<Record<string, any>>({ taxonStatus: ['Accepted'] });
   const [isOffline, setIsOffline] = useState(getIsOffline());
-  const [enrichmentQueue, setEnrichmentQueue] = useState<Taxon[]>([]);
-  const activeEnrichmentCount = useRef(0); 
   const [preferences, setPreferences] = useState<UserPreferences>({ 
       hybridSpacing: 'space',
       autoEnrichment: false,
       autoFitMaxWidth: 400,
       fitScreenMaxRatio: 4.0,
       colorTheme: 'option2a',
-      searchMode: 'prefix' // Default to optimized search
+      searchMode: 'prefix'
   });
   const [activities, setActivities] = useState<ActivityItem[]>([]);
   const cancelledActivityIds = useRef<Set<string>>(new Set());
@@ -54,8 +40,6 @@ export default function App() {
 
   const isFiltering = useMemo(() => {
     return Object.entries(gridFilters).some(([key, value]) => {
-      // Default state for status is usually just 'Accepted', don't treat that alone as 'active filtering' 
-      // for the purpose of hiding the "Garden Empty" state.
       if (key === 'taxonStatus') {
         return !Array.isArray(value) || value.length !== 1 || value[0] !== 'Accepted';
       }
@@ -76,7 +60,6 @@ export default function App() {
           else setIsFetchingMore(true);
           
           const limit = 100;
-          // OPTIMIZATION: Only count on the first page or search
           const shouldCount = isNewSearch;
           
           const { data, count } = await dataService.getTaxa({ 
@@ -86,13 +69,13 @@ export default function App() {
             sortBy: sortConfig.key, 
             sortDirection: sortConfig.direction,
             shouldCount,
-            searchMode: preferences.searchMode // Pass the experimental setting
+            searchMode: preferences.searchMode 
           });
           
           if (isNewSearch) { 
               setTaxa(data); 
               if (count !== -1) setTotalRecords(count);
-              else if (data.length === 0) setTotalRecords(0); // Explicitly zero if no data
+              else if (data.length === 0) setTotalRecords(0);
           } else {
               setTaxa(prev => [...prev, ...data]);
           }
@@ -105,39 +88,26 @@ export default function App() {
           setErrorDetails(e.message || "Database error.");
           setLoadingState(LoadingState.ERROR);
           setIsFetchingMore(false);
+          // Ensure we marked as initialized so the grid doesn't unmount on subsequent search errors
+          if (!isInitialized && taxa.length > 0) setIsInitialized(true);
       } finally { isFetchingRef.current = false; }
   };
 
   useEffect(() => { 
     setOffset(0); 
     fetchBatch(0, true); 
-  }, [gridFilters, sortConfig, preferences.searchMode]); // Reload on mode change
+  }, [gridFilters, sortConfig, preferences.searchMode]);
 
   const handleFilterChange = (key: string, value: any) => setGridFilters(prev => ({ ...prev, [key]: value }));
   const handleSettingsClose = () => { setShowSettingsModal(false); const n = getIsOffline(); setIsOffline(n); if (!n) fetchBatch(0, true); };
   const handleLoadMore = () => { if (!hasMore || isFetchingRef.current || loadingState === LoadingState.LOADING) return; const n = offset + 100; setOffset(n); fetchBatch(n, false); };
+  
   useEffect(() => { const s = localStorage.getItem('flora_prefs'); if (s) try { setPreferences(JSON.parse(s)); } catch(e) {} }, []); 
   useEffect(() => localStorage.setItem('flora_prefs', JSON.stringify(preferences)), [preferences]);
-  useEffect(() => { const h = (e: MouseEvent) => { if (toolsMenuRef.current && !toolsMenuRef.current.contains(e.target as Node)) setShowToolsMenu(false); }; document.addEventListener('mousedown', h); return () => document.removeEventListener('mousedown', h); }, [showToolsMenu]);
 
-  const addActivity = (name: string, type: 'mining' | 'import' | 'enrichment' | 'search', payload?: any, existingId?: string) => {
-      const id = existingId || crypto.randomUUID();
-      cancelledActivityIds.current.delete(id);
-      setActivities(prev => {
-          if (prev.some(a => a.id === id)) return prev.map(a => a.id === id ? { ...a, status: 'running' as ActivityStatus, message: 'Starting...', timestamp: Date.now() } : a);
-          const newItem: ActivityItem = { id, name, type, status: 'running' as ActivityStatus, message: 'Starting...', timestamp: Date.now(), payload, details: payload };
-          return [newItem, ...prev].slice(0, 50); 
-      });
-      return id;
-  };
-
-  const updateActivity = (id: string, message: string, updates?: Partial<ActivityItem>) => setActivities(prev => prev.map(a => a.id === id ? { ...a, message, ...updates } : a));
-  const completeActivity = (id: string, message: string = "Completed") => { setActivities(prev => prev.map(a => a.id === id ? { ...a, status: 'completed' as ActivityStatus, message, timestamp: Date.now() } : a)); cancelledActivityIds.current.delete(id); };
-  const failActivity = (id: string, errorMsg: string, canRetry: boolean = false) => setActivities(prev => prev.map(a => a.id === id ? { ...a, status: 'error' as ActivityStatus, message: errorMsg, canRetry } : a));
-
-  // main logical branches for rendering to prevent flashing
-  const isHardError = (isOffline || loadingState === LoadingState.ERROR) && taxa.length === 0;
-  const isActuallyEmpty = taxa.length === 0 && !isFiltering && loadingState === LoadingState.SUCCESS && totalRecords === 0;
+  // Main UI logic
+  const isHardError = (isOffline || (loadingState === LoadingState.ERROR && !isInitialized));
+  const isActuallyEmpty = taxa.length === 0 && !isFiltering && loadingState === LoadingState.SUCCESS && totalRecords === 0 && isInitialized;
   const showInitialLoader = !isInitialized && loadingState === LoadingState.LOADING;
 
   return (
@@ -151,13 +121,15 @@ export default function App() {
             onClick={() => setShowActivityPanel(!showActivityPanel)}
             className={`p-2 rounded-full transition-colors ${showActivityPanel ? 'bg-leaf-100 text-leaf-700' : 'text-slate-500 hover:bg-slate-100'}`}
           >
+            {/* Fix: Using size={20} instead of invalid size(20) */}
             <Activity size={20} />
           </button>
           <button 
             onClick={() => setShowSettingsModal(true)}
             className="p-2 text-slate-500 hover:bg-slate-100 rounded-full transition-colors"
           >
-            <SettingsIcon size={20} />
+            {/* Fix: Using Settings from lucide-react instead of missing SettingsIcon */}
+            <Settings size={20} />
           </button>
         </div>
       </header>
@@ -187,6 +159,7 @@ export default function App() {
             onSortChange={(key, direction) => setSortConfig({ key, direction: direction as 'asc' | 'desc' })}
             filters={gridFilters}
             onFilterChange={handleFilterChange}
+            error={loadingState === LoadingState.ERROR ? errorDetails : null}
           />
         )}
 

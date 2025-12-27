@@ -93,7 +93,7 @@ This document defines the logic and valid values for multi-select filters in the
 |	nothovar.	|	WCVP - Obsolete	|	nothovar.	|	nothovar.	|		|		|
 |	positio	|	WCVP - Obsolete	|	positio	|	positio	|		|		|
 |	proles	|	WCVP - Obsolete	|	proles	|	proles	|		|		|
-|	provar.	|	WCVP - Obsolete	|	provar.	|	provar.	|		|		|
+|	provar.	|	WCVP - Obsolete	|		|	provar.	|		|	In WCVP data but not in WCVP docs	|
 |	psp.	|	WCVP - Obsolete	|	psp.	|	psp.	|		|		|
 |	stirps	|	WCVP - Obsolete	|	stirps	|	stirps	|		|		|
 |	subap.	|	WCVP - Obsolete	|		|	subap.	|		|	In WCVP data but not in WCVP docs	|
@@ -138,21 +138,23 @@ This document defines the logic and valid values for multi-select filters in the
 | **Prefix (Standard)** | `|A...` | `LIKE 'Term%'` | **B-Tree** | Fastest possible search. Best for large-scale browsing. Matches only the start of the plant name. |
 | **Fuzzy (Flexible)** | `...A...` | `ILIKE '%term%'`| **Trigram GIN** | Most flexible. Matches text anywhere in the name. Supports `%` wildcards for complex filtering. |
 
-### Technical Implementation Details
+## 7. Intelligent Auto-Casing (Prefix Mode)
+**Strategy:** In **Prefix Mode**, the application applies specific casing rules to text filters before sending the query to the database. This allowed the use of optimized, case-sensitive **B-Tree indexes** while remaining user-friendly.
 
-#### Auto-Capitalization (Prefix Mode)
-In **Prefix Mode**, the application automatically capitalizes the first letter of the user's input before sending it to the database (e.g., typing `aga` becomes `Aga`).
-*   **Why:** Botanical nomenclature strictly dictates that higher-level ranks (Family, Genus) must always start with a capital letter.
-*   **Performance:** This transformation allows us to use a standard case-sensitive **B-Tree index** (configured with `COLLATE "C"`), which is significantly faster than a case-insensitive scan.
+*   **Family & Genus**: Title Case (e.g., "amaryllidaceae" → "Amaryllidaceae"). Matches the standard botanical capitalization for higher taxonomic ranks.
+*   **Species & Infraspecies**: Lowercase (e.g., "PARRYI" → "parryi"). Matches the botanical convention where specific epithets are never capitalized.
+*   **Taxon Name & Cultivar**: Capitalized first letter (e.g., "agave parryi" → "Agave parryi"). Ensures the string matches the combined format stored in the database.
 
-#### Implicit Wildcard Wrapping (Fuzzy Mode)
+## 8. Database Implementation Details
+
+### Implicit Wildcard Wrapping (Fuzzy Mode)
 In **Fuzzy Mode**, the application automatically wraps the user's input in wildcards (`%`) before sending it to the database.
 *   **Logic:** Input `Ag%par` is transformed into the query `%Ag%par%`.
 *   **Effect:** This ensures the search behaves as a "Contains" logic, finding the string fragments anywhere in the plant name, even if they are not at the start.
 
-#### Index Selection & Query Optimization
+### Index Selection & Query Optimization
 It is important to note that the application does not "choose" the index; it provides the query structure, and the **PostgreSQL Query Planner** determines the most efficient path:
-1.  **Prefix Queries (`LIKE 'Term%'`)**: The planner will prioritize the **B-Tree index**. This is an "Index Seek"—the fastest possible lookup method (<10ms).
+1.  **Prefix Queries (`LIKE 'Term%'`)**: The planner will prioritize the **B-Tree index**. This is an "Index Seek"—the fastest possible lookup method (less than 10ms).
 2.  **Middle-String Queries (`ILIKE '%term%'`)**: The planner will prioritize the **GIN Trigram index**. This is an "Index Scan"—it evaluates 3-character segments (trigrams) to find matches anywhere in the string.
 3.  **Fallback**: If the search term is too short (1-2 characters), the planner may determine that an index scan is more expensive than reading the table directly and opt for a **Sequential Table Scan**.
 
@@ -161,8 +163,27 @@ In Fuzzy mode, users can manually insert the `%` symbol to find non-contiguous f
 - *Example:* Typing `Ag%par%` will find all *Agave parryi* records.
 - *Example:* Typing `%var. truncata` will find all varieties named *truncata* regardless of Genus or Species.
 
-## Technical Note: Case Sensitivity & Capitalization
+## 9. Technical Note: Case Sensitivity & Capitalization
 Database filters in `dataService.ts` are strictly case-sensitive for these specific columns.
 - **Filter Values**: All options in multi-select dropdowns MUST match the database strings exactly (including small case for climate and lifeform literals).
 - **Grid Display**: The UI components must NOT transform values to ALL CAPS (e.g., using `.toUpperCase()` or the `uppercase` CSS class). Rank and Status should be rendered using the natural capitalization stored in the database (e.g., "Genus", "Species", "Accepted") to maintain consistency for data validation and debugging.
 - **CSS Inheritance**: Since filters are often located within `thead` (which typically has `uppercase`), UI components must use `normal-case` classes to ensure database literals are displayed with their original capitalization and are not distorted visually.
+
+## 10. Technical Equality (Exact Match) & Commit UX
+**Strategy:** Certain columns contain rigid, machine-readable data where partial matching or prefix logic is undesirable. For these, the application uses the strict SQL Equality operator (`=`) and an explicit commit-on-enter UX.
+
+**Target Columns:**
+*   **Internal IDs**: `id` (Primary Key UUID).
+*   **External Identifiers**: `wcvpId`, `ipniId`, `powoId`.
+*   **Relational Links**: `acceptedPlantNameId`, `parentPlantNameId`, `basionymPlantNameId`.
+*   **Publication Metadata**: `firstPublished`.
+
+**Commit Behavior:**
+*   **Keystroke Logic**: Unlike standard text filters, technical columns **do not** trigger a search on every keystroke. 
+*   **Commit Trigger**: Searches are only triggered when the user presses **Enter** or focus is moved away from the input field (**Blur**). 
+*   **Rationale**: This prevents "Database timeout (57014)" errors caused by expensive exact-match operations on incomplete fragments (e.g., a partial year or truncated UUID) while typing.
+
+**Matching Rules:**
+*   **Exact Byte Match**: Designed for pasting specific strings. Pasting `271046-1` into the IPNI ID filter will return only that specific record.
+*   **No Wildcards**: These filters never apply wildcards (`%`) or use `LIKE` logic. Matching is byte-for-byte.
+*   **firstPublished Note**: In the WCVP dataset, years are often stored with parentheses, e.g., `(1753)`. The equality search requires the input to match exactly including these characters.
