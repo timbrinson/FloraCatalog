@@ -4,7 +4,7 @@
 
 ## 1. Project Philosophy
 FloraCatalog is a tool for **botanical precision**. It bridges the gap between static scientific checklists (like the WCVP) and living garden collections. 
-- **Scientific Integrity First:** We strictly follow the Kew Gardens WCVP data standards.
+- **Scientific Integrity First:** We strictly adhere to the Kew Gardens WCVP data standards.
 - **AI as Curator, Not Author:** AI is used to parse, standardize, and mine data, but it must respect the authoritative hierarchy.
 - **UX Stability:** The application is a high-density "Smart Spreadsheet." UI stability (preserving state, focus, and filters) is as important as data accuracy.
 
@@ -32,5 +32,8 @@ The `docs/` folder is your long-term memory.
 - `docs/decisions/`: Technical justifications. Do not debate settled decisions.
 - `docs/features/`: Visual and functional specs. These define "correct" behavior even if the code looks complex.
 - `docs/FILTER_STRATEGIES.md`: The definitive rules for botanical data manipulation.
+
+## 6. The Zero-Action Rule
+**The Zero-Action Rule:** The AI is strictly prohibited from modifying *any* file in the project—be it code, documentation, or configuration—unless the user has explicitly approved the specific plan for those changes in the current turn. "Helpful" unsolicited updates to documentation, vision statements, or roadmap files are considered a breach of protocol.
 
 **By proceeding, you agree to operate within this hierarchy and respect the preservation of project context over personal optimization logic.**

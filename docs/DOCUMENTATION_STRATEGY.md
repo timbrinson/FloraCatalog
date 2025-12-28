@@ -35,6 +35,18 @@ This document tracks the plan and progress for building a robust documentation l
 - **Goal:** Formalize the start of a new session.
 - **Requirement:** AI must provide a "Project State Summary" and "Active Objective" based on documentation before emitting any code.
 
+## Documentation Maintenance Strategy
+To balance high-fidelity detail with readability, the project employs a three-tiered approach to document volume control:
+
+### Tier 1: The "Propose-First" Trimming Rule
+The AI is prohibited from unilaterally shortening documentation. If a section becomes unwieldy, the AI must explicitly flag it as a "Maintenance Suggestion" in its response, asking the user whether to consolidate the text or move details to an archive.
+
+### Tier 2: The "Side-Car Archive" Pattern
+Instead of deleting detailed technical reasoning or historical context, "Side-Car" files are created. The main documentation remains focused on current rules/specs, while the "Why" and specific edge cases are moved to `docs/decisions/` or `docs/archive/`.
+
+### Tier 3: The "Refactor for Brevity" Command
+Brevity updates are only performed via explicit user commands (e.g., "Refactor this section for brevity"). During such an update, the AI must provide a "Lossless Check" in its plan, identifying exactly what context is being archived or removed before emitting code.
+
 ## Implementation Roadmap
 
 - [x] Update `docs/AI_DEVELOPMENT_PROTOCOL.md` with Handover rules.

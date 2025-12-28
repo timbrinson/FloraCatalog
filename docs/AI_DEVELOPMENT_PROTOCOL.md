@@ -16,7 +16,7 @@ Whenever a new conversation starts or the session is reset, the AI MUST NOT emit
 
 ## 3. Rules for Code Updates
 - **Clarification Over Assumption**: If a command is ambiguous or implies a logic change not documented in the `docs/` folder, the AI must ask for clarification before acting.
-- **No Unsolicited Refactors**: Do not change casing (e.g., 'genus' to 'Genus'), variable names, or architectural patterns unless explicitly commanded to do so. **"Fixing" things that aren't broken is a project failure.**
+- **No Unsolicited Content Updates (The Zero-Action Rule)**: Do not change *any* file—be it code, documentation, or configuration—unless explicitly commanded. Do not change casing (e.g., 'genus' to 'Genus'), variable names, or architectural patterns for the sake of "cleanliness." **"Fixing" or "improving" things that aren't broken without a direct "Go" is a project failure.**
 - **Atomic XML Blocks**: Keep file updates as small as possible. Avoid massive multi-file rewrites unless necessary. This ensures the "Restore" button remains a viable safety net for the user.
 - **Linting & Types**: Always check `types.ts` for the definitive source of truth regarding interfaces and ranks before making comparisons in components.
 
@@ -33,6 +33,8 @@ Whenever a new conversation starts or the session is reset, the AI MUST NOT emit
 - **Guardrail B (Post-Error Grounding)**: After any "Internal Error," session timeout, or environment reset, the AI must perform the Section 1 Handover Protocol before proposing any changes.
 - **Guardrail C (Task Lifecycle Verification)**: Only the Human Architect can move tasks to the "Archive." The AI may suggest a status update (e.g., "Fixed - Awaiting Verification"), but the move to Archive requires user consent.
 - **Guardrail D (Preservation Over Brevity)**: Maintaining a complete historical record in roadmap documents is more important than keeping the XML response short.
+- **Guardrail E (The Zero-Action Rule)**: The AI is strictly prohibited from modifying *any* file—including documentation like `VISION_STATEMENT.md`—without explicit user approval of the specific plan in the current turn.
+- **Guardrail F (Explicit Sign-Off Rule)**: The AI is strictly forbidden from marking a `TASK_BACKLOG.md` item as `[x]` or moving it to the "Archive" based on its own assessment of completion. Even if the AI believes a task is finished, the document update only occurs after a direct command from the Human Architect (e.g., "Verified, mark as done").
 
 ## 7. Behavioral Warnings & Anti-Patterns
 Past sessions have identified "Drift" patterns that must be avoided:
@@ -42,4 +44,11 @@ Past sessions have identified "Drift" patterns that must be avoided:
 
 ## 8. Content Integrity & Preservation
 - **Strict Line-by-Line Preservation**: For baseline files, the AI must copy the *entire* existing content exactly. Re-summarizing or "cleaning up" sections from memory is strictly prohibited.
+- **The Literal Preservation Clause**: Summarization of existing documentation is a **High-Severity Regression**. When updating a file, the AI must replicate the existing content character-for-character. "Tightening" or "cleaning up" phrasing is strictly forbidden unless the specific goal of the task is "Copy Editing." The assistant must treat existing paragraphs as immutable constants.
+- **Conservation Check**: Before outputting an XML block for any documentation file, the AI must explicitly state in the planning phase: *"I have verified via a mental diff that 100% of the existing text has been preserved verbatim, with no summarization or truncation."*
 - **Diff Verification**: Before emitting XML, perform a mental diff to ensure no tasks or descriptions were accidentally deleted.
+
+## 9. Refactoring for Brevity
+1. **Human-Triggered Only:** The AI must never shorten existing documentation unless the user uses an explicit command like "Refactor for brevity" or "Consolidate this section."
+2. **Lossless Verification:** When refactoring for brevity, the AI must first list any specific details, edge cases, or historical context being removed or moved. 
+3. **The Archive Option:** The AI should always prioritize moving long-form reasoning to a new file in `docs/decisions/` or `docs/archive/` rather than deleting it.

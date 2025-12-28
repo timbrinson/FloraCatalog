@@ -1,5 +1,14 @@
 # Version History
 
+## v2.21.0 - Protocol Maturation & Briefing Strategy
+**Date:** June 14, 2025
+**Status:** (Ready for Push)
+
+### Protocol Improvements
+- **Literal Preservation Clause:** Codified Section 8 in `docs/AI_DEVELOPMENT_PROTOCOL.md`, making summarization of baseline documentation a high-severity regression.
+- **Explicit Sign-Off Rule:** Added Guardrail F, prohibiting the AI from unilaterally marking tasks as "Done" or archiving items in the backlog without human verification.
+- **Brevity Strategy:** Formalized Section 9 (Refactoring for Brevity) and the 3-Tiered Maintenance Strategy in `docs/DOCUMENTATION_STRATEGY.md` to balance detail fidelity with readability.
+
 ## v2.20.0 - Knowledge Layer & Roadmap Expansion
 **Date:** June 13, 2025
 **Status:** (Ready for Push)
