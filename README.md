@@ -1,48 +1,47 @@
-# FloraCatalog
+# FloraCatalog: Project Atlas
 
-**A Smart Botanical Database & Cataloging System**
+FloraCatalog is a high-performance botanical database application designed to bridge the gap between static scientific checklists (Kew Gardens WCVP) and living garden collections. It serves as a "Smart Spreadsheet" for botanical precision, utilizing AI to standardize nomenclature and curate rich horticultural data.
 
-FloraCatalog is a high-performance web application designed to manage complex botanical taxonomy. It combines the rigorous scientific standards of the World Checklist of Vascular Plants (WCVP) with the flexibility of AI-powered enrichment for cultivars and garden hybrids.
+## 🌿 Project Philosophy
+- **Scientific Integrity First:** We strictly adhere to the World Checklist of Vascular Plants (WCVP) data standards for nomenclature.
+- **Botanical Precision:** Accuracy in hybrid notation (using literal `×`) and taxonomic hierarchy is non-negotiable.
+- **UX Stability:** The application is a high-density professional tool. UI state preservation (filters, scroll, focus) is as critical as data accuracy.
+- **AI as Curator:** Generative AI is used to parse, standardize, and mine data, always operating within the constraints of authoritative botanical rules.
 
-![Version](https://img.shields.io/badge/version-2.15.0-emerald)
-![Tech](https://img.shields.io/badge/stack-React%20%7C%20Supabase%20%7C%20Gemini%20AI-blue)
+## 🗺️ Documentation Map
+This project maintains a robust documentation layer in the `docs/` directory to preserve context across development sessions.
 
-## Key Features
+### Core Governance
+- [**Vision & Context**](./docs/VISION_STATEMENT.md): **[Read Second]** Deep dive into the global state of botanical data and the mission to bridge scientific and horticultural records.
+- [**AI Onboarding & Behavior**](./docs/AI_ONBOARDING.md): **[Read First]** The manifesto defining the Human-as-Architect / AI-as-Lead-Dev relationship.
+- [**AI Development Protocol**](./docs/AI_DEVELOPMENT_PROTOCOL.md): Strict "Rules of Engagement" for code updates and session handovers.
+- [**Documentation Strategy**](./docs/DOCUMENTATION_STRATEGY.md): The long-term plan for project context preservation.
 
-*   **Advanced Data Grid:** A high-density "Tree Grid" that handles hierarchical data (Genus -> Species -> Cultivar) with infinite scrolling and virtual grouping.
-*   **AI Integration (Gemini 2.5):** 
-    *   Parses natural language plant names (e.g., "Agave parryi var. truncata") into structured taxonomic records.
-    *   Standardizes hybrid markers (`×` vs `x`).
-    *   Mines generic lists for registered cultivars.
-*   **WCVP Schema Alignment:** Strictly adheres to the Kew Gardens WCVP data model for scientific accuracy.
-*   **Data Lineage:** Tracks the source of every record (e.g., "WCVP v14" vs "Gemini AI") to maintain data integrity.
-*   **Offline / Online Mode:** Dynamically connects to a Supabase backend or runs in a read-only offline mode if credentials are missing.
+### Technical Architecture
+- [**Design Specifications**](./docs/DESIGN_SPECS.md): Deep dive into the React architecture, Grid visual rules, and UX logic.
+- [**Data Model & Management**](./docs/DATA_MODEL.md): Schema design, Ltree hierarchy strategy, and data lineage philosophy.
+- [**Data Mapping Table**](./docs/DATA_MAPPING.md): Field-level mapping between WCVP source data and the application database.
+- [**Filter Strategies**](./docs/FILTER_STRATEGIES.md): Definitive logic for search engines (B-Tree vs GIN) and botanical filter values.
 
-## Documentation
+### Guides & Operations
+- [**Setup Guide**](./docs/SETUP_GUIDE.md): Infrastructure configuration for Supabase and Gemini API.
+- [**Automation & Build Plan**](./docs/AUTOMATION_PLAN.md): Documentation for the interactive CLI tool used to rebuild the database.
+- [**Data Import Guide**](./docs/DATA_IMPORT_GUIDE.md): Step-by-step instructions for loading 1.4 million WCVP records.
 
-*   [**Setup Guide**](./docs/SETUP_GUIDE.md): How to configure Supabase and API keys.
-*   [**Automation Plan**](./docs/AUTOMATION_PLAN.md): Details the interactive CLI tool used to rebuild the database from scratch.
-*   [**Data Import Guide**](./docs/DATA_IMPORT_GUIDE.md): How to load the 1.4 million record WCVP dataset.
-*   [**Design Specs**](./docs/DESIGN_SPECS.md): Detailed architectural decisions and prompt context.
-*   [**Data Model**](./docs/DATA_MODEL.md): Database schema and lineage strategy.
+### Roadmap & History
+- [**Task Backlog**](./docs/TASK_BACKLOG.md): Active roadmap, pending features, and technical debt.
+- [**Version History**](./docs/VERSION_HISTORY.md): Detailed release notes and bug fix logs.
 
-## Quick Start
+## 🛠️ Tech Stack
+- **Frontend:** React 19 (Strict Mode), TypeScript, Tailwind CSS.
+- **Icons:** Lucide React.
+- **Intelligence:** Google Gemini API (`@google/genai`).
+- **Backend:** Supabase (PostgreSQL with `ltree` and `pg_trgm` extensions).
 
-1.  **Install Dependencies:**
-    ```bash
-    npm install
-    ```
+## 🚀 Quick Start
+1. **Connect Database:** Click the **Settings (Gear Icon)** in the app header and enter your Supabase credentials.
+2. **Build Database:** Run `npm run db:build` to initialize the schema and stream the WCVP dataset.
+3. **Analyze:** Use the Data Grid to filter by Rank, Status, or Name using the hybrid search engine.
 
-2.  **Run Locally:**
-    ```bash
-    npm run dev
-    ```
-
-3.  **Connect Database:**
-    *   Click the **Settings (Gear Icon)** in the top right.
-    *   Enter your Supabase URL and Anon Key.
-    *   Click "Save & Connect".
-
-## License
-
-Private / Proprietary.
+---
+*For botanical test cases and sample nomenclature, see [Test Data.md](./docs/Test%20Data.md).*

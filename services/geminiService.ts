@@ -52,49 +52,21 @@ export async function identifyTaxonomy(query: string): Promise<any[]> {
 }
 
 /**
- * searchTaxonCandidates: Performs a fuzzy search for plant names to resolve ambiguities.
- */
-export async function searchTaxonCandidates(query: string): Promise<SearchCandidate[]> {
-  const response = await ai.models.generateContent({
-    model: 'gemini-3-flash-preview',
-    contents: `Find the most likely botanical matches for the query: "${query}".
-    Include synonyms, common names, and trade names.`,
-    config: {
-      responseMimeType: "application/json",
-      responseSchema: {
-        type: Type.ARRAY,
-        items: {
-          type: Type.OBJECT,
-          properties: {
-            taxonName: { type: Type.STRING },
-            commonName: { type: Type.STRING },
-            acceptedName: { type: Type.STRING, description: "The correct botanical name if input is a synonym" },
-            matchType: { type: Type.STRING, description: "exact, synonym, fuzzy, common_name" },
-            confidence: { type: Type.NUMBER },
-            isHybrid: { type: Type.BOOLEAN }
-          },
-          required: ["taxonName", "matchType", "confidence"]
-        }
-      }
-    }
-  });
-
-  try {
-    return JSON.parse(response.text || "[]");
-  } catch (e) {
-    return [];
-  }
-}
-
-/**
- * enrichTaxon: Fetches additional botanical details, synonyms, and reference links.
+ * enrichTaxon: Fetches comprehensive botanical and horticultural details.
  */
 export async function enrichTaxon(taxon: Taxon): Promise<Partial<Taxon>> {
   const response = await ai.models.generateContent({
     model: 'gemini-3-flash-preview',
-    contents: `Provide detailed botanical info for "${taxon.taxonName}".
-    Categorize synonyms carefully: scientific, trade, misapplied, common.
-    Provide reputable reference URLs.`,
+    contents: `Provide deep horticultural and botanical data for "${taxon.taxonName}".
+    
+    Include:
+    1. A detailed narrative description.
+    2. Origin discovery year and historical background.
+    3. Physical traits: size (min/max), foliage/flower colors, texture.
+    4. Growing conditions: USDA zones, light, water, soil, growth rate.
+    5. Expansive Synonyms (A.K.A.s): 
+       - trade names, trademarks (TM), registered trademarks (R), 
+       - plant patents (PP), common names, and cultivar misapplications.`,
     config: {
       responseMimeType: "application/json",
       responseSchema: {
@@ -102,14 +74,41 @@ export async function enrichTaxon(taxon: Taxon): Promise<Partial<Taxon>> {
         properties: {
           description: { type: Type.STRING },
           commonName: { type: Type.STRING },
-          family: { type: Type.STRING },
+          hardinessMin: { type: Type.INTEGER },
+          hardinessMax: { type: Type.INTEGER },
+          heightMin: { type: Type.INTEGER },
+          heightMax: { type: Type.INTEGER },
+          widthMin: { type: Type.INTEGER },
+          widthMax: { type: Type.INTEGER },
+          originYear: { type: Type.INTEGER },
+          history: { type: Type.STRING },
+          morphology: {
+            type: Type.OBJECT,
+            properties: {
+              foliage: { type: Type.STRING },
+              flowers: { type: Type.STRING },
+              form: { type: Type.STRING },
+              texture: { type: Type.STRING },
+              seasonalVariation: { type: Type.STRING }
+            }
+          },
+          ecology: {
+            type: Type.OBJECT,
+            properties: {
+              soil: { type: Type.STRING },
+              light: { type: Type.STRING },
+              water: { type: Type.STRING },
+              growthRate: { type: Type.STRING },
+              floweringPeriod: { type: Type.STRING }
+            }
+          },
           synonyms: {
             type: Type.ARRAY,
             items: {
               type: Type.OBJECT,
               properties: {
                 name: { type: Type.STRING },
-                type: { type: Type.STRING, description: "scientific, trade, misapplied, common" }
+                type: { type: Type.STRING, enum: ['scientific', 'trade', 'trademark', 'registered_trademark', 'patent', 'common', 'misapplied', 'misrepresented', 'cultivar', 'unspecified'] }
               }
             }
           },
@@ -136,47 +135,12 @@ export async function enrichTaxon(taxon: Taxon): Promise<Partial<Taxon>> {
 }
 
 /**
- * deepScanTaxon: Systematic cultivar mining with progress feedback.
- */
-export async function deepScanTaxon(
-  name: string, 
-  rank: string, 
-  onProgress: (names: string[], status: string) => Promise<boolean>
-) {
-  const ranges = ["A-C", "D-F", "G-I", "J-L", "M-O", "P-R", "S-U", "V-Z"];
-  
-  for (const range of ranges) {
-    const status = `Scanning registered cultivars in range ${range}...`;
-    const response = await ai.models.generateContent({
-      model: 'gemini-3-pro-preview',
-      contents: `List all registered cultivars and varieties for the ${rank} "${name}" that start with letters in the range ${range}.
-      Respond with a simple JSON list of names.`,
-      config: {
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.ARRAY,
-          items: { type: Type.STRING }
-        }
-      }
-    });
-
-    try {
-      const foundNames: string[] = JSON.parse(response.text || "[]");
-      const shouldContinue = await onProgress(foundNames, status);
-      if (!shouldContinue) break;
-    } catch (e) {
-      console.error(`Range ${range} failed`, e);
-    }
-  }
-}
-
-/**
  * findAdditionalLinks: Web search for specific plant documentation.
  */
 export async function findAdditionalLinks(taxonName: string, existing: Link[]): Promise<Link[]> {
   const response = await ai.models.generateContent({
     model: 'gemini-3-flash-preview',
-    contents: `Find additional authoritative reference links for "${taxonName}". 
+    contents: `Find authoritative reference links (RHS, Missouri Botanical Garden, POWO, etc.) for "${taxonName}". 
     Avoid these existing links: ${existing.map(l => l.url).join(', ')}.`,
     config: {
       responseMimeType: "application/json",
@@ -190,30 +154,6 @@ export async function findAdditionalLinks(taxonName: string, existing: Link[]): 
           },
           required: ["title", "url"]
         }
-      }
-    }
-  });
-
-  try {
-    return JSON.parse(response.text || "[]");
-  } catch (e) {
-    return [];
-  }
-}
-
-/**
- * parseBulkText: Natural language list processing.
- */
-export async function parseBulkText(text: string): Promise<string[]> {
-  const response = await ai.models.generateContent({
-    model: 'gemini-3-flash-preview',
-    contents: `Extract a clean list of botanical names from this text. Ignore numbers, dates, or non-plant words:
-    "${text}"`,
-    config: {
-      responseMimeType: "application/json",
-      responseSchema: {
-        type: Type.ARRAY,
-        items: { type: Type.STRING }
       }
     }
   });

@@ -48,20 +48,30 @@ This document provides the definitive mapping between the World Checklist of Vas
 | | parentPlantNameId | Text | unselected | (none) | Parent Plant ID | Parent Plant Name ID | parentPlantNameId | parent_plant_name_id| parent_plant_name_id| | chr | ID for the parent taxon. | |
 | | basionymPlantNameId | Text | unselected | (none) | Basionym ID | Basionym Plant Name ID | basionymPlantNameId | basionym_plant_name_id| basionym_plant_name_id| | chr | ID of the original name. | |
 
+## The Golden Record (Horticultural Details)
+These fields are stored in the `app_taxon_details` table and are used to enrich standard scientific nomenclature.
+
+| Group | App Attribute | Database Column | Data Type | Notes |
+| :--- | :--- | :--- | :--- | :--- |
+| **Traits** | description | description_text | text | Narrative description |
+| | hardinessMin | hardiness_zone_min | integer | USDA Hardiness Zone |
+| | hardinessMax | hardiness_zone_max | integer | USDA Hardiness Zone |
+| | heightMin | height_min_cm | integer | Stored in Centimeters |
+| | heightMax | height_max_cm | integer | Stored in Centimeters |
+| | widthMin | width_min_cm | integer | Stored in Centimeters |
+| | widthMax | width_max_cm | integer | Stored in Centimeters |
+| | originYear | origin_year | integer | Year of discovery/introduction |
+| **JSONB Layers** | morphology | morphology | jsonb | Leaf/Flower color, texture, shape |
+| | ecology | ecology | jsonb | Soil type, light needs, watering |
+| | history | history_metadata | jsonb | Background, Discovery story |
+| | akaNames | alternative_names | jsonb | Trademarks, Patents, Patents, AKAs |
+| | links | reference_links | jsonb | Reputable source URLs |
+
 ## Technical Notes
 
-### Infraspecific Ranks (WCVP Value / Remark)
-**Vocabulary:** `agamosp., convar., ecas., f., grex, group, lusus, microf., microgene, micromorphe, modif., monstr., mut., nid, nothof., nothosubsp., nothovar., positio, proles, provar., psp., stirps, subf., sublusus, subproles, subsp., subspecioid, subvar., unterrasse, var.`
-**Note:** For more information, see the International Code of Nomenclature for algae, fungi and plants: https://www.iapt-taxon.org/nomen/main.php
+### Infraspecific Ranks
+**Vocabulary:** `subsp., var., subvar., f., subf., agamosp., convar., ecas., grex, group, lusus, microf., microgène, micromorphe, modif., monstr., mut., nid, nothof., nothosubsp., nothovar., positio, proles, provar., psp., stirps, subap., sublusus, subproles, subspecioid, subsubsp., unterrasse.`
 
-### Geography (Remark)
-See https://wcsp.science.kew.org/about.do#geography for details on narrative distribution forms.
-
-### Lifeform (Remark)
-Terms refer to a modified version of the Raunkiær system. See https://wcsp.science.kew.org/about.do#lifeforms for a glossary of terms used.
-
-### Climate (Value)
-**Categories:** `desert or dry shrubland, montane tropical, seasonally dry tropical, subalpine or subarctic, subtropical, subtropical or tropical, temperate, temperate, subtropical or tropical, wet tropical`
-
-### Homotypic Synonym (Remark)
-The synonym type - TRUE if homotypic synonym, otherwise NA. See ICN for algae, fungi and plants: https://www.iapt-taxon.org/nomen/main.php
+### Climate Literals
+**Values:** `desert or dry shrubland, montane tropical, seasonally dry tropical, subalpine or subarctic, subtropical, subtropical or tropical, temperate, temperate, subtropical or tropical, wet tropical.`
+*Note: These are strictly lowercase in the database.*

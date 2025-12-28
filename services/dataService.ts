@@ -11,12 +11,14 @@ const DETAILS_TABLE = 'app_taxon_details';
 // --- MAPPERS ---
 
 const mapFromDB = (row: any): Taxon => {
+  const details = row.details || {};
   return {
     id: row.id,
     parentId: row.parent_id,
     hierarchyPath: row.hierarchy_path ? row.hierarchy_path.replace(/_/g, '-') : undefined,
     
     wcvpId: row.wcvp_id,
+    // Fix: Use ipniId instead of ipni_id to match Taxon interface
     ipniId: row.ipni_id,
     powoId: row.powo_id,
     acceptedPlantNameId: row.accepted_plant_name_id,
@@ -60,9 +62,20 @@ const mapFromDB = (row: any): Taxon => {
           ? row.taxon_name.match(/'([^']+)'/)?.[1] || row.taxon_name 
           : (row.infraspecies || row.species || row.genus || row.taxon_name),
 
-    description: row.details?.description_text, 
-    synonyms: [], 
-    referenceLinks: [], 
+    // Knowledge Layer Mapping
+    description: details.description_text, 
+    hardinessMin: details.hardiness_zone_min,
+    hardinessMax: details.hardiness_zone_max,
+    heightMin: details.height_min_cm,
+    heightMax: details.height_max_cm,
+    widthMin: details.width_min_cm,
+    widthMax: details.width_max_cm,
+    originYear: details.origin_year,
+    morphology: details.morphology,
+    ecology: details.ecology,
+    history: details.history_metadata?.background, // Assuming history is stored in this sub-object
+    synonyms: details.alternative_names || [], 
+    referenceLinks: details.reference_links || [], 
     
     isDetailsLoaded: !!row.details,
     createdAt: new Date(row.created_at).getTime(),
@@ -91,13 +104,10 @@ const mapToDB = (taxon: Taxon) => {
     common_name: taxon.commonName,
 
     genus: taxon.genus,
-    // Fix: Using correct camelCase property from Taxon interface
     genus_hybrid: taxon.genusHybrid,
     species: taxon.species,
-    // Fix: Using correct camelCase property from Taxon interface
     species_hybrid: taxon.speciesHybrid,
     infraspecies: taxon.infraspecies,
-    // Fix: Using correct camelCase property from Taxon interface
     infraspecific_rank: taxon.infraspecificRank,
     cultivar: taxon.cultivar,
     
@@ -111,6 +121,7 @@ const mapToDB = (taxon: Taxon) => {
 
     place_of_publication: taxon.placeOfPublication,
     volume_and_page: taxon.volumeAndPage,
+    // Fix: Use firstPublished instead of first_published to match Taxon interface
     first_published: taxon.firstPublished,
     nomenclatural_remarks: taxon.nomenclaturalRemarks,
     reviewed: taxon.reviewed,
@@ -152,7 +163,7 @@ export const dataService = {
 
     let query = getSupabase()
       .from(DB_TABLE)
-      .select('*', shouldCount ? { count: 'estimated' } : {});
+      .select('*, details:app_taxon_details(*)', shouldCount ? { count: 'estimated' } : {});
 
     // --- Dynamic Filtering ---
     Object.entries(filters).forEach(([key, value]) => {
@@ -189,10 +200,8 @@ export const dataService = {
                     query = query.like('taxon_name', `${cleanVal}%`);
                 }
             } else if (isTechnicalId || isStrictMetadata) {
-                // Technical Equality: Strict exact match (=)
                 query = query.eq(dbKey, cleanVal);
             } else {
-                // Standard Prefix Search: Starts with (LIKE 'Val%')
                 query = query.like(dbKey, `${cleanVal}%`);
             }
         } else if (Array.isArray(value)) {
@@ -252,24 +261,40 @@ export const dataService = {
   async updateTaxon(id: string, updates: Partial<Taxon>): Promise<void> {
     if (getIsOffline()) throw new Error("Cannot update in offline mode");
     
-    // We only update the core table fields here
+    // We update the core table
     const dbUpdates: any = {};
+    const detailUpdates: any = {};
+    const detailKeys = ['description', 'hardinessMin', 'hardinessMax', 'heightMin', 'heightMax', 'widthMin', 'widthMax', 'originYear', 'morphology', 'ecology', 'history', 'synonyms', 'referenceLinks'];
+
     Object.entries(updates).forEach(([key, value]) => {
-      // Don't update complex UI-only fields or derived fields in this simplified method
-      if (['description', 'synonyms', 'referenceLinks', 'isDetailsLoaded'].includes(key)) return;
-      
-      const dbKey = key.replace(/([A-Z])/g, "_$1").toLowerCase();
-      dbUpdates[dbKey] = value;
+      if (detailKeys.includes(key)) {
+         if (key === 'description') detailUpdates.description_text = value;
+         else if (key === 'hardinessMin') detailUpdates.hardiness_zone_min = value;
+         else if (key === 'hardinessMax') detailUpdates.hardiness_zone_max = value;
+         else if (key === 'heightMin') detailUpdates.height_min_cm = value;
+         else if (key === 'heightMax') detailUpdates.height_max_cm = value;
+         else if (key === 'widthMin') detailUpdates.width_min_cm = value;
+         else if (key === 'widthMax') detailUpdates.width_max_cm = value;
+         else if (key === 'originYear') detailUpdates.origin_year = value;
+         else if (key === 'history') detailUpdates.history_metadata = { ...detailUpdates.history_metadata, background: value };
+         else if (key === 'synonyms') detailUpdates.alternative_names = value;
+         else if (key === 'referenceLinks') detailUpdates.reference_links = value;
+         else detailUpdates[key] = value;
+      } else {
+         const dbKey = key.replace(/([A-Z])/g, "_$1").toLowerCase();
+         dbUpdates[dbKey] = value;
+      }
     });
 
-    if (Object.keys(dbUpdates).length === 0) return;
+    if (Object.keys(dbUpdates).length > 0) {
+      const { error: coreError } = await getSupabase().from(DB_TABLE).update(dbUpdates).eq('id', id);
+      if (coreError) throw coreError;
+    }
 
-    const { error } = await getSupabase()
-      .from(DB_TABLE)
-      .update(dbUpdates)
-      .eq('id', id);
-
-    if (error) throw error;
+    if (Object.keys(detailUpdates).length > 0) {
+      const { error: detailError } = await getSupabase().from(DETAILS_TABLE).upsert({ taxon_id: id, ...detailUpdates });
+      if (detailError) throw detailError;
+    }
   },
 
   async deleteTaxon(id: string): Promise<void> {

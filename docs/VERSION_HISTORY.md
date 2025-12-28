@@ -1,8 +1,17 @@
 # Version History
 
+## v2.20.0 - Knowledge Layer & Roadmap Expansion
+**Date:** June 13, 2025
+**Status:** (Ready for Push)
+
+### Documentation Updates
+- **Vision Evolution:** Updated `docs/VISION_STATEMENT.md` to define the "Knowledge Layer," bridging the gap between scientific nomenclature (WCVP) and horticultural context (Physical Description, AKAs, History).
+- **Roadmap Refinement:** Expanded `docs/TASK_BACKLOG.md` with granular requirements for the "A.K.A" section, including trademarks, patents, and reputable source quoting.
+- **Data Mapping Extension:** Updated `docs/DATA_MAPPING.md` to include the schema for the "Golden Record" (`app_taxon_details`), documenting how traits like hardiness, size, and year of discovery are stored.
+
 ## v2.19.1 - Stability & Data Integrity Fixes
 **Date:** June 12, 2025
-**Status:** (Ready for Push)
+**Status:** (Verified)
 
 ### Improvements
 - **UX Resilience Overhaul:** Refined component mounting logic in `App.tsx` to ensure the `DataGrid` remains visible even during database errors (e.g., timeouts). This allows users to see the specific error message in the status bar while preserving their filter inputs and scroll position.

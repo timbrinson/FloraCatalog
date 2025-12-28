@@ -1,4 +1,3 @@
-
 export type ColorTheme = 'option1a' | 'option1b' | 'option2a' | 'option2b';
 
 export interface UserPreferences {
@@ -7,7 +6,7 @@ export interface UserPreferences {
   autoFitMaxWidth?: number;
   fitScreenMaxRatio?: number;
   colorTheme: ColorTheme;
-  searchMode: 'prefix' | 'fuzzy'; // Added for filtering optimization
+  searchMode: 'prefix' | 'fuzzy'; 
 }
 
 export enum LoadingState {
@@ -17,7 +16,17 @@ export enum LoadingState {
   ERROR = 'ERROR'
 }
 
-export type SynonymType = 'scientific' | 'trade' | 'misapplied' | 'common' | 'unspecified';
+export type SynonymType = 
+  | 'scientific' 
+  | 'trade' 
+  | 'trademark' 
+  | 'registered_trademark' 
+  | 'patent' 
+  | 'common' 
+  | 'misapplied' 
+  | 'misrepresented' 
+  | 'cultivar' 
+  | 'unspecified';
 
 export interface Synonym {
   name: string;
@@ -67,7 +76,32 @@ export interface Taxon {
   lifeformDescription?: string;
   climateDescription?: string;
   name: string;
+  
+  // Knowledge Layer Fields
   description?: string;
+  hardinessMin?: number;
+  hardinessMax?: number;
+  heightMin?: number;
+  heightMax?: number;
+  widthMin?: number;
+  widthMax?: number;
+  originYear?: number;
+  morphology?: {
+    foliage?: string;
+    flowers?: string;
+    form?: string;
+    texture?: string;
+    seasonalVariation?: string;
+  };
+  ecology?: {
+    soil?: string;
+    light?: string;
+    water?: string;
+    growthRate?: string;
+    floweringPeriod?: string;
+  };
+  history?: string;
+  
   synonyms: Synonym[];
   referenceLinks: Link[];
   isDetailsLoaded?: boolean;
