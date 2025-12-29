@@ -120,7 +120,7 @@ const COLUMN_GROUPS: ColumnGroup[] = [
             { id: 'parentId', label: 'Parent ID', tooltip: 'Parent UUID', defaultWidth: 100, filterType: 'text', defaultOn: false },
             { id: 'treeControl', label: 'Tree', tooltip: 'Tree Control', defaultWidth: 55, disableSorting: true, lockWidth: true, hideHeaderIcons: true, headerAlign: 'center', defaultOn: true },
             { id: 'childCount', label: '#', tooltip: 'Child Count', defaultWidth: 50, filterType: 'text', hideHeaderIcons: true, headerAlign: 'center', lockWidth: true, defaultOn: true },
-            { id: 'actions', label: 'Actions', tooltip: 'Actions', defaultWidth: 90, disableSorting: true, lockWidth: true, hideHeaderIcons: true, headerAlign: 'center', defaultOn: false },
+            { id: 'actions', label: 'Actions', tooltip: 'Actions', defaultWidth: 90, disableSorting: true, lockWidth: true, hideHeaderIcons: true, headerAlign: 'center', defaultOn: true },
         ]
     },
     {
@@ -334,8 +334,6 @@ const DataGrid: React.FC<DataGridProps> = ({
   const handleTextFilterChange = (key: string, val: string, forceCommit: boolean = false) => {
       setLocalTextFilters(prev => ({ ...prev, [key]: val }));
       
-      // If it's a technical column, we only commit on 'forceCommit' (Enter or Blur)
-      // This prevents expensive prefix matches on non-indexed partial dates/IDs
       if (isTechnicalColumn(key) && !forceCommit) return;
 
       if ((window as any).filterTimeout) clearTimeout((window as any).filterTimeout);
@@ -654,7 +652,7 @@ const DataGrid: React.FC<DataGridProps> = ({
                                return <td key={col.id} className={`p-2 border-r border-slate-50 truncate overflow-hidden max-w-0 ${col.headerAlign === 'center' ? 'text-center' : ''}`} title={String(val || '')}><span className={`${isBold ? "font-bold" : ""} ${isDimmed ? "font-normal" : ""} ${isBold ? (baseColor === 'slate' ? "text-slate-900" : `text-${baseColor}-900`) : (isDimmed ? "text-slate-400" : "")}`}>{displayVal}</span></td>;
                            })}
                         </tr>
-                        {isExpanded && !tr.isTreeHeader && (<tr><td colSpan={activeColumns.length} className="bg-slate-50/50 p-0 border-b border-slate-200 shadow-inner"><div className="p-4 border-l-4 border-slate-500 bg-white m-2 rounded-r-lg shadow-sm"><DetailsPanel title={tr.taxonName} description={tr.description} synonyms={tr.synonyms} referenceLinks={tr.referenceLinks} onUpdate={(updates) => onUpdate(tr.id, updates)} /></div></td></tr>)}
+                        {isExpanded && !tr.isVirtual && (<tr><td colSpan={activeColumns.length} className="bg-slate-50/50 p-0 border-b border-slate-200 shadow-inner"><div className="p-4 border-l-4 border-slate-500 bg-white m-2 rounded-r-lg shadow-sm"><DetailsPanel title={tr.taxonName} description={tr.description} synonyms={tr.synonyms} referenceLinks={tr.referenceLinks} onUpdate={(updates) => onUpdate?.(tr.id, updates)} morphology={tr.morphology} ecology={tr.ecology} history={tr.history} hardinessMin={tr.hardinessMin} hardinessMax={tr.hardinessMax} heightMax={tr.heightMax} widthMax={tr.widthMax} originYear={tr.originYear} /></div></td></tr>)}
                      </React.Fragment>
                   );
               })}

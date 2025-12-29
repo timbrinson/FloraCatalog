@@ -1,5 +1,17 @@
 # Version History
 
+## v2.21.1 - UI Findability & Trait Registry Prototype
+**Date:** June 15, 2025
+**Status:** (Verified)
+
+### New Features
+- **Details Panel Restoration:** Fixed a state logic error in `App.tsx` and `DataGrid.tsx` that prevented row expansion and update handlers. The "Actions" column is now visible by default.
+- **Specialized Trait Registry:** Introduced a dynamic trait section in `DetailsPanel.tsx` to handle taxon-specific attributes (e.g., Agave spine color) stored in JSONB blobs.
+
+### Documentation Updates
+- **Vision Realignment:** Updated `docs/VISION_STATEMENT.md` to reflect the 90% Grid / 5% Details Panel UI priority.
+- **Backlog Recalibration:** Adjusted completion estimates for the Knowledge Layer (5%) and Cultivated Layer (0%) to match actual project state. Added High-Priority items for Index Expansion and 3-Tier scaling.
+
 ## v2.21.0 - Protocol Maturation & Briefing Strategy
 **Date:** June 14, 2025
 **Status:** (Ready for Push)

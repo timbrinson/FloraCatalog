@@ -88,7 +88,6 @@ export default function App() {
           setErrorDetails(e.message || "Database error.");
           setLoadingState(LoadingState.ERROR);
           setIsFetchingMore(false);
-          // Ensure we marked as initialized so the grid doesn't unmount on subsequent search errors
           if (!isInitialized && taxa.length > 0) setIsInitialized(true);
       } finally { isFetchingRef.current = false; }
   };
@@ -102,10 +101,23 @@ export default function App() {
   const handleSettingsClose = () => { setShowSettingsModal(false); const n = getIsOffline(); setIsOffline(n); if (!n) fetchBatch(0, true); };
   const handleLoadMore = () => { if (!hasMore || isFetchingRef.current || loadingState === LoadingState.LOADING) return; const n = offset + 100; setOffset(n); fetchBatch(n, false); };
   
+  const handleTaxonUpdate = async (id: string, updates: Partial<Taxon>) => {
+      try {
+          await dataService.updateTaxon(id, updates);
+          setTaxa(prev => prev.map(t => t.id === id ? { ...t, ...updates } : t));
+      } catch (e: any) {
+          alert(`Failed to update: ${e.message}`);
+      }
+  };
+
+  const handleAction = (action: 'mine' | 'enrich', taxon: Taxon) => {
+      console.log(`Action requested: ${action} for ${taxon.taxonName}`);
+      // Placeholder for activity manager logic
+  };
+
   useEffect(() => { const s = localStorage.getItem('flora_prefs'); if (s) try { setPreferences(JSON.parse(s)); } catch(e) {} }, []); 
   useEffect(() => localStorage.setItem('flora_prefs', JSON.stringify(preferences)), [preferences]);
 
-  // Main UI logic
   const isHardError = (isOffline || (loadingState === LoadingState.ERROR && !isInitialized));
   const isActuallyEmpty = taxa.length === 0 && !isFiltering && loadingState === LoadingState.SUCCESS && totalRecords === 0 && isInitialized;
   const showInitialLoader = !isInitialized && loadingState === LoadingState.LOADING;
@@ -121,14 +133,12 @@ export default function App() {
             onClick={() => setShowActivityPanel(!showActivityPanel)}
             className={`p-2 rounded-full transition-colors ${showActivityPanel ? 'bg-leaf-100 text-leaf-700' : 'text-slate-500 hover:bg-slate-100'}`}
           >
-            {/* Fix: Using size={20} instead of invalid size(20) */}
             <Activity size={20} />
           </button>
           <button 
             onClick={() => setShowSettingsModal(true)}
             className="p-2 text-slate-500 hover:bg-slate-100 rounded-full transition-colors"
           >
-            {/* Fix: Using Settings from lucide-react instead of missing SettingsIcon */}
             <Settings size={20} />
           </button>
         </div>
@@ -152,6 +162,8 @@ export default function App() {
             taxa={taxa}
             preferences={preferences}
             onPreferenceChange={setPreferences}
+            onUpdate={handleTaxonUpdate}
+            onAction={handleAction}
             totalRecords={totalRecords}
             isLoadingMore={isFetchingMore || loadingState === LoadingState.LOADING}
             onLoadMore={handleLoadMore}

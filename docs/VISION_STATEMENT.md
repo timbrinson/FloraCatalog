@@ -16,6 +16,11 @@ Plant information exists at three distinct layers, yet no universal system exist
 ## The FloraCatalog Mission: Bridging the Gap
 FloraCatalog is designed to address these siloes by connecting cultivated plant records to natural plant concepts. We build a multi-layered knowledge base upon the advanced work of existing authorities.
 
+### The UI Philosophy: Findability & Density
+We recognize that for a botanical catalog, the user interface is the primary value driver.
+- **The Grid Experience (90% Priority):** The primary focus is a robust, high-performance "Smart Spreadsheet" (Data Grid). It must handle 1.4 million records with instant search, multi-rank grouping, and stable filtering. If a user cannot find a plant quickly, the data's richness is irrelevant.
+- **The Knowledge Layer (Details Panel):** While the grid handles "Findability," the Details Panel provides "Depth." This panel is an interactive workspace for horticultural context, supporting highly variable traits (e.g., spine color for Agave vs. leaf shape for Acer).
+
 ### 1. The Natural Core (WCVP)
 We use the **World Checklist of Vascular Plants (WCVP)** as our foundational backbone. 
 - **Role:** It provides the "Source of Truth" for natural nomenclature (Genus, Species, Infraspecies).

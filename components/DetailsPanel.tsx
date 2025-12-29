@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import { 
   ExternalLink, Globe, Plus, Loader2, CheckSquare, 
   Square, X, Info, Thermometer, Ruler, History as HistoryIcon, 
-  Leaf, Flower2, Layers, Sun, Droplets, Mountain
+  Leaf, Flower2, Layers, Sun, Droplets, Mountain,
+  Tags, Sparkles
 } from 'lucide-react';
 import { Link, Synonym, SynonymType, Taxon } from '../types';
 import { findAdditionalLinks } from '../services/geminiService';
@@ -109,6 +110,9 @@ const DetailsPanel: React.FC<DetailsPanelProps> = ({
       default: return 'bg-white text-slate-600 border-slate-200';
     }
   };
+
+  // Trait Registry Logic (Prototype)
+  const specializedTraits = Object.entries(morphology || {}).filter(([k]) => !['foliage', 'flowers', 'form', 'texture'].includes(k));
 
   return (
     <div className="flex flex-col gap-8">
@@ -251,11 +255,11 @@ const DetailsPanel: React.FC<DetailsPanelProps> = ({
       </div>
 
       {/* Knowledge Layer: Morphology, Ecology, History */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {/* Physical Characteristics */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+        {/* Universal Physical Characteristics */}
         <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm space-y-4">
           <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2 mb-4">
-            <Layers size={16} className="text-leaf-500" /> Physical Description
+            <Layers size={16} className="text-leaf-500" /> Universal Description
           </h4>
           <div className="space-y-4">
             <div className="flex items-start gap-3">
@@ -276,10 +280,34 @@ const DetailsPanel: React.FC<DetailsPanelProps> = ({
               <Info size={16} className="text-slate-300 mt-0.5" />
               <div>
                 <span className="text-[10px] uppercase font-bold text-slate-400 block tracking-wider">Form & Texture</span>
-                <span className="text-xs text-slate-700">{morphology?.form} {morphology?.texture ? `(${morphology.texture})` : ''}</span>
+                <span className="text-xs text-slate-700">{morphology?.form || 'Unspecified'} {morphology?.texture ? `(${morphology.texture})` : ''}</span>
               </div>
             </div>
           </div>
+        </div>
+
+        {/* Dynamic / Taxon-Specific Traits (Prototype for Agave spines, etc.) */}
+        <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm space-y-4">
+          <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2 mb-4">
+            <Sparkles size={16} className="text-purple-500" /> Specialized Traits
+          </h4>
+          {specializedTraits.length > 0 ? (
+             <div className="space-y-3">
+                {specializedTraits.map(([key, val]) => (
+                   <div key={key} className="flex justify-between items-center border-b border-slate-50 pb-2">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tight">{key.replace(/_/g, ' ')}</span>
+                      <span className="text-xs text-slate-700 font-medium">{String(val)}</span>
+                   </div>
+                ))}
+             </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center py-6 text-center opacity-40">
+                <Tags size={24} className="text-slate-300 mb-2" />
+                <p className="text-[10px] font-medium text-slate-500 uppercase tracking-tighter leading-tight px-4">
+                   No taxon-specific attributes defined. <br/> (e.g. Spine Color, Fruit Type)
+                </p>
+            </div>
+          )}
         </div>
 
         {/* Growth & Hardiness */}
@@ -330,7 +358,7 @@ const DetailsPanel: React.FC<DetailsPanelProps> = ({
             </div>
           </div>
           <div className="text-xs text-slate-600 leading-relaxed max-h-32 overflow-y-auto pr-2 custom-scrollbar italic border-l-2 border-slate-100 pl-3">
-            {history || 'Historical background not yet established for this taxon. Enriching the plant will attempt to find discovery context and origin details.'}
+            {history || 'Historical background not yet established for this taxon.'}
           </div>
         </div>
       </div>
