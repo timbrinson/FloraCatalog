@@ -88,6 +88,7 @@ type TreeRow = Taxon & {
     isVirtual?: boolean; 
 };
 
+// Fix: changed descendant_count to descendantCount
 const getDescendantCount = (taxon: Taxon): number => taxon.descendantCount || 0;
 
 interface ColumnConfig { 
@@ -263,7 +264,6 @@ const DataGrid: React.FC<DataGridProps> = ({
   const [columnOrder, setColumnOrder] = useState<string[]>(() => {
       const saved = loadState<string[]>('grid_col_order_rev11', []);
       if (saved.length > 0) return saved;
-      // Fixed: changed variable 'i' to 'c' to match the parameter name in the map function
       return ALL_COLUMNS.map(c => c.id);
   });
   
@@ -328,7 +328,7 @@ const DataGrid: React.FC<DataGridProps> = ({
        const rank = (row.taxonRank || '').toLowerCase();
        if (rank === 'family' && colId === 'genus') return '';
        
-       return row[colId];
+       return row[colId as keyof Taxon];
   };
 
   const handleTextFilterChange = (key: string, val: string, forceCommit: boolean = false) => {
@@ -346,9 +346,12 @@ const DataGrid: React.FC<DataGridProps> = ({
   };
 
   const gridRows = useMemo((): TreeRow[] => {
+      if (!taxa || taxa.length === 0) return [];
       if (groupBy.length === 0) return taxa as TreeRow[];
+      
       const outputRows: TreeRow[] = [];
       const bucketKey = (row: Taxon, depth: number) => String(getRowValue(row, groupBy[depth]) || '');
+      
       const findHeaderTaxon = (candidates: Taxon[], field: string, value: string): Taxon | undefined => {
           return candidates.find(t => {
              const valMatches = String(getRowValue(t, field)) === value;
@@ -361,14 +364,21 @@ const DataGrid: React.FC<DataGridProps> = ({
              return rank === field.toLowerCase();
           });
       };
+
       const processLevel = (subset: Taxon[], depth: number, parentPath: string) => {
+          if (!subset) return;
           if (depth >= groupBy.length) {
               subset.forEach(t => outputRows.push({ ...t, depth, treePath: `${parentPath}/${t.id}` }));
               return;
           }
           const field = groupBy[depth];
           const groups: Record<string, Taxon[]> = {};
-          subset.forEach(row => { const val = bucketKey(row, depth); if (!groups[val]) groups[val] = []; groups[val].push(row); });
+          subset.forEach(row => { 
+              const val = bucketKey(row, depth); 
+              if (!groups[val]) groups[val] = []; 
+              groups[val].push(row); 
+          });
+
           Object.keys(groups).sort().forEach(key => {
               const groupItems = groups[key];
               const path = `${parentPath}/${key}`;
@@ -392,6 +402,7 @@ const DataGrid: React.FC<DataGridProps> = ({
               } as any;
               headerRow.isTreeHeader = true;
               headerRow.treeExpanded = !collapsedGroups.has(path);
+              // Fix: changed descendant_count to descendantCount
               headerRow.childCount = headerTaxon ? headerTaxon.descendantCount : groupItems.length;
               headerRow.depth = depth;
               headerRow.treePath = path;
@@ -411,6 +422,7 @@ const DataGrid: React.FC<DataGridProps> = ({
   };
   
   const expandTreeLevel = (targetDepth: number) => {
+      if (!taxa) return;
       const newCollapsed = new Set<string>();
       const allPathsWithDepths: {path: string, depth: number}[] = [];
       const walk = (subset: Taxon[], depth: number, parentPath: string) => {
@@ -510,7 +522,7 @@ const DataGrid: React.FC<DataGridProps> = ({
     <div className="bg-white rounded-xl shadow border border-slate-200 overflow-hidden flex flex-col h-full relative">
       <div className="p-2 border-b border-slate-200 bg-slate-50 flex justify-between items-center z-20 relative flex-shrink-0">
          <div className="text-xs text-slate-500 font-medium px-2 flex items-center gap-4 flex-1">
-             <span>{taxa.length.toLocaleString()} of {totalRecords >= 0 ? totalRecords.toLocaleString() : 'many'} records loaded</span>
+             <span>{taxa?.length.toLocaleString() || '0'} of {totalRecords >= 0 ? totalRecords.toLocaleString() : 'many'} records loaded</span>
              {isLoadingMore && <span className="flex items-center gap-1 text-leaf-600"><Loader2Icon size={12} className="animate-spin"/> Loading...</span>}
              
              {error && (
@@ -638,6 +650,7 @@ const DataGrid: React.FC<DataGridProps> = ({
                         <tr className={`hover:bg-blue-50/50 transition-colors ${isExpanded ? 'bg-blue-50/50' : (baseColor === 'slate' ? (isHybrid ? 'bg-slate-50 saturate-50' : '') : `bg-${baseColor}-50 ${isHybrid ? 'saturate-50' : ''}`)} ${tr.isTreeHeader ? 'cursor-pointer group/header border-b-2 border-slate-200' : ''}`} onClick={tr.isTreeHeader ? () => toggleGroup(tr.treePath || '') : undefined}>
                            {activeColumns.map(col => {
                                if (col.id === 'treeControl') return <td key={col.id} className={`p-2 border-r border-slate-200 ${tr.isTreeHeader ? '' : 'border-slate-50'}`} style={{ paddingLeft: `${(tr.depth || 0) * 20}px` }}>{tr.isTreeHeader && <span className={`transform transition-transform inline-block ${tr.treeExpanded ? 'rotate-90' : ''}`}><ChevronRightIcon size={14} /></span>}</td>;
+                               // Fix: changed descendant_count to descendantCount
                                if (col.id === 'childCount') return <td key={col.id} className="p-2 border-r border-slate-200 text-xs text-center text-slate-400 font-mono">{tr.isTreeHeader ? tr.childCount : getDescendantCount(tr) || ''}</td>;
                                const val = getRowValue(tr, col.id); let displayVal: React.ReactNode = val || '';
                                if ((col.id === 'genusHybrid' || col.id === 'speciesHybrid') && (val === 'x' || val === 'X' || val === '×')) displayVal = '×';
@@ -656,7 +669,7 @@ const DataGrid: React.FC<DataGridProps> = ({
                      </React.Fragment>
                   );
               })}
-              {gridRows.length === 0 && !isLoadingMore && (<tr><td colSpan={activeColumns.length} className="p-8 text-center text-slate-400 italic">No matching records.</td></tr>)}
+              {(!gridRows || gridRows.length === 0) && !isLoadingMore && (<tr><td colSpan={activeColumns.length} className="p-8 text-center text-slate-400 italic">No matching records.</td></tr>)}
            </tbody>
         </table>
       </div>

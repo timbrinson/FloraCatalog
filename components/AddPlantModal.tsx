@@ -15,8 +15,7 @@ interface ParsedResult {
     species?: string;
     infraspecies?: string;
     infraspecificRank?: string;
-    genusHybrid?: string;
-    speciesHybrid?: string;
+    isHybrid: boolean;
     taxonStatus: string;
     existingId?: string;
 }
@@ -67,13 +66,22 @@ const AddPlantModal: React.FC<AddPlantModalProps> = ({ isOpen, onClose, onSucces
     setIsAnalyzing(true);
     setError(null);
     setParsedResults([]);
+    
+    console.group(`[AddPlantModal] Analyzing: "${inputValue.trim()}"`);
     try {
       const results = await identifyTaxonomy(inputValue.trim());
+      console.log(`AI returned ${results.length} taxonomic levels:`, results);
+
       if (results && results.length > 0) {
         const checkedResults: ParsedResult[] = [];
         for (const res of results) {
             // Check catalog for existing match
             const existing = await dataService.findTaxonByName(res.taxonName);
+            if (existing) {
+                console.log(`Match found in catalog: "${res.taxonName}" -> ${existing.id}`);
+            } else {
+                console.log(`No match for: "${res.taxonName}". Will create new record.`);
+            }
             checkedResults.push({ ...res, existingId: existing?.id });
         }
         setParsedResults(checkedResults);
@@ -81,8 +89,10 @@ const AddPlantModal: React.FC<AddPlantModalProps> = ({ isOpen, onClose, onSucces
         setError("AI could not parse this botanical name. Please try again with more detail.");
       }
     } catch (e: any) {
+      console.error("Analysis Error:", e);
       setError(`Analysis failed: ${e.message}`);
     } finally {
+      console.groupEnd();
       setIsAnalyzing(false);
     }
   };
@@ -131,6 +141,8 @@ const AddPlantModal: React.FC<AddPlantModalProps> = ({ isOpen, onClose, onSucces
     setError(null);
 
     const targetPlant = parsedResults[parsedResults.length - 1].taxonName;
+    console.group(`[AddPlantModal] Committing Lineage: ${targetPlant}`);
+
     const activityId = crypto.randomUUID();
     onAddActivity({
         id: activityId,
@@ -143,15 +155,55 @@ const AddPlantModal: React.FC<AddPlantModalProps> = ({ isOpen, onClose, onSucces
 
     try {
       let lastParentId: string | undefined = undefined;
+      
+      // Lineage Accumulator to prevent mapping corruption
+      const lineage = {
+          family: undefined as string | undefined,
+          genus: undefined as string | undefined,
+          species: undefined as string | undefined,
+          genusHybrid: undefined as string | undefined,
+          speciesHybrid: undefined as string | undefined
+      };
 
       for (const result of parsedResults) {
+          const rank = result.taxonRank.toLowerCase();
+          console.group(`Processing Rank: ${result.taxonRank} ("${result.taxonName}")`);
+          
+          // Update lineage trackers based on result rank
+          if (rank === 'family') {
+              lineage.family = result.name;
+              console.log(`Lineage updated: family = "${lineage.family}"`);
+          }
+          if (rank === 'genus') {
+              lineage.genus = result.name;
+              lineage.genusHybrid = result.isHybrid ? '×' : undefined;
+              console.log(`Lineage updated: genus = "${lineage.genus}" (isHybrid: ${result.isHybrid})`);
+          }
+          if (rank === 'species') {
+              lineage.species = result.name;
+              lineage.speciesHybrid = result.isHybrid ? '×' : undefined;
+              console.log(`Lineage updated: species = "${lineage.species}" (isHybrid: ${result.isHybrid})`);
+          }
+
           if (result.existingId) {
+              console.log(`Linking to existing record ${result.existingId}. Fetching authoritative values...`);
+              const existing = await dataService.getTaxonById(result.existingId);
+              if (existing) {
+                  // Ensure existing record metadata is pulled into lineage state for child records
+                  if (existing.family) lineage.family = existing.family;
+                  if (existing.genus) lineage.genus = existing.genus;
+                  if (existing.species) lineage.species = existing.species;
+                  if (existing.genusHybrid) lineage.genusHybrid = existing.genusHybrid;
+                  if (existing.speciesHybrid) lineage.speciesHybrid = existing.speciesHybrid;
+                  console.log(`Authoritative trackers updated from DB row. Current species: "${lineage.species}"`);
+              }
               lastParentId = result.existingId;
+              console.groupEnd();
               continue; 
           }
 
-          // FIX: Correct mapping for cultivars vs infraspecies
-          const isCultivar = result.taxonRank.toLowerCase() === 'cultivar';
+          const isCultivar = rank === 'cultivar';
+          const isVariety = rank === 'variety' || rank === 'subspecies' || rank === 'form';
 
           const newTaxon: Taxon = {
               id: crypto.randomUUID(),
@@ -159,26 +211,27 @@ const AddPlantModal: React.FC<AddPlantModalProps> = ({ isOpen, onClose, onSucces
               taxonRank: result.taxonRank,
               name: result.name,
               taxonName: result.taxonName,
-              // Default to 'Provisional' for new entries unless explicitly ICRA-vetted
-              taxonStatus: 'Provisional',
-              family: result.family,
-              genus: result.genus,
-              genusHybrid: result.genusHybrid,
-              species: result.species,
-              speciesHybrid: result.speciesHybrid,
-              infraspecies: isCultivar ? undefined : result.infraspecies,
-              infraspecificRank: isCultivar ? undefined : result.infraspecificRank,
+              taxonStatus: 'Provisional', 
+              family: lineage.family || result.family,
+              genus: lineage.genus || result.genus,
+              genusHybrid: lineage.genusHybrid,
+              species: lineage.species || result.species,
+              speciesHybrid: lineage.speciesHybrid,
+              infraspecies: isVariety ? result.name : undefined,
+              infraspecificRank: isVariety ? result.infraspecificRank : undefined,
               cultivar: isCultivar ? result.name : undefined,
               sourceId: selectedSourceId,
               verificationLevel: `FloraCatalog ${APP_VERSION} (UI)`,
               synonyms: [],
               referenceLinks: [],
               createdAt: Date.now()
-              // NOTE: parentPlantNameId/wcvpId left as undefined/null for manual records.
           };
 
+          console.log(`Constructing new ${rank} record:`, newTaxon);
           const saved = await dataService.createTaxon(newTaxon);
+          console.log(`Successfully created ${rank} with UUID: ${saved.id}`);
           lastParentId = saved.id;
+          console.groupEnd();
       }
 
       onAddActivity({
@@ -190,8 +243,11 @@ const AddPlantModal: React.FC<AddPlantModalProps> = ({ isOpen, onClose, onSucces
           timestamp: Date.now()
       });
 
+      console.log(`Commmit Complete for ${targetPlant}.`);
+      console.groupEnd();
       onSuccess();
     } catch (e: any) {
+      console.error("Commit Failure:", e);
       onAddActivity({
           id: activityId,
           name: `Failed to add ${targetPlant}`,
@@ -201,6 +257,7 @@ const AddPlantModal: React.FC<AddPlantModalProps> = ({ isOpen, onClose, onSucces
           timestamp: Date.now()
       });
       setError(`Save failed: ${e.message}`);
+      console.groupEnd();
     } finally {
       setIsSaving(false);
     }

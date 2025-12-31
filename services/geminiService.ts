@@ -15,10 +15,10 @@ export async function identifyTaxonomy(query: string): Promise<any[]> {
     Rules:
     1. Align with the World Checklist of Vascular Plants (WCVP).
     2. Correct misspellings and identify the "Accepted" name if the input is a synonym.
-    3. Identify hybrid status. Use '×' (not 'x') for genusHybrid or speciesHybrid if applicable.
-    4. CULTIVAR RULE: If a cultivar is detected (e.g. 'Bloodgood'), the 'name' property for that specific array item MUST be the cultivar name WITHOUT single quotes (e.g. "Bloodgood"), and 'taxonRank' MUST be "Cultivar".
-    5. SPECIES RULE: The species item in the array MUST NOT contain the cultivar name in its 'name' property.
-    6. For the 'taxonName' of a cultivar, wrap the name in single quotes (e.g. "Acer palmatum 'Bloodgood'").`,
+    3. CULTIVAR RULE: If a cultivar is detected (e.g. 'Bloodgood'), the 'name' property for that specific array item MUST be the cultivar name WITHOUT single quotes (e.g. "Bloodgood"), and 'taxonRank' MUST be "Cultivar".
+    4. SPECIES RULE: The species item in the array MUST NOT contain the cultivar name in its 'name' property.
+    5. For the 'taxonName' of a cultivar, wrap the name in single quotes (e.g. "Acer palmatum 'Bloodgood'").
+    6. HYBRID RULE: Set isHybrid=true if the taxon is a known hybrid (using × or x in the input).`,
     config: {
       responseMimeType: "application/json",
       responseSchema: {
@@ -34,11 +34,10 @@ export async function identifyTaxonomy(query: string): Promise<any[]> {
             species: { type: Type.STRING },
             infraspecies: { type: Type.STRING },
             infraspecificRank: { type: Type.STRING, description: "e.g. var., subsp., f." },
-            genusHybrid: { type: Type.STRING, description: "'×' or null" },
-            speciesHybrid: { type: Type.STRING, description: "'×' or null" },
+            isHybrid: { type: Type.BOOLEAN, description: "True if this rank level is a hybrid" },
             taxonStatus: { type: Type.STRING, description: "Accepted, Synonym, or Unresolved" }
           },
-          required: ["taxonRank", "name", "taxonName", "taxonStatus"]
+          required: ["taxonRank", "name", "taxonName", "taxonStatus", "isHybrid"]
         }
       }
     }

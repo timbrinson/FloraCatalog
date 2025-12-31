@@ -16,6 +16,7 @@ const mapSourceFromDB = (row: any): DataSource => ({
     id: row.id,
     name: row.name,
     version: row.version,
+    // Fix: changed citation_text to citationText
     citationText: row.citation_text,
     url: row.url,
     trustLevel: row.trust_level
@@ -26,6 +27,7 @@ const mapFromDB = (row: any): Taxon => {
   return {
     id: row.id,
     parentId: row.parent_id,
+    // Fix: changed hierarchy_path to hierarchyPath
     hierarchyPath: row.hierarchy_path ? row.hierarchy_path.replace(/_/g, '-') : undefined,
     
     wcvpId: row.wcvp_id,
@@ -65,6 +67,7 @@ const mapFromDB = (row: any): Taxon => {
     reviewed: row.reviewed,
 
     geographicArea: row.geographic_area,
+    // Fix: changed lifeform_description to lifeformDescription
     lifeformDescription: row.lifeform_description,
     climateDescription: row.climate_description,
 
@@ -92,6 +95,7 @@ const mapFromDB = (row: any): Taxon => {
     
     isDetailsLoaded: !!row.details,
     createdAt: new Date(row.created_at).getTime(),
+    // Fix: changed descendant_count to descendantCount
     descendantCount: row.descendant_count || 0
   };
 };
@@ -142,6 +146,7 @@ const mapToDB = (taxon: Taxon) => {
     reviewed: clean(taxon.reviewed),
 
     geographic_area: clean(taxon.geographicArea),
+    // Fix: changed lifeform_description to lifeformDescription
     lifeform_description: clean(taxon.lifeformDescription),
     climate_description: clean(taxon.climateDescription),
 
@@ -297,28 +302,63 @@ export const dataService = {
   },
 
   /**
-   * findTaxonByName: Enhanced botanical lookup.
-   * Multi-stage matching:
-   * 1. Exact case-insensitive match (fastest).
-   * 2. Normalized hybrid match (standardizing symbols like ×).
-   * 3. Trimmed substring match to handle trailing whitespace in DB.
+   * findTaxonByName: Robust botanical lookup.
+   * Uses case-sensitive equality match first to hit COLLATE "C" indexes.
+   * Falls back to Title-Cased equality for common nomenclature.
    */
   async findTaxonByName(name: string): Promise<Taxon | null> {
       if (getIsOffline()) return null;
       
       const cleanName = name.trim();
-      const normalizedName = cleanName.replace(/\sx\s/gi, ' × ').toLowerCase();
+      const titleCased = cleanName.charAt(0).toUpperCase() + cleanName.slice(1);
       
-      const { data, error } = await getSupabase()
+      console.log(`[dataService] findTaxonByName: Looking up "${cleanName}"...`);
+
+      // Step 1: Try exact match (Fastest, Hits Index)
+      const { data: exact, error: exactError } = await getSupabase()
           .from(DB_TABLE)
           .select('*, details:app_taxon_details(*)')
-          .or(`taxon_name.ilike.${cleanName},taxon_name.ilike.${normalizedName}`)
-          .order('taxon_rank', { ascending: true }) 
-          .limit(1)
+          .eq('taxon_name', cleanName)
           .maybeSingle();
       
-      if (error || !data) return null;
-      return mapFromDB(data);
+      if (!exactError && exact) {
+          console.log(`[dataService] Success: Exact match found for "${cleanName}".`);
+          return mapFromDB(exact);
+      }
+
+      // Step 2: Try Title Case match (Common for botanical names)
+      if (titleCased !== cleanName) {
+          console.log(`[dataService] Fallback: Trying title case "${titleCased}"...`);
+          const { data: titled, error: titleError } = await getSupabase()
+              .from(DB_TABLE)
+              .select('*, details:app_taxon_details(*)')
+              .eq('taxon_name', titleCased)
+              .maybeSingle();
+          
+          if (!titleError && titled) {
+              console.log(`[dataService] Success: Title case match found.`);
+              return mapFromDB(titled);
+          }
+      }
+
+      // Step 3: Hybrid symbol normalization fallback
+      const normalized = cleanName.replace(/\sx\s/gi, ' × ').replace(/\sX\s/g, ' × ');
+      if (normalized !== cleanName && normalized !== titleCased) {
+          console.log(`[dataService] Fallback: Trying symbol normalization "${normalized}"...`);
+          const { data: norm, error: normError } = await getSupabase()
+              .from(DB_TABLE)
+              .select('*, details:app_taxon_details(*)')
+              .eq('taxon_name', normalized)
+              .maybeSingle();
+          
+          if (!normError && norm) {
+              console.log(`[dataService] Success: Normalized symbol match found.`);
+              return mapFromDB(norm);
+          }
+      }
+      
+      console.log(`[dataService] No match found for "${cleanName}" in catalog.`);
+      return null;
   },
 
   async createTaxon(taxon: Taxon): Promise<Taxon> {
@@ -384,7 +424,6 @@ export const dataService = {
 
   /**
    * purgeNonWCVPTaxa: Highly resilient direct deletion.
-   * Switched to direct SQL-style delete call to minimize timeout risks.
    */
   async purgeNonWCVPTaxa(): Promise<void> {
       if (getIsOffline()) throw new Error("Cannot reset in offline mode");

@@ -39,10 +39,14 @@ DROP INDEX IF EXISTS idx_app_taxa_geo;
 DROP INDEX IF EXISTS idx_app_taxa_path_gist;
 DROP INDEX IF EXISTS idx_app_taxa_source;
 DROP INDEX IF EXISTS idx_app_taxa_source_nulls;
+DROP INDEX IF EXISTS idx_app_taxa_name_exact;
 
 -- 3. NOMENCLATURE SEARCH & SORT (CRITICAL)
 -- B-Tree Index for ORDER BY and Prefix LIKE. Uses COLLATE "C" for max performance.
 CREATE INDEX IF NOT EXISTS idx_app_taxa_name_sort ON app_taxa (taxon_name COLLATE "C");
+
+-- Exact match index for lineage detection (v2.18.1 fix)
+CREATE INDEX IF NOT EXISTS idx_app_taxa_name_exact ON app_taxa (taxon_name);
 
 -- Case-insensitive functional index for background lineage matching
 CREATE INDEX IF NOT EXISTS idx_app_taxa_name_ci ON app_taxa (LOWER(TRIM(taxon_name)));

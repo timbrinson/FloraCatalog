@@ -190,6 +190,7 @@ CREATE TABLE app_audit_log (
 -- 1. Search & Sort
 CREATE INDEX IF NOT EXISTS idx_app_taxa_taxon_name_trgm ON app_taxa USING GIN (taxon_name gin_trgm_ops);
 CREATE INDEX IF NOT EXISTS idx_app_taxa_name_sort ON app_taxa (taxon_name COLLATE "C");
+CREATE INDEX IF NOT EXISTS idx_app_taxa_name_exact ON app_taxa (taxon_name);
 
 -- 2. Hierarchy & Grouping
 CREATE INDEX IF NOT EXISTS idx_app_taxa_parent ON app_taxa(parent_id);

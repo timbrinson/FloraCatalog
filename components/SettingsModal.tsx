@@ -76,6 +76,8 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, preferen
       try {
           await dataService.purgeNonWCVPTaxa();
           alert("Manual entries and cultivars removed. The grid will refresh.");
+          // Reset local flags to force clean boot post-reload
+          localStorage.removeItem('flora_initialized');
           window.location.reload();
       } catch (e: any) {
           const msg = e.message?.includes('timeout') 
