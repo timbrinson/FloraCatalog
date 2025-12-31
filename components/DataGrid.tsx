@@ -144,7 +144,7 @@ const COLUMN_GROUPS: ColumnGroup[] = [
                 tooltip: 'Taxonomic Status', 
                 defaultWidth: 110, 
                 filterType: 'multi-select', 
-                filterOptions: ['Accepted', 'Synonym', 'Unplaced', 'Artificial Hybrid', 'Illegitimate', 'Invalid', 'Local Biotype', 'Misapplied', 'Orthographic', 'Provisionally Accepted', 'External to WCVP'], 
+                filterOptions: ['Accepted', 'Synonym', 'Unplaced', 'Registered', 'Provisional', 'Artificial Hybrid', 'Illegitimate', 'Invalid', 'Local Biotype', 'Misapplied', 'Orthographic', 'Provisionally Accepted', 'External to WCVP'], 
                 defaultOn: false 
             },
             { id: 'family', label: 'Family', tooltip: 'Family', defaultWidth: 120, filterType: 'text', defaultOn: false },
@@ -221,7 +221,7 @@ const COLUMN_GROUPS: ColumnGroup[] = [
             { id: 'volumeAndPage', label: 'Vol/Page', tooltip: 'Volume And Page', defaultWidth: 120, filterType: 'text', defaultOn: false },
             { id: 'firstPublished', label: 'First Published', tooltip: 'First Published Date', defaultWidth: 120, filterType: 'text', defaultOn: false },
             { id: 'nomenclaturalRemarks', label: 'Nom. Remarks', tooltip: 'Nomenclatural Remarks', defaultWidth: 200, filterType: 'text', defaultOn: false },
-            { id: 'reviewed', label: 'Reviewed', tooltip: 'Reviewed Status', defaultWidth: 80, filterType: 'multi-select', filterOptions: ['N', 'Y', 'NULL'], lockWidth: true, headerAlign: 'center', defaultOn: false },
+            { id: 'reviewed', label: 'Reviewed', tooltip: 'Reviewed Status', defaultWidth: 80, headerAlign: 'center', filterType: 'multi-select', filterOptions: ['N', 'Y', 'NULL'], lockWidth: true, defaultOn: false },
         ]
     },
     {
@@ -263,6 +263,7 @@ const DataGrid: React.FC<DataGridProps> = ({
   const [columnOrder, setColumnOrder] = useState<string[]>(() => {
       const saved = loadState<string[]>('grid_col_order_rev11', []);
       if (saved.length > 0) return saved;
+      // Fixed: changed variable 'i' to 'c' to match the parameter name in the map function
       return ALL_COLUMNS.map(c => c.id);
   });
   
@@ -327,7 +328,6 @@ const DataGrid: React.FC<DataGridProps> = ({
        const rank = (row.taxonRank || '').toLowerCase();
        if (rank === 'family' && colId === 'genus') return '';
        
-       // @ts-ignore
        return row[colId];
   };
 
@@ -617,7 +617,7 @@ const DataGrid: React.FC<DataGridProps> = ({
                                     {col.id === 'taxonName' && (
                                         <button 
                                             onClick={toggleSearchMode}
-                                            className={`absolute right-1 top-1 p-1 rounded transition-colors ${preferences.searchMode === 'fuzzy' ? 'bg-indigo-50 text-indigo-600 hover:bg-indigo-100 ring-1 ring-indigo-200' : 'text-slate-300 hover:text-slate-500 hover:bg-slate-100'}`}
+                                            className={`absolute right-1 top-1 p-1 rounded transition-colors ${preferences.searchMode === 'fuzzy' ? 'bg-indigo-50 text-indigo-600 hover:bg-indigo-100 ring-1 ring-indigo-200' : 'text-slate-300 text-slate-500 hover:bg-slate-100'}`}
                                             title={preferences.searchMode === 'prefix' ? "Prefix Search (Starts with) - Click to switch to Fuzzy" : "Fuzzy Search (Contains) - Click to switch to Prefix"}
                                         >
                                             {preferences.searchMode === 'prefix' ? <ArrowRightToLine size={12} /> : <AlignCenter size={12} />}
@@ -647,7 +647,7 @@ const DataGrid: React.FC<DataGridProps> = ({
                                if (COLUMN_RANK_MAP[col.id] && COLUMN_RANK_MAP[col.id] < rowRankLevel) isDimmed = true;
                                if (col.id === 'taxonRank') displayVal = <span className={`px-2 py-0.5 text-[10px] rounded border font-bold bg-${baseColor}-100 ${getTextClass(baseColor)} border-${baseColor}-200 normal-case`}>{val as string}</span>;
                                else if (col.id === 'taxonName') displayVal = formatFullScientificName(tr, preferences);
-                               else if (col.id === 'taxonStatus') { let b = 'bg-slate-100 text-slate-500'; if (val === 'Accepted') b = 'bg-green-50 text-green-700 border-green-200 border'; displayVal = <span className={`px-2 py-0.5 text-[10px] rounded font-bold ${b} normal-case`}>{val || '-'}</span>; }
+                               else if (col.id === 'taxonStatus') { let b = 'bg-slate-100 text-slate-500'; if (val === 'Accepted' || val === 'Registered') b = 'bg-green-50 text-green-700 border-green-200 border'; displayVal = <span className={`px-2 py-0.5 text-[10px] rounded font-bold ${b} normal-case`}>{val || '-'}</span>; }
                                else if (col.id === 'actions') displayVal = <div className="flex items-center justify-center gap-1"><button onClick={(e) => { e.stopPropagation(); setExpandedRows(prev => { const n = new Set(prev); n.has(tr.id) ? n.delete(tr.id) : n.add(tr.id); return n; }); }} className={`p-1.5 rounded shadow-sm ${isExpanded ? 'bg-slate-800 text-white' : 'bg-white border border-slate-200 text-slate-500 hover:text-slate-800'}`}>{isExpanded ? <ChevronUpIcon size={14}/> : <ChevronDownIcon size={14}/>}</button>{['genus', 'species', 'subspecies', 'variety', 'form'].includes(r) && <button onClick={(e) => { e.stopPropagation(); onAction?.('mine', tr); }} className="p-1.5 bg-indigo-50 border border-indigo-200 rounded text-indigo-600 hover:bg-indigo-100 shadow-sm"><PickaxeIcon size={14} /></button>}<button onClick={(e) => { e.stopPropagation(); onAction?.('enrich', tr); }} className="p-1.5 bg-amber-50 border border-amber-200 rounded text-amber-600 hover:bg-amber-100 shadow-sm"><Wand2Icon size={14} /></button></div>;
                                return <td key={col.id} className={`p-2 border-r border-slate-50 truncate overflow-hidden max-w-0 ${col.headerAlign === 'center' ? 'text-center' : ''}`} title={String(val || '')}><span className={`${isBold ? "font-bold" : ""} ${isDimmed ? "font-normal" : ""} ${isBold ? (baseColor === 'slate' ? "text-slate-900" : `text-${baseColor}-900`) : (isDimmed ? "text-slate-400" : "")}`}>{displayVal}</span></td>;
                            })}

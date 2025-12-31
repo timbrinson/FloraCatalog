@@ -1,23 +1,24 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { Taxon, Link, Synonym, SearchCandidate } from "../types";
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-
 /**
  * identifyTaxonomy: Parses natural language input into a structured taxonomic hierarchy.
  */
 export async function identifyTaxonomy(query: string): Promise<any[]> {
+  // Create a new GoogleGenAI instance right before making an API call to ensure it always uses the most up-to-date API key.
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   const response = await ai.models.generateContent({
-    model: 'gemini-3-flash-preview',
-    contents: `Act as a world-class botanical taxonomist. Parse the following plant name into a strict hierarchy starting from the highest identifiable rank down to the most specific.
+    model: 'gemini-3-pro-preview',
+    contents: `Act as a world-class botanical taxonomist. Parse the following plant name into a strict hierarchy.
     Input: "${query}"
     
     Rules:
     1. Align with the World Checklist of Vascular Plants (WCVP).
     2. Correct misspellings and identify the "Accepted" name if the input is a synonym.
     3. Identify hybrid status. Use '×' (not 'x') for genusHybrid or speciesHybrid if applicable.
-    4. For cultivars, wrap the name in single quotes in the taxonName.
-    5. Infer hidden hybrids (e.g., "Lycoris rosea" is actually "Lycoris × rosea").`,
+    4. CULTIVAR RULE: If a cultivar is detected (e.g. 'Bloodgood'), the 'name' property for that specific array item MUST be the cultivar name WITHOUT single quotes (e.g. "Bloodgood"), and 'taxonRank' MUST be "Cultivar".
+    5. SPECIES RULE: The species item in the array MUST NOT contain the cultivar name in its 'name' property.
+    6. For the 'taxonName' of a cultivar, wrap the name in single quotes (e.g. "Acer palmatum 'Bloodgood'").`,
     config: {
       responseMimeType: "application/json",
       responseSchema: {
@@ -26,7 +27,7 @@ export async function identifyTaxonomy(query: string): Promise<any[]> {
           type: Type.OBJECT,
           properties: {
             taxonRank: { type: Type.STRING, description: "e.g. Genus, Species, Variety, Subspecies, Cultivar" },
-            name: { type: Type.STRING, description: "The specific epithet or cultivar name alone" },
+            name: { type: Type.STRING, description: "The specific epithet OR cultivar name alone" },
             taxonName: { type: Type.STRING, description: "The full scientific name including parents" },
             family: { type: Type.STRING },
             genus: { type: Type.STRING },
@@ -55,8 +56,10 @@ export async function identifyTaxonomy(query: string): Promise<any[]> {
  * enrichTaxon: Fetches comprehensive botanical and horticultural details.
  */
 export async function enrichTaxon(taxon: Taxon): Promise<Partial<Taxon>> {
+  // Create a new GoogleGenAI instance right before making an API call to ensure it always uses the most up-to-date API key.
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   const response = await ai.models.generateContent({
-    model: 'gemini-3-flash-preview',
+    model: 'gemini-3-pro-preview',
     contents: `Provide deep horticultural and botanical data for "${taxon.taxonName}".
     
     Include:
@@ -138,6 +141,8 @@ export async function enrichTaxon(taxon: Taxon): Promise<Partial<Taxon>> {
  * findAdditionalLinks: Web search for specific plant documentation.
  */
 export async function findAdditionalLinks(taxonName: string, existing: Link[]): Promise<Link[]> {
+  // Create a new GoogleGenAI instance right before making an API call to ensure it always uses the most up-to-date API key.
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   const response = await ai.models.generateContent({
     model: 'gemini-3-flash-preview',
     contents: `Find authoritative reference links (RHS, Missouri Botanical Garden, POWO, etc.) for "${taxonName}". 

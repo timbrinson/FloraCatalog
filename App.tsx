@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { Loader2, Leaf, Activity, Settings } from 'lucide-react';
+import { Loader2, Leaf, Activity, Settings, Plus } from 'lucide-react';
 import { Taxon, LoadingState, UserPreferences, ActivityItem, ActivityStatus } from './types';
 import { dataService } from './services/dataService';
 import { getIsOffline } from './services/supabaseClient';
@@ -8,6 +8,7 @@ import DataGrid from './components/DataGrid';
 import ConfirmDialog from './components/ConfirmDialog';
 import SettingsModal from './components/SettingsModal';
 import ActivityPanel from './components/ActivityPanel';
+import AddPlantModal from './components/AddPlantModal';
 
 export default function App() {
   const [loadingState, setLoadingState] = useState<LoadingState>(LoadingState.IDLE);
@@ -15,6 +16,7 @@ export default function App() {
   const [errorDetails, setErrorDetails] = useState<string | null>(null);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [showActivityPanel, setShowActivityPanel] = useState(false);
+  const [showAddModal, setShowAddModal] = useState(false);
   const [taxa, setTaxa] = useState<Taxon[]>([]);
   const [offset, setOffset] = useState(0);
   const [hasMore, setHasMore] = useState(true);
@@ -111,8 +113,32 @@ export default function App() {
   };
 
   const handleAction = (action: 'mine' | 'enrich', taxon: Taxon) => {
-      console.log(`Action requested: ${action} for ${taxon.taxonName}`);
-      // Placeholder for activity manager logic
+      const id = crypto.randomUUID();
+      const newActivity: ActivityItem = {
+          id,
+          name: `${action === 'mine' ? 'Mining' : 'Enriching'} ${taxon.taxonName}`,
+          type: action === 'mine' ? 'mining' : 'enrichment',
+          status: 'running',
+          message: 'Initializing AI curator...',
+          timestamp: Date.now()
+      };
+      setActivities(prev => [newActivity, ...prev]);
+      setShowActivityPanel(true);
+  };
+
+  const handleAddActivity = (activity: ActivityItem) => {
+      setActivities(prev => {
+          const exists = prev.find(a => a.id === activity.id);
+          if (exists) {
+              return prev.map(a => a.id === activity.id ? activity : a);
+          }
+          return [activity, ...prev];
+      });
+  };
+
+  const handleAddSuccess = () => {
+      setShowAddModal(false);
+      fetchBatch(0, true);
   };
 
   useEffect(() => { const s = localStorage.getItem('flora_prefs'); if (s) try { setPreferences(JSON.parse(s)); } catch(e) {} }, []); 
@@ -130,11 +156,37 @@ export default function App() {
         </div>
         <div className="flex items-center gap-3">
           <button 
-            onClick={() => setShowActivityPanel(!showActivityPanel)}
-            className={`p-2 rounded-full transition-colors ${showActivityPanel ? 'bg-leaf-100 text-leaf-700' : 'text-slate-500 hover:bg-slate-100'}`}
+            onClick={() => setShowAddModal(true)}
+            className="flex items-center gap-2 px-4 py-1.5 bg-leaf-600 text-white text-xs font-bold rounded-full hover:bg-leaf-700 transition-colors shadow-sm"
           >
-            <Activity size={20} />
+            <Plus size={16} /> Add Plant
           </button>
+          
+          <div className="relative">
+            <button 
+              onClick={() => setShowActivityPanel(!showActivityPanel)}
+              className={`p-2 rounded-full transition-colors ${showActivityPanel ? 'bg-leaf-100 text-leaf-700' : 'text-slate-500 hover:bg-slate-100'}`}
+            >
+              <Activity size={20} />
+              {activities.filter(a => a.status === 'running' || a.status === 'needs_input').length > 0 && (
+                <span className="absolute top-1 right-1 w-2 h-2 bg-amber-500 rounded-full border-2 border-white"></span>
+              )}
+            </button>
+            {showActivityPanel && (
+              <ActivityPanel 
+                activities={activities}
+                isOpen={showActivityPanel}
+                onClose={() => setShowActivityPanel(false)}
+                onCancel={(id) => {
+                    cancelledActivityIds.current.add(id);
+                    setActivities(prev => prev.map(a => a.id === id ? { ...a, status: 'error', message: 'Cancelled by user.' } : a));
+                }}
+                onRetry={(item) => {/* retry logic */}}
+                onDismiss={(id) => setActivities(prev => prev.filter(a => a.id !== id))}
+              />
+            )}
+          </div>
+
           <button 
             onClick={() => setShowSettingsModal(true)}
             className="p-2 text-slate-500 hover:bg-slate-100 rounded-full transition-colors"
@@ -174,17 +226,6 @@ export default function App() {
             error={loadingState === LoadingState.ERROR ? errorDetails : null}
           />
         )}
-
-        {showActivityPanel && (
-          <ActivityPanel 
-            activities={activities}
-            isOpen={showActivityPanel}
-            onClose={() => setShowActivityPanel(false)}
-            onCancel={(id) => cancelledActivityIds.current.add(id)}
-            onRetry={(item) => {/* retry logic */}}
-            onDismiss={(id) => setActivities(prev => prev.filter(a => a.id !== id))}
-          />
-        )}
       </main>
 
       {showSettingsModal && (
@@ -193,6 +234,15 @@ export default function App() {
           onClose={handleSettingsClose}
           preferences={preferences}
           onUpdate={setPreferences}
+        />
+      )}
+
+      {showAddModal && (
+        <AddPlantModal 
+          isOpen={showAddModal}
+          onClose={() => setShowAddModal(false)}
+          onSuccess={handleAddSuccess}
+          onAddActivity={handleAddActivity}
         />
       )}
 

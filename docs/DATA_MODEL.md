@@ -1,4 +1,3 @@
-
 # FloraCatalog Data Model & Management Design
 
 ## Core Philosophy: Lineage & Traceability
@@ -14,13 +13,13 @@ Every record and modification must capture a strict "Who, What, When, and How" c
 This is critical because data might be updated by a batch script (WCVP Sync), an AI agent (Mining), or a human administrator.
 
 **Context Requirements:**
-1.  **Source:** Where did this exist originally? (e.g., "WCVP 2025 Download", "Gemini AI v2.5")
-2.  **Process:** How was it put here? (e.g., "Bulk Import Script", "Deep Mine Process", "Manual Correction")
+1.  **Source:** Where did this exist originally? (e.g., "WCVP 2025 Download", "RHS Plant Finder", "Gemini AI v2.5")
+2.  **Process:** How was it put here? (e.g., "Bulk Import Script", "FloraCatalog UI v2.18.0", "Manual Correction")
 3.  **Application Context:**
     *   **Application Name:** (e.g., "FloraCatalog")
-    *   **Application Version:** (e.g., "v2.9.1") - *Critical for debugging data corruption from specific app updates.*
+    *   **Application Version:** (e.g., "v2.18.0") - *Critical for debugging data corruption from specific app updates.*
 4.  **User Identity:**
-    *   If triggered by a User Command: Capture the User ID.
+    *   If triggered by a User Command: Capture the User ID (currently placeholders as 'UI_USER').
     *   If System Background Task: Leave User ID null or mark as 'SYSTEM'.
 5.  **Timestamp:** When was it captured in our DB?
 
@@ -37,8 +36,8 @@ This is critical because data might be updated by a batch script (WCVP Sync), an
 *   **Purpose:** The active catalog used by the application.
 *   **Relation:** Can link to `wcvp_import` via `wcvp_id`, but exists independently to allow non-WCVP plants (Cultivars).
 *   **Lineage Columns:**
-    *   `created_by_process`: (e.g., 'WCVP_SYNC', 'USER_ADD')
-    *   `source_id`: FK to `app_data_sources`.
+    *   `verification_level`: Stores process info (e.g., 'FloraCatalog v2.18.0 (UI)')
+    *   `source_id`: FK to `app_data_sources`. Mandatory for all records.
 
 ### 3. The "Golden Record" (`app_taxon_details`)
 *   **Cardinality:** 1:1 (One row per Taxon).
@@ -60,7 +59,7 @@ This is critical because data might be updated by a batch script (WCVP Sync), an
 *   **Purpose:** Central lookup for citations.
 *   **Example Rows:**
     *   ID: 1, Name: "WCVP", Version: "14 (2025)", URL: "kew.org..."
-    *   ID: 2, Name: "Gemini AI", Version: "2.5 Flash", Context: "Enrichment"
+    *   ID: 2, Name: "FloraCatalog Manual", Version: "v2.18.0", Context: "UI Manual Entry"
 
 ### 6. Audit Log (`app_audit_log`)
 *   **Purpose:** Immutable history of changes to the Core or Golden Record.

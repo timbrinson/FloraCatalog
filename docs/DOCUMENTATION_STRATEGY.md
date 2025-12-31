@@ -20,10 +20,13 @@ This document tracks the plan and progress for building a robust documentation l
 - **Content:** Defines the Human-as-Architect/AI-as-Lead-Dev hierarchy, documents past behavioral anti-patterns, and defines communication signals (e.g., "Strong feedback means STOP and re-ground").
 
 ### 3. Architectural Decision Records (`docs/decisions/`)
-- **Status:** [Pending]
+- **Status:** [Done]
 - **Goal:** An archive of technical choices.
 - **Format:** Context -> Options -> Choice -> Consequences.
-- **First ADRs to write:** Search Engine logic (B-Tree vs GIN), Ltree vs Adjacency List for hierarchy.
+- **Completed ADRs:** 
+    - ADR-001: Hybrid Search Strategy.
+    - ADR-002: Hierarchical Data Persistence (Ltree).
+    - ADR-003: Maintenance Strategy (Split-Control Purge).
 
 ### 4. Functional Specifications (`docs/features/`)
 - **Status:** [Pending]
@@ -53,6 +56,7 @@ Brevity updates are only performed via explicit user commands (e.g., "Refactor t
 - [x] Create `docs/AI_ONBOARDING.md`.
 - [x] Refactor `README.md` into the Project Atlas.
 - [x] Create `docs/VISION_STATEMENT.md`.
-- [ ] Backfill ADR-001: Hybrid Search Strategy.
-- [ ] Backfill ADR-002: Hierarchical Data Persistence (Ltree).
+- [x] Backfill ADR-001: Hybrid Search Strategy.
+- [x] Backfill ADR-002: Hierarchical Data Persistence (Ltree).
+- [x] Create ADR-003: Maintenance Strategy.
 - [ ] Create Spec: DataGrid Visual Behavior.

@@ -1,5 +1,34 @@
 # Version History
 
+## v2.22.0 - Add Plant Control Suite
+**Date:** June 18, 2025
+**Status:** (Ready for Verification)
+
+### New Features
+- **AI-Assisted Add Modal:** Introduced `AddPlantModal.tsx` which allows users to add new plants using natural language.
+  - **Parsing Engine:** Utilizes Gemini 3 Pro to decompose complex botanical names into hierarchical records (Genus, Species, Cultivar).
+  - **Lineage Preview:** Provides a visual "Dry Run" of the hierarchy before database commitment.
+  - **Bulk Upload UI:** Added a foundation for bulk file/text list imports.
+- **Header Actions:** Added a high-visibility "Add Plant" button to the main navigation header.
+
+## v2.21.3 - Split Maintenance Control
+**Date:** June 17, 2025
+**Status:** (Verified)
+
+### New Features
+- **Granular Maintenance Utility:** In response to architectural needs for independent experimentation, the "Reset" tool in `SettingsModal.tsx` has been split into two distinct operations:
+  - **Purge Cultivars:** Removes non-WCVP taxa (source_id != 1) while preserving the core dataset.
+  - **Wipe Details:** Clears the AI-enriched horticultural Knowledge Layer (descriptions, traits, links) for ALL plants without affecting the nomenclature hierarchy.
+- **Safety Dialogs:** Added dedicated confirmation states and descriptive warnings for each maintenance operation.
+
+## v2.21.2 - Maintenance & Purge Utility
+**Date:** June 16, 2025
+**Status:** (Verified)
+
+### New Features
+- **Reset to Baseline Utility:** Added a high-severity maintenance tool in `SettingsModal.tsx` to purge non-WCVP plants and clear AI-mined horticultural details. This allows for clean-slate experimentation with cultivars without a full database rebuild.
+- **Service Integration:** Implemented `resetToBaseline` in `dataService.ts` with cascading purge logic for `app_taxa` and `app_taxon_details`.
+
 ## v2.21.1 - UI Findability & Trait Registry Prototype
 **Date:** June 15, 2025
 **Status:** (Verified)

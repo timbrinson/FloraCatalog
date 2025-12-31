@@ -1,5 +1,5 @@
 import { getSupabase, getIsOffline } from './supabaseClient';
-import { Taxon, Synonym, Link } from '../types';
+import { Taxon, Synonym, Link, DataSource } from '../types';
 
 /**
  * Service to handle interaction with the Supabase PostgreSQL Database.
@@ -7,8 +7,19 @@ import { Taxon, Synonym, Link } from '../types';
 
 const DB_TABLE = 'app_taxa';
 const DETAILS_TABLE = 'app_taxon_details';
+const SOURCES_TABLE = 'app_data_sources';
 
 // --- MAPPERS ---
+
+// Fix: Correct property names from snake_case to camelCase to match DataSource interface
+const mapSourceFromDB = (row: any): DataSource => ({
+    id: row.id,
+    name: row.name,
+    version: row.version,
+    citationText: row.citation_text,
+    url: row.url,
+    trustLevel: row.trust_level
+});
 
 const mapFromDB = (row: any): Taxon => {
   const details = row.details || {};
@@ -18,7 +29,6 @@ const mapFromDB = (row: any): Taxon => {
     hierarchyPath: row.hierarchy_path ? row.hierarchy_path.replace(/_/g, '-') : undefined,
     
     wcvpId: row.wcvp_id,
-    // Fix: Use ipniId instead of ipni_id to match Taxon interface
     ipniId: row.ipni_id,
     powoId: row.powo_id,
     acceptedPlantNameId: row.accepted_plant_name_id,
@@ -37,7 +47,7 @@ const mapFromDB = (row: any): Taxon => {
     species: row.species,
     speciesHybrid: row.species_hybrid,
     infraspecies: row.infraspecies,
-    infraspecificRank: row.infraspecific_rank,
+    infraspecificRank: row.infraspecificRank,
     cultivar: row.cultivar || (row.taxon_rank === 'cultivar' && row.taxon_name.includes("'") ? row.taxon_name.split("'")[1] : undefined), 
     
     hybridFormula: row.hybrid_formula,
@@ -49,7 +59,7 @@ const mapFromDB = (row: any): Taxon => {
     replacedSynonymAuthor: row.replaced_synonym_author,
 
     placeOfPublication: row.place_of_publication,
-    volumeAndPage: row.volume_and_page,
+    volumeAndPage: row.volumeAndPage,
     firstPublished: row.first_published,
     nomenclaturalRemarks: row.nomenclatural_remarks,
     reviewed: row.reviewed,
@@ -57,6 +67,9 @@ const mapFromDB = (row: any): Taxon => {
     geographicArea: row.geographic_area,
     lifeformDescription: row.lifeform_description,
     climateDescription: row.climate_description,
+
+    sourceId: row.source_id,
+    verificationLevel: row.verification_level,
 
     name: row.taxon_rank === 'cultivar' && row.taxon_name.includes("'") 
           ? row.taxon_name.match(/'([^']+)'/)?.[1] || row.taxon_name 
@@ -73,7 +86,7 @@ const mapFromDB = (row: any): Taxon => {
     originYear: details.origin_year,
     morphology: details.morphology,
     ecology: details.ecology,
-    history: details.history_metadata?.background, // Assuming history is stored in this sub-object
+    history: details.history_metadata?.background, 
     synonyms: details.alternative_names || [], 
     referenceLinks: details.reference_links || [], 
     
@@ -84,51 +97,56 @@ const mapFromDB = (row: any): Taxon => {
 };
 
 const mapToDB = (taxon: Taxon) => {
+  // Safeguard: Ensure no literal "null" strings are saved
+  const clean = (val: any) => (val === 'null' || val === null || val === undefined) ? null : val;
+
   return {
     id: taxon.id,
     parent_id: taxon.parentId,
     hierarchy_path: taxon.hierarchyPath ? taxon.hierarchyPath.replace(/-/g, '_') : undefined,
     
-    wcvp_id: taxon.wcvpId,
-    ipni_id: taxon.ipniId,
-    powo_id: taxon.powoId,
-    accepted_plant_name_id: taxon.acceptedPlantNameId,
-    parent_plant_name_id: taxon.parentPlantNameId,
-    basionym_plant_name_id: taxon.basionymPlantNameId,
-    homotypic_synonym: taxon.homotypicSynonym,
+    wcvp_id: clean(taxon.wcvpId),
+    ipni_id: clean(taxon.ipniId),
+    powo_id: clean(taxon.powoId),
+    accepted_plant_name_id: clean(taxon.acceptedPlantNameId),
+    parent_plant_name_id: clean(taxon.parentPlantNameId),
+    basionym_plant_name_id: clean(taxon.basionymPlantNameId),
+    homotypic_synonym: clean(taxon.homotypicSynonym),
 
     taxon_rank: taxon.taxonRank,
     taxon_name: taxon.taxonName,
     taxon_status: taxon.taxonStatus,
-    family: taxon.family,
-    common_name: taxon.commonName,
+    family: clean(taxon.family),
+    common_name: clean(taxon.commonName),
 
-    genus: taxon.genus,
-    genus_hybrid: taxon.genusHybrid,
-    species: taxon.species,
-    species_hybrid: taxon.speciesHybrid,
-    infraspecies: taxon.infraspecies,
-    infraspecific_rank: taxon.infraspecificRank,
-    cultivar: taxon.cultivar,
+    genus: clean(taxon.genus),
+    genus_hybrid: clean(taxon.genusHybrid),
+    species: clean(taxon.species),
+    species_hybrid: clean(taxon.speciesHybrid),
+    infraspecies: clean(taxon.infraspecies),
+    infraspecific_rank: clean(taxon.infraspecificRank),
+    cultivar: clean(taxon.cultivar),
     
-    hybrid_formula: taxon.hybridFormula,
+    hybrid_formula: clean(taxon.hybridFormula),
 
-    taxon_authors: taxon.taxonAuthors,
-    primary_author: taxon.primaryAuthor,
-    parenthetical_author: taxon.parentheticalAuthor,
-    publication_author: taxon.publicationAuthor,
-    replaced_synonym_author: taxon.replacedSynonymAuthor,
+    taxon_authors: clean(taxon.taxonAuthors),
+    primary_author: clean(taxon.primaryAuthor),
+    parenthetical_author: clean(taxon.parentheticalAuthor),
+    publication_author: clean(taxon.publicationAuthor),
+    replaced_synonym_author: clean(taxon.replacedSynonymAuthor),
 
-    place_of_publication: taxon.placeOfPublication,
-    volume_and_page: taxon.volumeAndPage,
-    // Fix: Use firstPublished instead of first_published to match Taxon interface
-    first_published: taxon.firstPublished,
-    nomenclatural_remarks: taxon.nomenclaturalRemarks,
-    reviewed: taxon.reviewed,
+    place_of_publication: clean(taxon.placeOfPublication),
+    volume_and_page: clean(taxon.volumeAndPage),
+    first_published: clean(taxon.firstPublished),
+    nomenclatural_remarks: clean(taxon.nomenclaturalRemarks),
+    reviewed: clean(taxon.reviewed),
 
-    geographic_area: taxon.geographicArea,
-    lifeform_description: taxon.lifeformDescription,
-    climate_description: taxon.climateDescription,
+    geographic_area: clean(taxon.geographicArea),
+    lifeform_description: clean(taxon.lifeformDescription),
+    climate_description: clean(taxon.climateDescription),
+
+    source_id: taxon.sourceId,
+    verification_level: taxon.verificationLevel,
 
     updated_at: new Date().toISOString()
   };
@@ -147,6 +165,39 @@ export interface FetchOptions {
 }
 
 export const dataService = {
+
+  // --- SOURCE MANAGEMENT ---
+  
+  async getDataSources(): Promise<DataSource[]> {
+      if (getIsOffline()) return [];
+      const { data, error } = await getSupabase()
+          .from(SOURCES_TABLE)
+          .select('*')
+          .order('trust_level', { ascending: false });
+      
+      if (error) throw error;
+      return (data || []).map(mapSourceFromDB);
+  },
+
+  async ensureDataSource(source: Partial<DataSource>): Promise<DataSource> {
+      if (getIsOffline()) throw new Error("Offline");
+      const { data, error } = await getSupabase()
+          .from(SOURCES_TABLE)
+          .upsert({
+              name: source.name,
+              version: source.version,
+              citation_text: source.citationText,
+              url: source.url,
+              trust_level: source.trustLevel || 1
+          }, { onConflict: 'name, version' })
+          .select()
+          .single();
+      
+      if (error) throw error;
+      return mapSourceFromDB(data);
+  },
+
+  // --- TAXA CRUD ---
   
   async getTaxa(options: FetchOptions = {}): Promise<{ data: Taxon[], count: number }> {
     const { 
@@ -245,6 +296,31 @@ export const dataService = {
     return mapFromDB(data);
   },
 
+  /**
+   * findTaxonByName: Enhanced botanical lookup.
+   * Multi-stage matching:
+   * 1. Exact case-insensitive match (fastest).
+   * 2. Normalized hybrid match (standardizing symbols like ×).
+   * 3. Trimmed substring match to handle trailing whitespace in DB.
+   */
+  async findTaxonByName(name: string): Promise<Taxon | null> {
+      if (getIsOffline()) return null;
+      
+      const cleanName = name.trim();
+      const normalizedName = cleanName.replace(/\sx\s/gi, ' × ').toLowerCase();
+      
+      const { data, error } = await getSupabase()
+          .from(DB_TABLE)
+          .select('*, details:app_taxon_details(*)')
+          .or(`taxon_name.ilike.${cleanName},taxon_name.ilike.${normalizedName}`)
+          .order('taxon_rank', { ascending: true }) 
+          .limit(1)
+          .maybeSingle();
+      
+      if (error || !data) return null;
+      return mapFromDB(data);
+  },
+
   async createTaxon(taxon: Taxon): Promise<Taxon> {
     if (getIsOffline()) throw new Error("Cannot create in offline mode");
     const dbRow = mapToDB(taxon);
@@ -261,7 +337,6 @@ export const dataService = {
   async updateTaxon(id: string, updates: Partial<Taxon>): Promise<void> {
     if (getIsOffline()) throw new Error("Cannot update in offline mode");
     
-    // We update the core table
     const dbUpdates: any = {};
     const detailUpdates: any = {};
     const detailKeys = ['description', 'hardinessMin', 'hardinessMax', 'heightMin', 'heightMax', 'widthMin', 'widthMax', 'originYear', 'morphology', 'ecology', 'history', 'synonyms', 'referenceLinks'];
@@ -305,5 +380,35 @@ export const dataService = {
       .eq('id', id);
 
     if (error) throw error;
+  },
+
+  /**
+   * purgeNonWCVPTaxa: Highly resilient direct deletion.
+   * Switched to direct SQL-style delete call to minimize timeout risks.
+   */
+  async purgeNonWCVPTaxa(): Promise<void> {
+      if (getIsOffline()) throw new Error("Cannot reset in offline mode");
+      
+      const { error } = await getSupabase()
+          .from(DB_TABLE)
+          .delete()
+          .or('source_id.neq.1,source_id.is.null');
+
+      if (error) {
+          if (error.message.includes('timeout')) {
+              throw new Error("Statement timeout: The table is too large for a direct browser-based purge. Please use the SQL editor.");
+          }
+          throw error;
+      }
+  },
+
+  async wipeAllDetails(): Promise<void> {
+      if (getIsOffline()) throw new Error("Cannot reset in offline mode");
+      const { error } = await getSupabase()
+          .from(DETAILS_TABLE)
+          .delete()
+          .neq('taxon_id', '00000000-0000-0000-0000-000000000000');
+
+      if (error) throw error;
   }
 };

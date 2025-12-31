@@ -37,8 +37,8 @@ This document defines the logic and valid values for multi-select filters in the
 |	positio	|	WCVP - Obsolete	|		|	positio	|		|	In WCVP data but not in WCVP docs	|
 |	proles	|	WCVP - Obsolete	|	proles	|	proles	|		|	Listed in WCVP docs but not used by app	|
 |	provar.	|	WCVP - Obsolete	|		|	provar.	|		|	In WCVP data but not in WCVP docs	|
-|	psp.	|	WCVP - Obsolete	|		|	psp.	|		|	In WCVP data but not in WCVP docs	|
-|	stirps	|	WCVP - Obsolete	|		|	stirps	|		|	In WCVP data but not in WCVP docs	|
+|	psp.	|	WCVP - Obsolete	|	psp.	|	psp.	|		|		|
+|	stirps	|	WCVP - Obsolete	|	stirps	|	stirps	|		|		|
 |	subap.	|	WCVP - Obsolete	|		|	subap.	|		|	In WCVP data but not in WCVP docs	|
 |	sublusus	|	WCVP - Obsolete	|	sublusus	|	sublusus	|		|		|
 |	subproles	|	WCVP - Obsolete	|	subproles	|	subproles	|		|		|
@@ -55,6 +55,8 @@ This document defines the logic and valid values for multi-select filters in the
 |	Accepted	|	WCVP - Primary	|	Accepted	|	Accepted	|		|	Placed first as this is the most important status from WCVP	|
 |	Synonym	|	WCVP - Primary	|	Synonym	|	Synonym	|		|		|
 |	Unplaced	|	WCVP - Primary	|	Unplaced	|	Unplaced	|		|		|
+|	Registered	|	App Extension	|		|		|	Registered	|	Used for Cultivars registered with an International Cultivar Registration Authority (ICRA).	|
+|	Provisional	|	App Extension	|		|		|	Provisional	|	Used for manually added plants or trade names awaiting registration.	|
 |	Artificial Hybrid	|	WCVP - Secondary	|	Artificial Hybrid	|	Artificial Hybrid	|		|	Subtype of Synonym	|
 |	Illegitimate	|	WCVP - Secondary	|	Illegitimate	|	Illegitimate	|		|	Subtype of Synonym	|
 |	Invalid	|	WCVP - Secondary	|	Invalid	|	Invalid	|		|	Subtype of Synonym	|
@@ -130,13 +132,15 @@ This document defines the logic and valid values for multi-select filters in the
 - Common terms include: phanerophyte, geophyte, therophyte, chamaephyte, hemicryptophyte.
 - Use prefix matching (e.g., typing "phanerophyte" will find "climbing phanerophyte").
 
-## 6. Search Engines & Performance (`taxonName`)
+## 6. Search Engines & Performance (**Scope: `taxonName` column only**)
 **Strategy:** The application provides two distinct ways to query plant names via the `taxonName` column. Users can toggle between these modes using the icon inside the search input.
 
 | Mode | Icon | SQL Logic | Index Used | Use Case |
 | :--- | :--- | :--- | :--- | :--- |
 | **Prefix (Standard)** | `|A...` | `LIKE 'Term%'` | **B-Tree** | Fastest possible search. Best for large-scale browsing. Matches only the start of the plant name. |
 | **Fuzzy (Flexible)** | `...A...` | `ILIKE '%term%'`| **Trigram GIN** | Most flexible. Matches text anywhere in the name. Supports `%` wildcards for complex filtering. |
+
+**Note:** Other text-based columns (e.g., `family`, `genus`, `geographic_area`) utilize standard B-Tree prefix matching but do not currently support the "Fuzzy" toggle.
 
 ## 7. Intelligent Auto-Casing (Prefix Mode)
 **Strategy:** In **Prefix Mode**, the application applies specific casing rules to text filters before sending the query to the database. This allowed the use of optimized, case-sensitive **B-Tree indexes** while remaining user-friendly.

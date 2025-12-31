@@ -35,6 +35,7 @@ Whenever a new conversation starts or the session is reset, the AI MUST NOT emit
 - **Guardrail D (Preservation Over Brevity)**: Maintaining a complete historical record in roadmap documents is more important than keeping the XML response short.
 - **Guardrail E (The Zero-Action Rule)**: The AI is strictly prohibited from modifying *any* file—including documentation like `VISION_STATEMENT.md`—without explicit user approval of the specific plan in the current turn.
 - **Guardrail F (Explicit Sign-Off Rule)**: The AI is strictly forbidden from marking a `TASK_BACKLOG.md` item as `[x]` or moving it to the "Archive" based on its own assessment of completion. Even if the AI believes a task is finished, the document update only occurs after a direct command from the Human Architect (e.g., "Verified, mark as done").
+- **Guardrail G (Dead Code Hygiene)**: During architectural transitions (e.g., switching from cards to grids), the AI must proactively identify orphaned files that no longer have import references in the main tree. The AI must list these as "Recommended Deletions" in the planning phase and remove them if authorized.
 
 ## 7. Behavioral Warnings & Anti-Patterns
 Past sessions have identified "Drift" patterns that must be avoided:
@@ -45,10 +46,14 @@ Past sessions have identified "Drift" patterns that must be avoided:
 ## 8. Content Integrity & Preservation
 - **Strict Line-by-Line Preservation**: For baseline files, the AI must copy the *entire* existing content exactly. Re-summarizing or "cleaning up" sections from memory is strictly prohibited.
 - **The Literal Preservation Clause**: Summarization of existing documentation is a **High-Severity Regression**. When updating a file, the AI must replicate the existing content character-for-character. "Tightening" or "cleaning up" phrasing is strictly forbidden unless the specific goal of the task is "Copy Editing." The assistant must treat existing paragraphs as immutable constants.
-- **Conservation Check**: Before outputting an XML block for any documentation file, the AI must explicitly state in the planning phase: *"I have verified via a mental diff that 100% of the existing text has been preserved verbatim, with no summarization or truncation."*
+- **Conservation Check**: Before outputing an XML block for any documentation file, the AI must explicitly state in the planning phase: *"I have verified via a mental diff that 100% of the existing text has been preserved verbatim, with no summarization or truncation."*
 - **Diff Verification**: Before emitting XML, perform a mental diff to ensure no tasks or descriptions were accidentally deleted.
 
 ## 9. Refactoring for Brevity
 1. **Human-Triggered Only:** The AI must never shorten existing documentation unless the user uses an explicit command like "Refactor for brevity" or "Consolidate this section."
 2. **Lossless Verification:** When refactoring for brevity, the AI must first list any specific details, edge cases, or historical context being removed or moved. 
 3. **The Archive Option:** The AI should always prioritize moving long-form reasoning to a new file in `docs/decisions/` or `docs/archive/` rather than deleting it.
+
+## 10. Manual Action Notification
+1. **Explicit Flags:** If any proposed change requires the user to execute SQL in Supabase, update a `.env` file, or perform a manual browser action (e.g., "Clear LocalStorage"), the AI MUST explicitly list these under a high-visibility header titled "**MANUAL ACTION REQUIRED**" at the start of its natural language response.
+2. **Persistence:** This notification rule is intended to prevent functional gaps where the code assumes a data layer optimization that has not yet been applied by the human architect.

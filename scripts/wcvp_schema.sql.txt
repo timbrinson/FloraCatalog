@@ -1,4 +1,3 @@
-
 -- Enable required extensions
 CREATE EXTENSION IF NOT EXISTS ltree;
 CREATE EXTENSION IF NOT EXISTS pg_trgm;
@@ -66,8 +65,13 @@ CREATE TABLE app_data_sources (
     citation_text text,
     url text,
     trust_level int DEFAULT 1,
-    last_accessed_at timestamptz DEFAULT NOW()
+    last_accessed_at timestamptz DEFAULT NOW(),
+    -- Ensures we don't duplicate sources while adding via UI
+    CONSTRAINT app_data_sources_name_version_key UNIQUE (name, version)
 );
+
+-- NOTE: If you manually insert Source ID 1 (WCVP), you MUST reset the sequence:
+-- SELECT setval('app_data_sources_id_seq', (SELECT MAX(id) FROM app_data_sources));
 
 -- 2. ATTRIBUTE REGISTRY
 CREATE TABLE app_attribute_definitions (
@@ -184,7 +188,7 @@ CREATE TABLE app_audit_log (
 -- =============================================================================
 
 -- 1. Search & Sort
-CREATE INDEX IF NOT EXISTS idx_app_taxa_name_trgm ON app_taxa USING GIN (taxon_name gin_trgm_ops);
+CREATE INDEX IF NOT EXISTS idx_app_taxa_taxon_name_trgm ON app_taxa USING GIN (taxon_name gin_trgm_ops);
 CREATE INDEX IF NOT EXISTS idx_app_taxa_name_sort ON app_taxa (taxon_name COLLATE "C");
 
 -- 2. Hierarchy & Grouping
@@ -202,12 +206,15 @@ CREATE INDEX IF NOT EXISTS idx_app_taxa_gh ON app_taxa(genus_hybrid);
 CREATE INDEX IF NOT EXISTS idx_app_taxa_sh ON app_taxa(species_hybrid);
 
 -- 4. Identifiers (WCVP / IPNI / POWO)
--- UNIQUE index on wcvp_id is handled by the table definition above
 CREATE INDEX IF NOT EXISTS idx_app_taxa_ipni ON app_taxa(ipni_id);
 CREATE INDEX IF NOT EXISTS idx_app_taxa_powo ON app_taxa(powo_id);
 CREATE INDEX IF NOT EXISTS idx_app_taxa_accepted_wcvp ON app_taxa(accepted_plant_name_id);
 CREATE INDEX IF NOT EXISTS idx_app_taxa_parent_wcvp ON app_taxa(parent_plant_name_id);
 CREATE INDEX IF NOT EXISTS idx_app_taxa_basionym_wcvp ON app_taxa(basionym_plant_name_id);
+
+-- 5. Maintenance / Purge Support
+CREATE INDEX IF NOT EXISTS idx_app_taxa_source ON app_taxa(source_id);
+CREATE INDEX IF NOT EXISTS idx_app_taxa_source_nulls ON app_taxa (source_id) WHERE source_id IS NULL;
 
 -- permissions
 ALTER TABLE wcvp_import DISABLE ROW LEVEL SECURITY;

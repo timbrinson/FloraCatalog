@@ -38,6 +38,15 @@ export interface Link {
   url: string;
 }
 
+export interface DataSource {
+  id: number;
+  name: string;
+  version?: string;
+  citationText?: string;
+  url?: string;
+  trustLevel?: number;
+}
+
 export interface Taxon {
   id: string;
   parentId?: string;
@@ -77,6 +86,10 @@ export interface Taxon {
   climateDescription?: string;
   name: string;
   
+  // Lineage
+  sourceId?: number;
+  verificationLevel?: string;
+
   // Knowledge Layer Fields
   description?: string;
   hardinessMin?: number;

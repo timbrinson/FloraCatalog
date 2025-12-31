@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
-import { X, Settings, Layout, Zap, Palette, Database, Save, Search as SearchIcon, Cpu } from 'lucide-react';
+import { X, Settings, Layout, Zap, Palette, Database, Save, Search as SearchIcon, Cpu, AlertTriangle, RefreshCw, Loader2, Trash2 } from 'lucide-react';
 import { UserPreferences, ColorTheme } from '../types';
 import { reloadClient, MANUAL_URL, MANUAL_KEY } from '../services/supabaseClient';
+import { dataService } from '../services/dataService';
+import ConfirmDialog from './ConfirmDialog';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -16,6 +18,12 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, preferen
   // Default to LocalStorage, fallback to constants from file
   const [dbUrl, setDbUrl] = useState(localStorage.getItem('supabase_url') || MANUAL_URL);
   const [dbKey, setDbKey] = useState(localStorage.getItem('supabase_anon_key') || MANUAL_KEY);
+  
+  const [isPurging, setIsPurging] = useState(false);
+  const [isWiping, setIsWiping] = useState(false);
+  
+  const [showPurgeConfirm, setShowPurgeConfirm] = useState(false);
+  const [showWipeConfirm, setShowWipeConfirm] = useState(false);
 
   // Pattern for preview: Genus -> Species -> Infraspecies -> Cultivar -> Repeat
   const PREVIEW_SEQUENCE = [
@@ -58,6 +66,39 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, preferen
           }
       } else {
           alert("Please enter both Project URL and Key.");
+      }
+  };
+
+  const handlePurgeNonWCVP = async () => {
+      if (isPurging) return;
+      setShowPurgeConfirm(false);
+      setIsPurging(true);
+      try {
+          await dataService.purgeNonWCVPTaxa();
+          alert("Manual entries and cultivars removed. The grid will refresh.");
+          window.location.reload();
+      } catch (e: any) {
+          const msg = e.message?.includes('timeout') 
+            ? "The purge timed out on the server, but may still be processing. Please wait a minute and refresh the page manually."
+            : `Purge failed: ${e.message}`;
+          alert(msg);
+      } finally {
+          setIsPurging(false);
+      }
+  };
+
+  const handleWipeAllDetails = async () => {
+      if (isWiping) return;
+      setShowWipeConfirm(false);
+      setIsWiping(true);
+      try {
+          await dataService.wipeAllDetails();
+          alert("Knowledge Layer (Details) successfully wiped. All plant records preserved. Reloading...");
+          window.location.reload();
+      } catch (e: any) {
+          alert(`Wipe failed: ${e.message}`);
+      } finally {
+          setIsWiping(false);
       }
   };
 
@@ -199,119 +240,48 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, preferen
                 </div>
             </div>
 
-            {/* Automation Section */}
+            {/* Maintenance & Danger Zone */}
             <div>
                 <h4 className="text-sm font-bold text-slate-700 uppercase tracking-wide mb-3 flex items-center gap-2">
-                    <Zap size={14}/> Automation
+                    <AlertTriangle size={14}/> Maintenance & Danger Zone
                 </h4>
-                <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
-                    <label className="flex items-center justify-between cursor-pointer">
-                        <div>
-                            <span className="text-sm font-medium text-slate-800 block">Auto-Enrichment</span>
-                            <span className="text-xs text-slate-500">Automatically fetch details (description, links) when adding plants.</span>
+                <div className="space-y-4">
+                    {/* Operation A: Purge Cultivars */}
+                    <div className="bg-red-50 p-4 rounded-lg border border-red-100 space-y-3">
+                        <div className="space-y-1">
+                            <span className="text-xs font-bold text-red-800 block">Purge Cultivars & Manual Entries</span>
+                            <p className="text-[10px] text-red-600 leading-relaxed">
+                                Removes all plants NOT part of the standard WCVP core. This action will also delete the associated details for these specific plants.
+                            </p>
                         </div>
-                        <input 
-                            type="checkbox" 
-                            checked={preferences.autoEnrichment}
-                            onChange={(e) => onUpdate({ ...preferences, autoEnrichment: e.target.checked })}
-                            className="w-5 h-5 text-leaf-600 rounded focus:ring-leaf-500 accent-leaf-600"
-                        />
-                    </label>
-                </div>
-            </div>
-
-            {/* Hybrid Formatting Section */}
-            <div>
-                <h4 className="text-sm font-bold text-slate-700 uppercase tracking-wide mb-3">Formatting</h4>
-                <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
-                    <label className="text-sm font-medium text-slate-700 mb-2 block">Hybrid Symbol Spacing</label>
-                    <p className="text-xs text-slate-500 mb-3">Choose how hybrid names are displayed (Intergeneric and Interspecific).</p>
-                    
-                    <div className="flex flex-col gap-3">
-                        <label className="flex items-center gap-2 cursor-pointer p-2 hover:bg-white rounded border border-transparent hover:border-slate-200 transition-colors">
-                            <input 
-                                type="radio" 
-                                name="hybridSpacing"
-                                checked={preferences.hybridSpacing === 'nospace'}
-                                onChange={() => onUpdate({ ...preferences, hybridSpacing: 'nospace' })}
-                                className="text-leaf-600 focus:ring-leaf-500"
-                            />
-                            <div className="flex flex-col">
-                                <span className="text-sm text-slate-800 font-medium">No Space</span>
-                                <span className="text-xs text-slate-500 font-serif italic">×Mangave</span>
-                                <span className="text-xs text-slate-500 font-serif italic">Salvia ×jamensis</span>
-                            </div>
-                        </label>
-                        
-                        <label className="flex items-center gap-2 cursor-pointer p-2 hover:bg-white rounded border border-transparent hover:border-slate-200 transition-colors">
-                            <input 
-                                type="radio" 
-                                name="hybridSpacing"
-                                checked={preferences.hybridSpacing === 'space'}
-                                onChange={() => onUpdate({ ...preferences, hybridSpacing: 'space' })}
-                                className="text-leaf-600 focus:ring-leaf-500"
-                            />
-                            <div className="flex flex-col">
-                                <span className="text-sm text-slate-800 font-medium">With Space</span>
-                                <span className="text-xs text-slate-500 font-serif italic">× Mangave</span>
-                                <span className="text-xs text-slate-500 font-serif italic">Salvia × jamensis</span>
-                            </div>
-                        </label>
-                    </div>
-                </div>
-            </div>
-
-            {/* Grid Layout Section */}
-            <div>
-                <h4 className="text-sm font-bold text-slate-700 uppercase tracking-wide mb-3 flex items-center gap-2">
-                    <Layout size={14}/> Grid Layout
-                </h4>
-                <div className="bg-slate-50 p-4 rounded-lg border border-slate-200 space-y-4">
-                    
-                    {/* Auto Fit Limit */}
-                    <div>
-                        <div className="flex justify-between items-center mb-1">
-                            <label className="text-sm font-medium text-slate-700">Auto Fit Limit</label>
-                            <span className="text-xs font-mono text-slate-500">{preferences.autoFitMaxWidth || 400}px</span>
-                        </div>
-                        <p className="text-xs text-slate-500 mb-2">Maximum width for columns when using "Auto Fit".</p>
-                        <input 
-                            type="range" 
-                            min="200" 
-                            max="800" 
-                            step="50"
-                            value={preferences.autoFitMaxWidth || 400}
-                            onChange={(e) => onUpdate({ ...preferences, autoFitMaxWidth: parseInt(e.target.value) })}
-                            className="w-full accent-leaf-600"
-                        />
+                        <button 
+                            onClick={() => setShowPurgeConfirm(true)}
+                            disabled={isPurging || isWiping}
+                            className={`w-full flex items-center justify-center gap-2 py-2 rounded-lg text-xs font-bold transition-colors ${isPurging ? 'bg-red-200 text-red-400' : 'bg-red-600 text-white hover:bg-red-700 shadow-sm'}`}
+                        >
+                            {isPurging ? <Loader2 size={14} className="animate-spin"/> : <Trash2 size={14} />}
+                            {isPurging ? "Purging..." : "Purge Non-WCVP Taxa"}
+                        </button>
                     </div>
 
-                    <div className="h-px bg-slate-200"></div>
-
-                    {/* Fit Screen Weight */}
-                    <div>
-                        <div className="flex justify-between items-center mb-1">
-                            <label className="text-sm font-medium text-slate-700">Fit Screen Max Ratio</label>
-                            <span className="text-xs font-mono text-slate-500">{preferences.fitScreenMaxRatio || 4.0}x</span>
+                    {/* Operation B: Wipe Details */}
+                    <div className="bg-amber-50 p-4 rounded-lg border border-amber-100 space-y-3">
+                        <div className="space-y-1">
+                            <span className="text-xs font-bold text-amber-800 block">Wipe Knowledge Layer (Details)</span>
+                            <p className="text-[10px] text-amber-600 leading-relaxed">
+                                Clears ALL descriptions, traits, and links for ALL plants. The nomenclature (names) will remain intact. 
+                                <span className="font-bold block mt-1">Warning: Large tables may take significant time.</span>
+                            </p>
                         </div>
-                        <p className="text-xs text-slate-500 mb-2">
-                            When fitting to screen, prevent columns from being wider than X times the smallest column.
-                        </p>
-                        <input 
-                            type="range" 
-                            min="1.0" 
-                            max="10.0" 
-                            step="0.5"
-                            value={preferences.fitScreenMaxRatio || 4.0}
-                            onChange={(e) => onUpdate({ ...preferences, fitScreenMaxRatio: parseFloat(e.target.value) })}
-                            className="w-full accent-leaf-600"
-                        />
-                        <div className="flex justify-between text-[10px] text-slate-400 mt-1">
-                            <span>Uniform Width (1x)</span>
-                            <span>Allow Wide (10x)</span>
-                        </div>
+                        <button 
+                            onClick={() => setShowWipeConfirm(true)}
+                            disabled={isPurging || isWiping}
+                            className={`w-full flex items-center justify-center gap-2 py-2 rounded-lg text-xs font-bold transition-colors ${isWiping ? 'bg-amber-200 text-amber-400' : 'bg-amber-600 text-white hover:bg-amber-700 shadow-sm'}`}
+                        >
+                            {isWiping ? <Loader2 size={14} className="animate-spin"/> : <RefreshCw size={14} />}
+                            {isWiping ? "Wiping Details..." : "Wipe All Horticultural Details"}
+                        </button>
                     </div>
-
                 </div>
             </div>
         </div>
@@ -324,6 +294,30 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, preferen
                 Done
             </button>
         </div>
+
+        {showPurgeConfirm && (
+            <ConfirmDialog 
+                isOpen={showPurgeConfirm}
+                title="Confirm Taxa Purge"
+                message="Are you sure? This will permanently delete all manual entries and cultivars. Only the 1.4M WCVP records will remain. This cannot be undone."
+                confirmLabel="Yes, Purge Cultivars"
+                isDestructive={true}
+                onConfirm={handlePurgeNonWCVP}
+                onCancel={() => setShowPurgeConfirm(false)}
+            />
+        )}
+
+        {showWipeConfirm && (
+            <ConfirmDialog 
+                isOpen={showWipeConfirm}
+                title="Wipe Knowledge Layer"
+                message="Are you sure? This will delete ALL descriptions, traits, and links for every plant in your database. All scientific names are preserved, but AI enrichments will be lost. This may take some time."
+                confirmLabel="Yes, Wipe Details"
+                isDestructive={true}
+                onConfirm={handleWipeAllDetails}
+                onCancel={() => setShowWipeConfirm(false)}
+            />
+        )}
       </div>
     </div>
   );
