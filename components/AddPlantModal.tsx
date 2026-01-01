@@ -1,10 +1,11 @@
-
 // DO NOT add any new files, classes, or namespaces.
 import React, { useState } from 'react';
 import { X, Sprout, Loader2, Sparkles, Database, PlusCircle } from 'lucide-react';
 import { identifyTaxonomy } from '../services/geminiService';
 import { dataService } from '../services/dataService';
 import { Taxon, ActivityItem } from '../types';
+
+const APP_VERSION = 'v2.25.0';
 
 interface AddPlantModalProps {
   isOpen: boolean;
@@ -14,17 +15,17 @@ interface AddPlantModalProps {
 }
 
 interface ParsedResult {
-    taxonRank: string;
+    taxon_rank: string;
     name: string;
-    taxonName: string;
+    taxon_name: string;
     family?: string;
     genus?: string;
     species?: string;
     infraspecies?: string;
-    infraspecificRank?: string;
+    infraspecific_rank?: string;
     cultivar?: string;
-    isHybrid: boolean;
-    taxonStatus: string;
+    is_hybrid: boolean;
+    taxon_status: string;
 }
 
 /**
@@ -46,7 +47,6 @@ const AddPlantModal: React.FC<AddPlantModalProps> = ({
     setIsIdentifying(true);
     setError(null);
     try {
-      // Call Gemini API to parse the natural language query
       const parsed = await identifyTaxonomy(query);
       setResults(parsed);
     } catch (e: any) {
@@ -64,31 +64,30 @@ const AddPlantModal: React.FC<AddPlantModalProps> = ({
       const newTaxon: Taxon = {
         id,
         name: result.name,
-        taxonName: result.taxonName,
-        taxonRank: result.taxonRank,
-        taxonStatus: result.taxonStatus,
+        taxon_name: result.taxon_name,
+        taxon_rank: result.taxon_rank,
+        taxon_status: result.taxon_status,
         family: result.family,
         genus: result.genus,
         species: result.species,
         infraspecies: result.infraspecies,
-        infraspecificRank: result.infraspecificRank,
+        infraspecific_rank: result.infraspecific_rank,
         cultivar: result.cultivar,
-        // Basic mapping for hybrids from the identification result
-        genusHybrid: result.isHybrid && result.taxonRank.toLowerCase() === 'genus' ? '×' : undefined,
-        speciesHybrid: result.isHybrid && result.taxonRank.toLowerCase() === 'species' ? '×' : undefined,
-        synonyms: [],
-        referenceLinks: [],
-        createdAt: Date.now(),
-        sourceId: 2, // Manual/AI Import source
-        descendantCount: 0
+        genus_hybrid: result.is_hybrid && result.taxon_rank.toLowerCase() === 'genus' ? '×' : undefined,
+        species_hybrid: result.is_hybrid && result.taxon_rank.toLowerCase() === 'species' ? '×' : undefined,
+        alternative_names: [],
+        reference_links: [],
+        created_at: Date.now(),
+        source_id: 2, // Manual/AI Import source
+        descendant_count: 0,
+        verification_level: `FloraCatalog ${APP_VERSION}`
       };
 
       await dataService.createTaxon(newTaxon);
       
-      // Track this success in the activity panel
       onAddActivity({
         id: crypto.randomUUID(),
-        name: `Added ${result.taxonName}`,
+        name: `Added ${result.taxon_name}`,
         type: 'import',
         status: 'completed',
         message: 'Successfully added to collection',
@@ -139,12 +138,7 @@ const AddPlantModal: React.FC<AddPlantModalProps> = ({
               Identify
             </button>
           </div>
-
-          {error && (
-            <div className="p-3 bg-red-50 border border-red-100 text-red-600 rounded-lg text-xs flex items-center gap-2">
-              <Database size={14} /> {error}
-            </div>
-          )}
+          {error && (<div className="p-3 bg-red-50 border border-red-100 text-red-600 rounded-lg text-xs flex items-center gap-2"><Database size={14} /> {error}</div>)}
         </div>
 
         <div className="flex-1 overflow-y-auto min-h-[200px] border border-slate-100 rounded-lg bg-slate-50/50 p-4">
@@ -154,22 +148,13 @@ const AddPlantModal: React.FC<AddPlantModalProps> = ({
               {results.map((res, idx) => (
                 <div key={idx} className="bg-white p-3 rounded-lg border border-slate-200 shadow-sm flex items-center justify-between group hover:border-leaf-300 transition-colors">
                   <div className="flex items-center gap-4">
-                    <div className="px-2 py-1 bg-slate-100 text-[10px] font-bold text-slate-500 rounded border uppercase min-w-[70px] text-center">
-                      {res.taxonRank}
-                    </div>
+                    <div className="px-2 py-1 bg-slate-100 text-[10px] font-bold text-slate-500 rounded border uppercase min-w-[70px] text-center">{res.taxon_rank}</div>
                     <div>
-                      <div className="text-sm font-bold text-slate-800">{res.taxonName}</div>
-                      <div className="text-[10px] text-slate-400 font-medium">Status: {res.taxonStatus}</div>
+                      <div className="text-sm font-bold text-slate-800">{res.taxon_name}</div>
+                      <div className="text-[10px] text-slate-400 font-medium">Status: {res.taxon_status}</div>
                     </div>
                   </div>
-                  <button 
-                    onClick={() => handleSave(res)}
-                    disabled={isSaving}
-                    className="flex items-center gap-1 px-3 py-1.5 bg-leaf-50 text-leaf-600 text-[10px] font-bold uppercase rounded border border-leaf-200 hover:bg-leaf-600 hover:text-white transition-all shadow-sm"
-                    title="Add this record to database"
-                  >
-                    <PlusCircle size={14} /> Add to Garden
-                  </button>
+                  <button onClick={() => handleSave(res)} disabled={isSaving} className="flex items-center gap-1 px-3 py-1.5 bg-leaf-50 text-leaf-600 text-[10px] font-bold uppercase rounded border border-leaf-200 hover:bg-leaf-600 hover:text-white transition-all shadow-sm" title="Add this record to database"><PlusCircle size={14} /> Add to Garden</button>
                 </div>
               ))}
             </div>
@@ -182,12 +167,7 @@ const AddPlantModal: React.FC<AddPlantModalProps> = ({
         </div>
 
         <div className="mt-6 flex justify-end gap-3">
-          <button 
-            onClick={onClose}
-            className="px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
-          >
-            Cancel
-          </button>
+          <button onClick={onClose} className="px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-lg transition-colors">Cancel</button>
         </div>
       </div>
     </div>

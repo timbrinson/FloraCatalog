@@ -1,12 +1,13 @@
+
 export type ColorTheme = 'option1a' | 'option1b' | 'option2a' | 'option2b';
 
 export interface UserPreferences {
-  hybridSpacing: 'space' | 'nospace';
-  autoEnrichment: boolean;
-  autoFitMaxWidth?: number;
-  fitScreenMaxRatio?: number;
-  colorTheme: ColorTheme;
-  searchMode: 'prefix' | 'fuzzy'; 
+  hybrid_spacing: 'space' | 'nospace';
+  auto_enrichment: boolean;
+  auto_fit_max_width?: number;
+  fit_screen_max_ratio?: number;
+  color_theme: ColorTheme;
+  search_mode: 'prefix' | 'fuzzy'; 
 }
 
 export enum LoadingState {
@@ -42,93 +43,95 @@ export interface DataSource {
   id: number;
   name: string;
   version?: string;
-  citationText?: string;
+  citation_text?: string;
   url?: string;
-  trustLevel?: number;
+  trust_level?: number;
 }
 
 export interface Taxon {
   id: string;
-  parentId?: string;
-  hierarchyPath?: string;
-  wcvpId?: string;
-  ipniId?: string;
-  powoId?: string;
-  acceptedPlantNameId?: string;
-  parentPlantNameId?: string;
-  basionymPlantNameId?: string;
-  homotypicSynonym?: string;
-  taxonRank: string;
-  taxonName: string;
-  taxonStatus: string;
+  parent_id?: string;
+  hierarchy_path?: string;
+  wcvp_id?: string;
+  ipni_id?: string;
+  powo_id?: string;
+  accepted_plant_name_id?: string;
+  parent_plant_name_id?: string;
+  basionym_plant_name_id?: string;
+  homotypic_synonym?: string;
+  taxon_rank: string;
+  taxon_name: string;
+  taxon_status: string;
   family?: string;
-  commonName?: string;
+  common_name?: string;
   genus?: string;
-  genusHybrid?: string;
+  genus_hybrid?: string;
   species?: string;
-  speciesHybrid?: string;
+  species_hybrid?: string;
   infraspecies?: string;
-  infraspecificRank?: string;
+  infraspecific_rank?: string;
   cultivar?: string;
-  hybridFormula?: string;
-  taxonAuthors?: string;
-  primaryAuthor?: string;
-  parentheticalAuthor?: string;
-  publicationAuthor?: string;
-  replacedSynonymAuthor?: string;
-  placeOfPublication?: string;
-  volumeAndPage?: string;
-  firstPublished?: string;
-  nomenclaturalRemarks?: string;
+  hybrid_formula?: string;
+  taxon_authors?: string;
+  primary_author?: string;
+  parenthetical_author?: string;
+  publication_author?: string;
+  replaced_synonym_author?: string;
+  place_of_publication?: string;
+  volume_and_page?: string;
+  first_published?: string;
+  nomenclatural_remarks?: string;
   reviewed?: string;
-  geographicArea?: string;
-  lifeformDescription?: string;
-  climateDescription?: string;
+  geographic_area?: string;
+  lifeform_description?: string;
+  climate_description?: string;
   name: string;
   
   // Lineage
-  sourceId?: number;
-  verificationLevel?: string;
+  source_id?: number;
+  verification_level?: string;
 
   // Knowledge Layer Fields
-  description?: string;
-  hardinessMin?: number;
-  hardinessMax?: number;
-  heightMin?: number;
-  heightMax?: number;
-  widthMin?: number;
-  widthMax?: number;
-  originYear?: number;
+  description_text?: string;
+  hardiness_zone_min?: number;
+  hardiness_zone_max?: number;
+  height_min_cm?: number;
+  height_max_cm?: number;
+  width_min_cm?: number;
+  width_max_cm?: number;
+  origin_year?: number;
   morphology?: {
     foliage?: string;
     flowers?: string;
     form?: string;
     texture?: string;
-    seasonalVariation?: string;
+    seasonal_variation?: string;
   };
   ecology?: {
     soil?: string;
     light?: string;
     water?: string;
-    growthRate?: string;
-    floweringPeriod?: string;
+    growth_rate?: string;
+    flowering_period?: string;
   };
-  history?: string;
+  history_metadata?: {
+    background?: string;
+  };
   
-  synonyms: Synonym[];
-  referenceLinks: Link[];
-  isDetailsLoaded?: boolean;
-  createdAt: number;
-  descendantCount?: number;
+  alternative_names: Synonym[];
+  reference_links: Link[];
+  is_details_loaded?: boolean;
+  created_at: number;
+  descendant_count?: number;
 }
 
 export interface SearchCandidate {
-  taxonName: string;
-  commonName?: string;
-  acceptedName?: string;
-  matchType: string;
+  taxon_name: string;
+  common_name?: string;
+  accepted_name?: string;
+  match_type: string;
   confidence: number;
-  isHybrid?: boolean;
+  is_hybrid?: boolean;
 }
 
 export type ActivityStatus = 'running' | 'completed' | 'error' | 'needs_input';
@@ -142,7 +145,7 @@ export interface ActivityItem {
   timestamp: number;
   payload?: any;
   details?: any;
-  canRetry?: boolean;
+  can_retry?: boolean;
   resolution?: {
     type: 'duplicate' | 'synonym' | 'correction' | 'ambiguous';
     candidates: SearchCandidate[];

@@ -28,6 +28,7 @@ This document tracks the plan and progress for building a robust documentation l
     - ADR-002: Hierarchical Data Persistence (Ltree).
     - ADR-003: Maintenance Strategy (Split-Control Purge).
     - ADR-004: Universal Naming Standardization (Database Literal Sovereignty).
+    - ADR-005: Principles of Computational Strategy (Hybrid Intelligence).
 
 ### 4. Functional Specifications (`docs/features/`)
 - **Status:** [Pending]
@@ -63,4 +64,5 @@ Brevity updates are only performed via explicit user commands (e.g., "Refactor t
 - [x] Backfill ADR-001: Hybrid Search Strategy.
 - [x] Backfill ADR-002: Hierarchical Data Persistence (Ltree).
 - [x] Create ADR-003: Maintenance Strategy.
+- [x] Create ADR-005: Computational Strategy.
 - [ ] Create Spec: DataGrid Visual Behavior.

@@ -1,8 +1,21 @@
 # Version History
 
+## v2.25.0 - Hybrid Intelligence Framework
+**Date:** June 21, 2025
+**Status:** (Current Release - Prepared for GitHub)
+
+### Architectural Shift (ADR-005)
+- **Deterministic Sovereignty:** Codified the principle that botanical standards (ICN/ICNCP) must be implemented via algorithms, not AI.
+- **AI as Ambiguity Bridge:** Officially restricted AI usage to natural language translation and messy data extraction at the system boundaries.
+- **Scalability Optimization:** Prioritized client-side browser logic over server-side API calls to reduce latency and eliminate "LLM Tax."
+
+### Documentation & Alignment
+- **Governance Audit:** Synchronized `README.md` and `DOCUMENTATION_STRATEGY.md` with the new computational principles.
+- **Version Alignment:** Synchronized version strings across `package.json`, `AddPlantModal.tsx`, and all documentation files.
+
 ## v2.24.0 - Stability Baseline & Refactor Preparation
 **Date:** June 20, 2025
-**Status:** (Current Release - Stability Checkpoint)
+**Status:** (Verified Baseline)
 
 ### Improvements & Preparation
 - **Project Checkpoint:** Verified "Known Good State" after a series of UX and data integrity fixes.

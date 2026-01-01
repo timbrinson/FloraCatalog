@@ -1,8 +1,10 @@
+
 import { getSupabase, getIsOffline } from './supabaseClient';
 import { Taxon, Synonym, Link, DataSource } from '../types';
 
 /**
  * Service to handle interaction with the Supabase PostgreSQL Database.
+ * ADR-004: Universal snake_case standardization.
  */
 
 const DB_TABLE = 'app_taxa';
@@ -12,146 +14,87 @@ const SOURCES_TABLE = 'app_data_sources';
 // --- MAPPERS ---
 
 const mapSourceFromDB = (row: any): DataSource => ({
-    id: row.id,
-    name: row.name,
-    version: row.version,
-    // Fix: Object literal may only specify known properties, but 'citation_text' does not exist in type 'DataSource'.
-    citationText: row.citation_text,
-    url: row.url,
-    // Fix: Object literal may only specify known properties, but 'trust_level' does not exist in type 'DataSource'.
-    trustLevel: row.trust_level
+    ...row // ADR-004: DB columns match TS interface exactly
 });
 
 const mapFromDB = (row: any): Taxon => {
   const details = row.details || {};
-  const rankLower = (row.taxon_rank || '').toLowerCase();
+  const rank_lower = (row.taxon_rank || '').toLowerCase();
   
   return {
-    id: row.id,
-    parentId: row.parent_id,
-    hierarchyPath: row.hierarchy_path ? row.hierarchy_path.replace(/_/g, '-') : undefined,
+    ...row,
+    // Fix ltree underscore/dash representation for UI logic if needed
+    hierarchy_path: row.hierarchy_path ? row.hierarchy_path.replace(/_/g, '-') : undefined,
     
-    wcvpId: row.wcvp_id,
-    ipniId: row.ipni_id,
-    powoId: row.powo_id,
-    acceptedPlantNameId: row.accepted_plant_name_id,
-    parentPlantNameId: row.parent_plant_name_id,
-    basionymPlantNameId: row.basionym_plant_name_id,
-    homotypicSynonym: row.homotypic_synonym,
-
-    taxonRank: row.taxon_rank as string,
-    taxonName: row.taxon_name,
-    taxonStatus: row.taxon_status as string,
-    family: row.family,
-    commonName: row.common_name,
-    
-    genus: row.genus,
-    genusHybrid: row.genus_hybrid,
-    species: row.species,
-    speciesHybrid: row.species_hybrid,
-    infraspecies: row.infraspecies,
-    infraspecificRank: row.infraspecific_rank, // Corrected from infraspecificRank
-    cultivar: row.cultivar || (rankLower === 'cultivar' && row.taxon_name.includes("'") ? row.taxon_name.split("'")[1] : undefined), 
-    
-    hybridFormula: row.hybrid_formula,
-
-    taxonAuthors: row.taxon_authors,
-    primaryAuthor: row.primary_author,
-    parentheticalAuthor: row.parenthetical_author,
-    publicationAuthor: row.publication_author,
-    replacedSynonymAuthor: row.replaced_synonym_author,
-
-    placeOfPublication: row.place_of_publication,
-    // Fix: Map snake_case DB column correctly
-    volumeAndPage: row.volume_and_page,
-    firstPublished: row.first_published,
-    nomenclaturalRemarks: row.nomenclatural_remarks,
-    reviewed: row.reviewed,
-
-    geographicArea: row.geographic_area,
-    lifeformDescription: row.lifeform_description,
-    climateDescription: row.climate_description,
-
-    sourceId: row.source_id,
-    verificationLevel: row.verification_level,
-
-    // Fix: Use rankLower to handle case-insensitive rank matching for name field
-    name: rankLower === 'cultivar' && row.taxon_name.includes("'") 
+    // Virtual name field logic
+    name: rank_lower === 'cultivar' && row.taxon_name.includes("'") 
           ? row.taxon_name.match(/'([^']+)'/)?.[1] || row.taxon_name 
           : (row.infraspecies || row.species || row.genus || row.taxon_name),
 
-    // Knowledge Layer Mapping
-    description: details.description_text, 
-    hardinessMin: details.hardiness_zone_min,
-    hardinessMax: details.hardiness_zone_max,
-    heightMin: details.height_min_cm,
-    heightMax: details.height_max_cm,
-    widthMin: details.width_min_cm,
-    widthMax: details.width_max_cm,
-    originYear: details.origin_year,
+    // Details mapping (Golden Record Table)
+    description_text: details.description_text, 
+    hardiness_zone_min: details.hardiness_zone_min,
+    hardiness_zone_max: details.hardiness_zone_max,
+    height_min_cm: details.height_min_cm,
+    height_max_cm: details.height_max_cm,
+    width_min_cm: details.width_min_cm,
+    width_max_cm: details.width_max_cm,
+    origin_year: details.origin_year,
     morphology: details.morphology,
     ecology: details.ecology,
-    history: details.history_metadata?.background, 
-    synonyms: details.alternative_names || [], 
-    referenceLinks: details.reference_links || [], 
+    history_metadata: details.history_metadata,
+    alternative_names: details.alternative_names || [], 
+    reference_links: details.reference_links || [], 
     
-    isDetailsLoaded: !!row.details,
-    createdAt: new Date(row.created_at).getTime(),
-    descendantCount: row.descendant_count || 0
+    is_details_loaded: !!row.details,
+    created_at: new Date(row.created_at).getTime(),
+    descendant_count: row.descendant_count || 0
   };
 };
 
 const mapToDB = (taxon: Taxon) => {
   const clean = (val: any) => (val === 'null' || val === null || val === undefined) ? null : val;
 
+  // We only care about core app_taxa columns for the core table map
   return {
     id: taxon.id,
-    parent_id: taxon.parentId,
-    hierarchy_path: taxon.hierarchyPath ? taxon.hierarchyPath.replace(/-/g, '_') : undefined,
-    
-    wcvp_id: clean(taxon.wcvpId),
-    ipni_id: clean(taxon.ipniId),
-    powo_id: clean(taxon.powoId),
-    accepted_plant_name_id: clean(taxon.acceptedPlantNameId),
-    parent_plant_name_id: clean(taxon.parentPlantNameId),
-    basionym_plant_name_id: clean(taxon.basionymPlantNameId),
-    homotypic_synonym: clean(taxon.homotypicSynonym),
-
-    taxon_rank: taxon.taxonRank,
-    taxon_name: taxon.taxonName,
-    taxon_status: taxon.taxonStatus,
+    parent_id: taxon.parent_id,
+    hierarchy_path: taxon.hierarchy_path ? taxon.hierarchy_path.replace(/-/g, '_') : undefined,
+    wcvp_id: clean(taxon.wcvp_id),
+    ipni_id: clean(taxon.ipni_id),
+    powo_id: clean(taxon.powo_id),
+    accepted_plant_name_id: clean(taxon.accepted_plant_name_id),
+    parent_plant_name_id: clean(taxon.parent_plant_name_id),
+    basionym_plant_name_id: clean(taxon.basionym_plant_name_id),
+    homotypic_synonym: clean(taxon.homotypic_synonym),
+    taxon_rank: taxon.taxon_rank,
+    taxon_name: taxon.taxon_name,
+    taxon_status: taxon.taxon_status,
     family: clean(taxon.family),
-    common_name: clean(taxon.commonName),
-
+    common_name: clean(taxon.common_name),
     genus: clean(taxon.genus),
-    genus_hybrid: clean(taxon.genusHybrid),
+    genus_hybrid: clean(taxon.genus_hybrid),
     species: clean(taxon.species),
-    species_hybrid: clean(taxon.speciesHybrid),
+    species_hybrid: clean(taxon.species_hybrid),
     infraspecies: clean(taxon.infraspecies),
-    infraspecific_rank: clean(taxon.infraspecificRank),
+    infraspecific_rank: clean(taxon.infraspecific_rank),
     cultivar: clean(taxon.cultivar),
-    
-    hybrid_formula: clean(taxon.hybridFormula),
-
-    taxon_authors: clean(taxon.taxonAuthors),
-    primary_author: clean(taxon.primaryAuthor),
-    parenthetical_author: clean(taxon.parentheticalAuthor),
-    publication_author: clean(taxon.publicationAuthor),
-    replaced_synonym_author: clean(taxon.replacedSynonymAuthor),
-
-    place_of_publication: clean(taxon.placeOfPublication),
-    volume_and_page: clean(taxon.volumeAndPage),
-    first_published: clean(taxon.firstPublished),
-    nomenclatural_remarks: clean(taxon.nomenclaturalRemarks),
+    hybrid_formula: clean(taxon.hybrid_formula),
+    taxon_authors: clean(taxon.taxon_authors),
+    primary_author: clean(taxon.primary_author),
+    parenthetical_author: clean(taxon.parenthetical_author),
+    publication_author: clean(taxon.publication_author),
+    replaced_synonym_author: clean(taxon.replaced_synonym_author),
+    place_of_publication: clean(taxon.place_of_publication),
+    volume_and_page: clean(taxon.volume_and_page),
+    first_published: clean(taxon.first_published),
+    nomenclatural_remarks: clean(taxon.nomenclatural_remarks),
     reviewed: clean(taxon.reviewed),
-
-    geographic_area: clean(taxon.geographicArea),
-    lifeform_description: clean(taxon.lifeformDescription),
-    climate_description: clean(taxon.climateDescription),
-
-    source_id: taxon.sourceId,
-    verification_level: taxon.verificationLevel,
-
+    geographic_area: clean(taxon.geographic_area),
+    lifeform_description: clean(taxon.lifeform_description),
+    climate_description: clean(taxon.climate_description),
+    source_id: taxon.source_id,
+    verification_level: taxon.verification_level,
     updated_at: new Date().toISOString()
   };
 };
@@ -160,10 +103,10 @@ export interface FetchOptions {
     offset?: number;
     limit?: number;
     filters?: Record<string, any>; 
-    sortBy?: string;
-    sortDirection?: 'asc' | 'desc';
-    shouldCount?: boolean;
-    searchMode?: 'prefix' | 'fuzzy'; 
+    sort_by?: string;
+    sort_direction?: 'asc' | 'desc';
+    should_count?: boolean;
+    search_mode?: 'prefix' | 'fuzzy'; 
 }
 
 export const dataService = {
@@ -188,9 +131,9 @@ export const dataService = {
           .upsert({
               name: source.name,
               version: source.version,
-              citation_text: source.citationText,
+              citation_text: source.citation_text,
               url: source.url,
-              trust_level: source.trustLevel || 1
+              trust_level: source.trust_level || 1
           }, { onConflict: 'name, version' })
           .select()
           .single();
@@ -206,48 +149,46 @@ export const dataService = {
         offset = 0, 
         limit = 100,
         filters = {},
-        sortBy = 'taxonName',
-        sortDirection = 'asc',
-        shouldCount = false,
-        searchMode = 'prefix'
+        sort_by = 'taxon_name',
+        sort_direction = 'asc',
+        should_count = false,
+        search_mode = 'prefix'
     } = options;
 
     if (getIsOffline()) return { data: [], count: 0 };
 
     let query = getSupabase()
       .from(DB_TABLE)
-      .select('*, details:app_taxon_details(*)', shouldCount ? { count: 'estimated' } : {});
+      .select('*, details:app_taxon_details(*)', should_count ? { count: 'estimated' } : {});
 
     // --- Dynamic Filtering ---
     Object.entries(filters).forEach(([key, value]) => {
         if (value === undefined || value === null || value === '') return;
         
-        let dbKey = key.replace(/([A-Z])/g, "_$1").toLowerCase();
-        if (key === 'wcvpId') dbKey = 'wcv_p_id'; 
-        if (key === 'ipniId') dbKey = 'ipni_id';
-        if (key === 'powoId') dbKey = 'powo_id';
+        // ADR-004: key IS already snake_case
+        const dbKey = key;
         
         if (typeof value === 'string') {
             const rawSearch = value.trim();
             if (!rawSearch) return;
 
             let cleanVal = rawSearch;
-            if (searchMode === 'prefix') {
+            if (search_mode === 'prefix') {
                 if (key === 'family' || key === 'genus') {
                     cleanVal = rawSearch.charAt(0).toUpperCase() + rawSearch.slice(1).toLowerCase();
                 } else if (key === 'species' || key === 'infraspecies') {
                     cleanVal = rawSearch.toLowerCase();
-                } else if (key === 'taxonName' || key === 'cultivar') {
+                } else if (key === 'taxon_name' || key === 'cultivar') {
                     cleanVal = rawSearch.charAt(0).toUpperCase() + rawSearch.slice(1);
                 }
             }
 
             // --- Filter Mode Dispatcher ---
-            const isTechnicalId = key === 'id' || key.endsWith('Id');
-            const isStrictMetadata = key === 'firstPublished';
+            const isTechnicalId = key === 'id' || key.endsWith('_id');
+            const isStrictMetadata = key === 'first_published';
 
-            if (key === 'taxonName') {
-                if (searchMode === 'fuzzy') {
+            if (key === 'taxon_name') {
+                if (search_mode === 'fuzzy') {
                     query = query.ilike('taxon_name', `%${rawSearch}%`);
                 } else {
                     query = query.like('taxon_name', `${cleanVal}%`);
@@ -273,10 +214,8 @@ export const dataService = {
     });
 
     // --- Sorting & Pagination ---
-    if (sortBy) {
-        let dbSortKey = sortBy.replace(/([A-Z])/g, "_$1").toLowerCase();
-        if (sortBy === 'wcvpId') dbSortKey = 'wcvp_id';
-        query = query.order(dbSortKey, { ascending: sortDirection === 'asc' });
+    if (sort_by) {
+        query = query.order(sort_by, { ascending: sort_direction === 'asc' });
     }
 
     const { data, count, error } = await query
@@ -298,18 +237,9 @@ export const dataService = {
     return mapFromDB(data);
   },
 
-  /**
-   * findTaxonByName: Intelligent synonym-dereferencing lookup.
-   * 1. Fetches all matches for a name.
-   * 2. Returns the 'Accepted' record if present.
-   * 3. If only synonyms found, dereferences via accepted_plant_name_id to find the canonical record.
-   */
   async findTaxonByName(name: string): Promise<Taxon | null> {
       if (getIsOffline()) return null;
-      
       const cleanName = name.trim();
-      
-      // 1. Fetch up to 100 matches to ensure we don't miss the 'Accepted' record among many synonyms
       const { data, error } = await getSupabase()
           .from(DB_TABLE)
           .select('*, details:app_taxon_details(*)')
@@ -317,12 +247,8 @@ export const dataService = {
           .limit(100);
 
       if (error || !data || data.length === 0) return null;
-
-      // 2. Direct Priority: Return the record where status is 'Accepted'
       const acceptedMatch = data.find(t => t.taxon_status === 'Accepted');
       if (acceptedMatch) return mapFromDB(acceptedMatch);
-
-      // 3. Synonym Dereferencing: If we found synonyms, follow the pointer to the Accepted record
       const synonymWithLink = data.find(t => t.accepted_plant_name_id && t.accepted_plant_name_id !== t.wcvp_id);
       if (synonymWithLink) {
           const { data: target, error: targetError } = await getSupabase()
@@ -330,13 +256,8 @@ export const dataService = {
               .select('*, details:app_taxon_details(*)')
               .eq('wcvp_id', synonymWithLink.accepted_plant_name_id)
               .maybeSingle();
-          
-          if (!targetError && target) {
-              return mapFromDB(target);
-          }
+          if (!targetError && target) return mapFromDB(target);
       }
-
-      // 4. Fallback: Return the first result if no accepted/dereferenced record found
       return mapFromDB(data[0]);
   },
 
@@ -358,25 +279,13 @@ export const dataService = {
     
     const dbUpdates: any = {};
     const detailUpdates: any = {};
-    const detailKeys = ['description', 'hardinessMin', 'hardinessMax', 'heightMin', 'heightMax', 'widthMin', 'widthMax', 'originYear', 'morphology', 'ecology', 'history', 'synonyms', 'referenceLinks'];
+    const detailKeys = ['description_text', 'hardiness_zone_min', 'hardiness_zone_max', 'height_min_cm', 'height_max_cm', 'width_min_cm', 'width_max_cm', 'origin_year', 'morphology', 'ecology', 'history_metadata', 'alternative_names', 'reference_links'];
 
     Object.entries(updates).forEach(([key, value]) => {
       if (detailKeys.includes(key)) {
-         if (key === 'description') detailUpdates.description_text = value;
-         else if (key === 'hardinessMin') detailUpdates.hardiness_zone_min = value;
-         else if (key === 'hardinessMax') detailUpdates.hardiness_zone_max = value;
-         else if (key === 'heightMin') detailUpdates.height_min_cm = value;
-         else if (key === 'heightMax') detailUpdates.height_max_cm = value;
-         else if (key === 'widthMin') detailUpdates.width_min_cm = value;
-         else if (key === 'widthMax') detailUpdates.width_max_cm = value;
-         else if (key === 'originYear') detailUpdates.origin_year = value;
-         else if (key === 'history') detailUpdates.history_metadata = { ...detailUpdates.history_metadata, background: value };
-         else if (key === 'synonyms') detailUpdates.alternative_names = value;
-         else if (key === 'referenceLinks') detailUpdates.reference_links = value;
-         else detailUpdates[key] = value;
+         detailUpdates[key] = value;
       } else {
-         const dbKey = key.replace(/([A-Z])/g, "_$1").toLowerCase();
-         dbUpdates[dbKey] = value;
+         dbUpdates[key] = value;
       }
     });
 
@@ -401,20 +310,15 @@ export const dataService = {
     if (error) throw error;
   },
 
-  /**
-   * purgeNonWCVPTaxa: Highly resilient direct deletion.
-   */
   async purgeNonWCVPTaxa(): Promise<void> {
       if (getIsOffline()) throw new Error("Cannot reset in offline mode");
-      
       const { error } = await getSupabase()
           .from(DB_TABLE)
           .delete()
           .or('source_id.neq.1,source_id.is.null');
-
       if (error) {
           if (error.message.includes('timeout')) {
-              throw new Error("Statement timeout: The table is too large for a direct browser-based purge. Please use the SQL editor.");
+              throw new Error("Statement timeout. Please use the SQL editor.");
           }
           throw error;
       }
@@ -426,7 +330,6 @@ export const dataService = {
           .from(DETAILS_TABLE)
           .delete()
           .neq('taxon_id', '00000000-0000-0000-0000-000000000000');
-
       if (error) throw error;
   }
 };
