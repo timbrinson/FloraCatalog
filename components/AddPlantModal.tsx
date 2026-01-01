@@ -4,7 +4,7 @@ import { identifyTaxonomy } from '../services/geminiService';
 import { dataService } from '../services/dataService';
 import { Taxon, ActivityItem, DataSource } from '../types';
 
-const APP_VERSION = 'v2.18.0';
+const APP_VERSION = 'v2.23.0';
 
 interface ParsedResult {
     taxonRank: string;
