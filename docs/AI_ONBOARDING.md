@@ -3,10 +3,10 @@
 **CRITICAL: This is the first document an AI assistant must read before analyzing code or proposing changes.**
 
 ## 1. Project Philosophy
-FloraCatalog is a tool for **botanical precision**. It bridges the gap between static scientific checklists (like the WCVP) and living garden collections. 
-- **Scientific Integrity First:** We strictly adhere to the Kew Gardens WCVP data standards.
+FloraCatalog is a tool for **botanical precision**. It bridges the gap between static scientific checklists (like the WCVP), horticultural registries (ICRA), and living garden collections. 
+- **Scientific & Horticultural Integrity:** We adhere to Kew Gardens WCVP data standards and International Cultivar Registration Authority designations.
 - **AI as Curator, Not Author:** AI is used to parse, standardize, and mine data, but it must respect the authoritative hierarchy.
-- **UX Stability:** The application is a high-density "Smart Spreadsheet." UI stability (preserving state, focus, and filters) is as important as data accuracy.
+- **UX Stability:** The application is a high-density "Multi-Dimensional Data Dashboard." UI stability (preserving state, focus, and filters) is as important as data accuracy.
 
 ## 2. Command Hierarchy
 1.  **The Human (Architect):** Owns the vision, the roadmap, and the final decision on all logic and UI choices.

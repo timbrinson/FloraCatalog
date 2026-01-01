@@ -38,6 +38,9 @@ This document tracks the plan and progress for building a robust documentation l
 - **Goal:** Formalize the start of a new session.
 - **Requirement:** AI must provide a "Project State Summary" and "Active Objective" based on documentation before emitting any code.
 
+## The Shared Mental Model
+The ultimate goal of every development cycle is to leave the documentation in a better state than it was found. This ensures that the "sync" achieved between the human architect and the AI is codified for future sessions. Documentation is the permanent bridge across session resets, preventing "contextual drift" and ensuring that the project's logic remains sovereign and accessible to both humans and machines. Every interaction should leave a record of the "Why" to maintain continuity.
+
 ## Documentation Maintenance Strategy
 To balance high-fidelity detail with readability, the project employs a three-tiered approach to document volume control:
 

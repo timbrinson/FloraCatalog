@@ -57,3 +57,10 @@ Past sessions have identified "Drift" patterns that must be avoided:
 ## 10. Manual Action Notification
 1. **Explicit Flags:** If any proposed change requires the user to execute SQL in Supabase, update a `.env` file, or perform a manual browser action (e.g., "Clear LocalStorage"), the AI MUST explicitly list these under a high-visibility header titled "**MANUAL ACTION REQUIRED**" at the start of its natural language response.
 2. **Persistence:** This notification rule is intended to prevent functional gaps where the code assumes a data layer optimization that has not yet been applied by the human architect.
+
+## 11. The Error Disclosure Clause
+If the development environment flags a compilation, linting, or runtime error, the AI is strictly prohibited from attempting to fix it silently or taking unauthorized technical initiative. The AI must:
+1.  **Stop immediately.**
+2.  **Paste the exact error message** (e.g., from the compiler or console) into the chat.
+3.  **Explain the likely cause** and propose a specific fix.
+4.  **Wait for the Human Architect's explicit approval** before modifying any files to resolve the error.

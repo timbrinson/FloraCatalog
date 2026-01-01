@@ -5,7 +5,7 @@ In the world today, there is no single authoritative source for comprehensive pl
 - **Conflicting Data:** Significant discrepancies exist across different sites regarding plant hardiness, origins, and descriptions.
 - **Fact vs. Opinion:** It is often difficult for researchers and gardeners to distinguish between verified botanical facts and horticultural opinions.
 - **Name Collisions:** Different sites frequently use different names for the same plant, or the same name for different plants, with no universal catalog to resolve the ambiguity.
-- **The Context Gap:** Authoritative scientific checklists (like WCVP) are excellent for nomenclature but often lack the rich horticultural context—size, color, growth rate, and cultivation history—required by enthusiasts and professionals.
+- **The Context Gap:** Information is currently fragmented across specialized plant communities, specialist nurseries, universities, scientific organizations, online catalogs, and commercial sales sites. Users lack a unified record that integrates nomenclature with the rich heritage, performance, and descriptive depth found across the horticultural spectrum.
 
 ## Three Levels of Botanical Reality
 Plant information exists at three distinct layers, yet no universal system exists to tie them together holistically:
@@ -14,28 +14,28 @@ Plant information exists at three distinct layers, yet no universal system exist
 3.  **Cultivated Plants:** Human-selected variations (Cultivars, Grexes, Trade Names).
 
 ## The FloraCatalog Mission: Bridging the Gap
-FloraCatalog is designed to address these siloes by connecting cultivated plant records to natural plant concepts. We build a multi-layered knowledge base upon the advanced work of existing authorities.
+FloraCatalog is a botanical bridge that anchors diverse collections to authoritative scientific standards (WCVP) and horticultural registration standards (ICRA). We build a multi-layered, shared knowledge base upon the advanced work of existing authorities.
 
 ### The UI Philosophy: Findability & Density
 We recognize that for a botanical catalog, the user interface is the primary value driver.
-- **The Grid Experience (90% Priority):** The primary focus is a robust, high-performance "Smart Spreadsheet" (Data Grid). It must handle 1.4 million records with instant search, multi-rank grouping, and stable filtering. If a user cannot find a plant quickly, the data's richness is irrelevant.
-- **The Knowledge Layer (Details Panel):** While the grid handles "Findability," the Details Panel provides "Depth." This panel is an interactive workspace for horticultural context, supporting highly variable traits (e.g., spine color for Agave vs. leaf shape for Acer).
+- **Multi-Dimensional Data Dashboard (90% Priority):** A flexible, high-density interface designed for instant findability. It allows users to slice and group millions of records—spanning the vast WCVP baseline and an ever-expanding library of garden cultivars and hybrids—transforming massive datasets into a shared, navigable collection.
+- **Universal Plant Profile (Details Panel):** While the grid handles "Findability," the Details Panel provides "Depth." This panel is a high-fidelity repository for everything known about a plant, consolidated from scientific checklists and horticultural trade sources.
+- **Background Task Orchestrator (Activity Panel):** A centralized hub for monitoring and auditing long-running operations. It allows users to track real-time progress, resolve nomenclature ambiguities, and review the processing details and outcomes after the fact during the current session.
 
 ### 1. The Natural Core (WCVP)
-We use the **World Checklist of Vascular Plants (WCVP)** as our foundational backbone. 
-- **Role:** It provides the "Source of Truth" for natural nomenclature (Genus, Species, Infraspecies).
+We use the **World Checklist of Vascular Plants (WCVP)** as our foundational scientific backbone. 
+- **Role:** It provides the primary scientific standard for natural nomenclature (Genus, Species, Infraspecies).
 - **Status:** WCVP is the most trusted resource in the botanical community, serving as the backbone for major efforts like *Plants of the World Online (POWO)* and the *World Flora Online (WFO)*.
 
 #### Why WCVP? (Scientific Justification)
-FloraCatalog selects WCVP as its foundational backbone due to its unique combination of rigor and dynamism:
+FloraCatalog selects WCVP due to its unique combination of rigor and dynamism:
 - **Expert-Driven Curation:** Status of every name is determined by expert compilers based on peer-reviewed literature and global consensus.
 - **Evidence-Based Transparency:** Each taxonomic decision is explicitly linked to supporting references.
-- **Temporal Coherence:** Offers "snapshots" of knowledge over time, tracking taxonomic changes rather than providing a static list.
 - **Continuous Currency:** Incorporates user feedback and new publications weekly.
 - **Community Trust:** Serves as the foundational "backbone" for the world's leading botanical gardens and research institutions.
 
 ### 2. The Cultivated Layer (ICRAs & Community)
-We integrate lists from **International Cultivar Registration Authorities (ICRAs)**.
+We leverage the registration standards of **International Cultivar Registration Authorities (ICRAs)** as the next foundational layer of the catalog.
 - **Role:** These organizations manage cultivar names following the *International Code of Nomenclature for Cultivated Plants (ICNCP)*.
 - **Connectivity:** We tie these registration lists directly to the accepted WCVP natural plant names.
 - **Non-Authoritative Cultivars:** Since many popular, accessible, and relevant cultivated plants do not get registered with an ICRA, FloraCatalog allows for the inclusion of these records. However, since these are not from an authoritative registration source, we prioritize "Trusted Sources" while visually distinguishing these records from authoritative data to maintain scientific integrity.
@@ -60,4 +60,4 @@ A primary long-term goal is the integration of imagery to aid in identification 
 - **Challenges:** We acknowledge the significant technical challenges (storage/hosting) and legal hurdles (licensing and copyright) associated with high-quality botanical imagery. Our strategy prioritizes linking to trusted external image repositories while selectively hosting community-contributed media.
 
 ## Conclusion
-By synthesizing scientific rigor (WCVP) with horticultural registration (ICRAs) and rich descriptive context, FloraCatalog provides a path toward a holistic, trusted, and interconnected source of botanical information.
+By synthesizing scientific rigor (WCVP) with horticultural registration (ICRAs) and rich descriptive context, FloraCatalog provides a path toward a holistic, trusted, and shared source of botanical information.
