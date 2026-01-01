@@ -10,9 +10,10 @@ interface SettingsModalProps {
   onClose: () => void;
   preferences: UserPreferences;
   onUpdate: (newPrefs: UserPreferences) => void;
+  onMaintenanceComplete?: () => void;
 }
 
-const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, preferences, onUpdate }) => {
+const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, preferences, onUpdate, onMaintenanceComplete }) => {
   if (!isOpen) return null;
 
   // Default to LocalStorage, fallback to constants from file
@@ -76,9 +77,11 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, preferen
       try {
           await dataService.purgeNonWCVPTaxa();
           alert("Manual entries and cultivars removed. The grid will refresh.");
-          // Reset local flags to force clean boot post-reload
-          localStorage.removeItem('flora_initialized');
-          window.location.reload();
+          if (onMaintenanceComplete) {
+              onMaintenanceComplete();
+          } else {
+              window.location.reload();
+          }
       } catch (e: any) {
           const msg = e.message?.includes('timeout') 
             ? "The purge timed out on the server, but may still be processing. Please wait a minute and refresh the page manually."
@@ -95,8 +98,12 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, preferen
       setIsWiping(true);
       try {
           await dataService.wipeAllDetails();
-          alert("Knowledge Layer (Details) successfully wiped. All plant records preserved. Reloading...");
-          window.location.reload();
+          alert("Knowledge Layer (Details) successfully wiped. All plant records preserved. Grid will refresh.");
+          if (onMaintenanceComplete) {
+              onMaintenanceComplete();
+          } else {
+              window.location.reload();
+          }
       } catch (e: any) {
           alert(`Wipe failed: ${e.message}`);
       } finally {

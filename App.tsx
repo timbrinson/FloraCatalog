@@ -141,6 +141,13 @@ export default function App() {
       fetchBatch(0, true);
   };
 
+  const handleMaintenanceComplete = () => {
+      // Clear results and force reload without resetting application initialization state
+      setTaxa([]);
+      setOffset(0);
+      fetchBatch(0, true);
+  };
+
   useEffect(() => { const s = localStorage.getItem('flora_prefs'); if (s) try { setPreferences(JSON.parse(s)); } catch(e) {} }, []); 
   useEffect(() => localStorage.setItem('flora_prefs', JSON.stringify(preferences)), [preferences]);
 
@@ -234,6 +241,7 @@ export default function App() {
           onClose={handleSettingsClose}
           preferences={preferences}
           onUpdate={setPreferences}
+          onMaintenanceComplete={handleMaintenanceComplete}
         />
       )}
 

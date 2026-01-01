@@ -11,23 +11,24 @@ const SOURCES_TABLE = 'app_data_sources';
 
 // --- MAPPERS ---
 
-// Fix: Correct property names from snake_case to camelCase to match DataSource interface
 const mapSourceFromDB = (row: any): DataSource => ({
     id: row.id,
     name: row.name,
     version: row.version,
-    // Fix: changed citation_text to citationText
+    // Fix: Object literal may only specify known properties, but 'citation_text' does not exist in type 'DataSource'.
     citationText: row.citation_text,
     url: row.url,
+    // Fix: Object literal may only specify known properties, but 'trust_level' does not exist in type 'DataSource'.
     trustLevel: row.trust_level
 });
 
 const mapFromDB = (row: any): Taxon => {
   const details = row.details || {};
+  const rankLower = (row.taxon_rank || '').toLowerCase();
+  
   return {
     id: row.id,
     parentId: row.parent_id,
-    // Fix: changed hierarchy_path to hierarchyPath
     hierarchyPath: row.hierarchy_path ? row.hierarchy_path.replace(/_/g, '-') : undefined,
     
     wcvpId: row.wcvp_id,
@@ -49,8 +50,8 @@ const mapFromDB = (row: any): Taxon => {
     species: row.species,
     speciesHybrid: row.species_hybrid,
     infraspecies: row.infraspecies,
-    infraspecificRank: row.infraspecificRank,
-    cultivar: row.cultivar || (row.taxon_rank === 'cultivar' && row.taxon_name.includes("'") ? row.taxon_name.split("'")[1] : undefined), 
+    infraspecificRank: row.infraspecific_rank, // Corrected from infraspecificRank
+    cultivar: row.cultivar || (rankLower === 'cultivar' && row.taxon_name.includes("'") ? row.taxon_name.split("'")[1] : undefined), 
     
     hybridFormula: row.hybrid_formula,
 
@@ -61,20 +62,21 @@ const mapFromDB = (row: any): Taxon => {
     replacedSynonymAuthor: row.replaced_synonym_author,
 
     placeOfPublication: row.place_of_publication,
-    volumeAndPage: row.volumeAndPage,
+    // Fix: Map snake_case DB column correctly
+    volumeAndPage: row.volume_and_page,
     firstPublished: row.first_published,
     nomenclaturalRemarks: row.nomenclatural_remarks,
     reviewed: row.reviewed,
 
     geographicArea: row.geographic_area,
-    // Fix: changed lifeform_description to lifeformDescription
     lifeformDescription: row.lifeform_description,
     climateDescription: row.climate_description,
 
     sourceId: row.source_id,
     verificationLevel: row.verification_level,
 
-    name: row.taxon_rank === 'cultivar' && row.taxon_name.includes("'") 
+    // Fix: Use rankLower to handle case-insensitive rank matching for name field
+    name: rankLower === 'cultivar' && row.taxon_name.includes("'") 
           ? row.taxon_name.match(/'([^']+)'/)?.[1] || row.taxon_name 
           : (row.infraspecies || row.species || row.genus || row.taxon_name),
 
@@ -95,13 +97,11 @@ const mapFromDB = (row: any): Taxon => {
     
     isDetailsLoaded: !!row.details,
     createdAt: new Date(row.created_at).getTime(),
-    // Fix: changed descendant_count to descendantCount
     descendantCount: row.descendant_count || 0
   };
 };
 
 const mapToDB = (taxon: Taxon) => {
-  // Safeguard: Ensure no literal "null" strings are saved
   const clean = (val: any) => (val === 'null' || val === null || val === undefined) ? null : val;
 
   return {
@@ -146,7 +146,6 @@ const mapToDB = (taxon: Taxon) => {
     reviewed: clean(taxon.reviewed),
 
     geographic_area: clean(taxon.geographicArea),
-    // Fix: changed lifeform_description to lifeformDescription
     lifeform_description: clean(taxon.lifeformDescription),
     climate_description: clean(taxon.climateDescription),
 
@@ -156,8 +155,6 @@ const mapToDB = (taxon: Taxon) => {
     updated_at: new Date().toISOString()
   };
 };
-
-// --- CRUD OPERATIONS ---
 
 export interface FetchOptions {
     offset?: number;
@@ -226,7 +223,7 @@ export const dataService = {
         if (value === undefined || value === null || value === '') return;
         
         let dbKey = key.replace(/([A-Z])/g, "_$1").toLowerCase();
-        if (key === 'wcvpId') dbKey = 'wcvp_id'; 
+        if (key === 'wcvpId') dbKey = 'wcv_p_id'; 
         if (key === 'ipniId') dbKey = 'ipni_id';
         if (key === 'powoId') dbKey = 'powo_id';
         
@@ -302,63 +299,45 @@ export const dataService = {
   },
 
   /**
-   * findTaxonByName: Robust botanical lookup.
-   * Uses case-sensitive equality match first to hit COLLATE "C" indexes.
-   * Falls back to Title-Cased equality for common nomenclature.
+   * findTaxonByName: Intelligent synonym-dereferencing lookup.
+   * 1. Fetches all matches for a name.
+   * 2. Returns the 'Accepted' record if present.
+   * 3. If only synonyms found, dereferences via accepted_plant_name_id to find the canonical record.
    */
   async findTaxonByName(name: string): Promise<Taxon | null> {
       if (getIsOffline()) return null;
       
       const cleanName = name.trim();
-      const titleCased = cleanName.charAt(0).toUpperCase() + cleanName.slice(1);
       
-      console.log(`[dataService] findTaxonByName: Looking up "${cleanName}"...`);
-
-      // Step 1: Try exact match (Fastest, Hits Index)
-      const { data: exact, error: exactError } = await getSupabase()
+      // 1. Fetch up to 100 matches to ensure we don't miss the 'Accepted' record among many synonyms
+      const { data, error } = await getSupabase()
           .from(DB_TABLE)
           .select('*, details:app_taxon_details(*)')
-          .eq('taxon_name', cleanName)
-          .maybeSingle();
-      
-      if (!exactError && exact) {
-          console.log(`[dataService] Success: Exact match found for "${cleanName}".`);
-          return mapFromDB(exact);
-      }
+          .ilike('taxon_name', cleanName)
+          .limit(100);
 
-      // Step 2: Try Title Case match (Common for botanical names)
-      if (titleCased !== cleanName) {
-          console.log(`[dataService] Fallback: Trying title case "${titleCased}"...`);
-          const { data: titled, error: titleError } = await getSupabase()
+      if (error || !data || data.length === 0) return null;
+
+      // 2. Direct Priority: Return the record where status is 'Accepted'
+      const acceptedMatch = data.find(t => t.taxon_status === 'Accepted');
+      if (acceptedMatch) return mapFromDB(acceptedMatch);
+
+      // 3. Synonym Dereferencing: If we found synonyms, follow the pointer to the Accepted record
+      const synonymWithLink = data.find(t => t.accepted_plant_name_id && t.accepted_plant_name_id !== t.wcvp_id);
+      if (synonymWithLink) {
+          const { data: target, error: targetError } = await getSupabase()
               .from(DB_TABLE)
               .select('*, details:app_taxon_details(*)')
-              .eq('taxon_name', titleCased)
+              .eq('wcvp_id', synonymWithLink.accepted_plant_name_id)
               .maybeSingle();
           
-          if (!titleError && titled) {
-              console.log(`[dataService] Success: Title case match found.`);
-              return mapFromDB(titled);
+          if (!targetError && target) {
+              return mapFromDB(target);
           }
       }
 
-      // Step 3: Hybrid symbol normalization fallback
-      const normalized = cleanName.replace(/\sx\s/gi, ' × ').replace(/\sX\s/g, ' × ');
-      if (normalized !== cleanName && normalized !== titleCased) {
-          console.log(`[dataService] Fallback: Trying symbol normalization "${normalized}"...`);
-          const { data: norm, error: normError } = await getSupabase()
-              .from(DB_TABLE)
-              .select('*, details:app_taxon_details(*)')
-              .eq('taxon_name', normalized)
-              .maybeSingle();
-          
-          if (!normError && norm) {
-              console.log(`[dataService] Success: Normalized symbol match found.`);
-              return mapFromDB(norm);
-          }
-      }
-      
-      console.log(`[dataService] No match found for "${cleanName}" in catalog.`);
-      return null;
+      // 4. Fallback: Return the first result if no accepted/dereferenced record found
+      return mapFromDB(data[0]);
   },
 
   async createTaxon(taxon: Taxon): Promise<Taxon> {

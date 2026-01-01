@@ -27,6 +27,7 @@ This document tracks the plan and progress for building a robust documentation l
     - ADR-001: Hybrid Search Strategy.
     - ADR-002: Hierarchical Data Persistence (Ltree).
     - ADR-003: Maintenance Strategy (Split-Control Purge).
+    - ADR-004: Universal Naming Standardization (Database Literal Sovereignty).
 
 ### 4. Functional Specifications (`docs/features/`)
 - **Status:** [Pending]

@@ -64,3 +64,8 @@ If the development environment flags a compilation, linting, or runtime error, t
 2.  **Paste the exact error message** (e.g., from the compiler or console) into the chat.
 3.  **Explain the likely cause** and propose a specific fix.
 4.  **Wait for the Human Architect's explicit approval** before modifying any files to resolve the error.
+
+## 12. Naming Sovereignty (ADR-004)
+For all application tiers, **Database Literals are the sovereign naming standard.** 
+- Properties in TypeScript interfaces, API service objects, and React state/props must match the PostgreSQL column names exactly (using `snake_case`).
+- Human-centric conventions (like `camelCase` in JavaScript) are deprecated for this project to eliminate the "Mapping Tax" and ensure AI-driven code reliability.

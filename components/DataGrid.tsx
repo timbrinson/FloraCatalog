@@ -323,7 +323,9 @@ const DataGrid: React.FC<DataGridProps> = ({
 
   const getRowValue = (row: Taxon, colId: string) => {
        if (colId === 'childCount') { const tr = row as TreeRow; return tr.isTreeHeader ? tr.childCount : getDescendantCount(tr); }
-       if (colId === 'cultivar' && row.taxonRank === 'Cultivar') return row.name;
+       
+       // Use explicit cultivar property if available
+       if (colId === 'cultivar') return row.cultivar || '';
        
        const rank = (row.taxonRank || '').toLowerCase();
        if (rank === 'family' && colId === 'genus') return '';
