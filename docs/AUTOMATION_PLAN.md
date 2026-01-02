@@ -17,7 +17,7 @@ The project is organized to separate application code from raw data and build to
   │   ├── DATA_MODEL.md
   │   └── ...guides
   ├── scripts/              # Build & Database Scripts
-  │   ├── automate_build.js # The Master Controller (v2.5)
+  │   ├── automate_build.js # The Master Controller (v2.6)
   │   ├── convert_wcvp.py   # Data cleaner
   │   ├── split_csv.py      # CSV splitter for browser uploads
   │   ├── wcvp_schema.sql.txt     # Core table definitions
@@ -115,12 +115,13 @@ The `scripts/automate_build.js` is an interactive CLI that guides the Admin thro
 | **8** | **Counts** | Auto | SQL | Calculates descendant counts for the UI grid. |
 | **9** | **Performance** | Auto | SQL | Runs `scripts/optimize_indexes.sql.txt`. |
 
-## 7. Segmented Recovery (New)
-If a load fails or data is missing (e.g., records T-Z), you can use the **Segment Filter** in Steps 4, 6, 7, and 8.
-1.  Choose the step from the menu.
-2.  Enter the start letter (e.g., 'T').
-3.  The script will skip segments A-S and process only the targeted range.
-4.  The population step (Step 4) now uses `NOT EXISTS` logic to prevent duplicates during recovery.
+## 7. Segmented Recovery & Gap Closure
+If you populated records in chunks (e.g., A-S first, then T-Z), you must run a **Gap Closure** pass:
+1.  **Why:** Children in the A-S range couldn't find parents in the T-Z range during the first pass.
+2.  **Protocol:** 
+    *   Run Step 6 (Link Parents) for **'All'** ranges.
+    *   Run Step 7 (Hierarchy) for **'All'** ranges.
+3.  **False Root Recovery:** Step 7 now automatically identifies and resets "False Roots"—records that were temporarily marked as roots because their parents were missing. This ensures they are correctly grafted into the tree once the parent is present.
 
 ---
 

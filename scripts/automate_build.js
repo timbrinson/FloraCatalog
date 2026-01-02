@@ -1,9 +1,9 @@
 /**
- * AUTOMATED DATABASE BUILDER (CLI) v2.25.1
+ * AUTOMATED DATABASE BUILDER (CLI) v2.26.0
  * 
  * Orchestrates the transformation of raw WCVP data into the FloraCatalog database.
  * Optimized for free-tier environments using granular segmented iterative hierarchy.
- * v2.25.1: Self-healing population logic and improved segment range filtering.
+ * v2.26.0: Added "False Root Recovery" logic to Step 7 for cross-segment gap closure.
  */
 
 import pg from 'pg';
@@ -144,7 +144,8 @@ const getPythonCommand = () => {
  */
 const selectSegments = async () => {
     console.log("\nAvailable Ranges: A, D, H, M, S, T, W, or 'All'");
-    const filter = await askQuestion("Target alphabetical range (Enter to skip A-S): ");
+    log("Recommendation: If recovering T-Z, run Step 6-8 for 'All' to close gaps.");
+    const filter = await askQuestion("Target alphabetical range (e.g. 'All'): ");
     
     if (!filter || filter.toLowerCase() === 'all') return SEGMENTS;
     
@@ -244,6 +245,18 @@ async function stepHierarchy(client, segments) {
     log("Calculating Hierarchy Paths (Ltree - Segmented Iterative)...");
     await client.query("SET statement_timeout = 0;");
     
+    // --- GAP RECOVERY LOGIC ---
+    // If we previously ran A-S, some records were roots but now have parents in T-Z.
+    // We must reset these "False Roots" (paths with length 2 that now have a parent).
+    log("Resetting False Roots (Recovery Logic)...");
+    await client.query(`
+        UPDATE app_taxa 
+        SET hierarchy_path = NULL 
+        WHERE parent_id IS NOT NULL 
+          AND hierarchy_path IS NOT NULL 
+          AND nlevel(hierarchy_path) = 2;
+    `);
+
     log("Initializing Level 0 (Roots)...");
     for (const seg of segments) {
         log(`Level 0: Segment ${seg.label}...`);
@@ -307,7 +320,7 @@ async function stepOptimize(client) {
 // --- MAIN LOOP ---
 
 async function main() {
-    console.log("\n🌿 FLORA CATALOG - DATABASE AUTOMATION v2.25.1 🌿\n");
+    console.log("\n🌿 FLORA CATALOG - DATABASE AUTOMATION v2.26.0 🌿\n");
     process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
     let dbUrl = process.env.DATABASE_URL;
     let finalConfig;

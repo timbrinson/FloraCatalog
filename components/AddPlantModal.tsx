@@ -6,7 +6,7 @@ import { dataService } from '../services/dataService';
 import { Taxon, ActivityItem } from '../types';
 import { assembleScientificName } from '../utils/formatters';
 
-const APP_VERSION = 'v2.25.1';
+const APP_VERSION = 'v2.26.0';
 
 interface PipelineItem {
     taxon_rank: string;
