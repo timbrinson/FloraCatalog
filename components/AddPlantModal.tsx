@@ -6,7 +6,7 @@ import { dataService } from '../services/dataService';
 import { Taxon, ActivityItem } from '../types';
 import { assembleScientificName } from '../utils/formatters';
 
-const APP_VERSION = 'v2.26.2';
+const APP_VERSION = 'v2.26.1';
 
 interface PipelineItem {
     taxon_rank: string;
@@ -69,21 +69,20 @@ const AddPlantModal: React.FC<AddPlantModalProps> = ({
       for (const rank of ranksToCheck) {
           let rawPart: Partial<Taxon> | null = null;
           
-          // CRITICAL: Inherit hybrid flags and family from AI lineage across all ranks
-          const meta = {
-              family: lineage.family,
+          // CRITICAL: Inherit hybrid flags from AI lineage across all ranks to preserve markers like ×
+          const hybridMeta = {
               genus_hybrid: lineage.genus_hybrid ? '×' : undefined,
               species_hybrid: lineage.species_hybrid ? '×' : undefined
           };
 
           if (rank === 'Genus' && lineage.genus) {
-              rawPart = { ...meta, genus: lineage.genus, taxon_rank: 'Genus' };
+              rawPart = { ...hybridMeta, genus: lineage.genus, taxon_rank: 'Genus' };
           } else if (rank === 'Species' && lineage.species) {
-              rawPart = { ...meta, genus: lineage.genus, species: lineage.species, taxon_rank: 'Species' };
+              rawPart = { ...hybridMeta, genus: lineage.genus, species: lineage.species, taxon_rank: 'Species' };
           } else if (rank === 'Infraspecies' && (lineage.infraspecies || lineage.infraspecific_rank)) {
-              rawPart = { ...meta, genus: lineage.genus, species: lineage.species, infraspecific_rank: lineage.infraspecific_rank, infraspecies: lineage.infraspecies, taxon_rank: lineage.target_rank };
+              rawPart = { ...hybridMeta, genus: lineage.genus, species: lineage.species, infraspecific_rank: lineage.infraspecific_rank, infraspecies: lineage.infraspecies, taxon_rank: lineage.target_rank };
           } else if (rank === 'Cultivar' && lineage.cultivar) {
-              rawPart = { ...meta, genus: lineage.genus, species: lineage.species, infraspecific_rank: lineage.infraspecific_rank, infraspecies: lineage.infraspecies, cultivar: lineage.cultivar, taxon_rank: 'Cultivar' };
+              rawPart = { ...hybridMeta, genus: lineage.genus, species: lineage.species, infraspecific_rank: lineage.infraspecific_rank, infraspecies: lineage.infraspecies, cultivar: lineage.cultivar, taxon_rank: 'Cultivar' };
           }
 
           if (!rawPart) continue;
@@ -135,7 +134,6 @@ const AddPlantModal: React.FC<AddPlantModalProps> = ({
         taxon_rank: item.taxon_rank,
         // ADR-005: Standards Governance - Manual additions default to Provisional
         taxon_status: 'Provisional', 
-        family: item.raw.family,
         genus: item.raw.genus,
         species: item.raw.species,
         infraspecies: item.raw.infraspecies,

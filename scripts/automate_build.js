@@ -1,5 +1,5 @@
 /**
- * AUTOMATED DATABASE BUILDER (CLI) v2.26.0
+ * AUTOMATED DATABASE BUILDER (CLI) v2.26.1
  * 
  * Orchestrates the transformation of raw WCVP data into the FloraCatalog database.
  * Optimized for free-tier environments using granular segmented iterative hierarchy.
@@ -320,7 +320,7 @@ async function stepOptimize(client) {
 // --- MAIN LOOP ---
 
 async function main() {
-    console.log("\n🌿 FLORA CATALOG - DATABASE AUTOMATION v2.26.0 🌿\n");
+    console.log("\n🌿 FLORA CATALOG - DATABASE AUTOMATION v2.26.1 🌿\n");
     process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
     let dbUrl = process.env.DATABASE_URL;
     let finalConfig;

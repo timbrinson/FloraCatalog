@@ -32,7 +32,7 @@ interface DataGridProps {
 }
 
 const RANK_HIERARCHY: Record<string, number> = {
-    'family': 1, 'genus': 2, 'species': 3, 'subspecies': 4, 'variety': 5, 'form': 6, 'group': 7, 'grex': 8, 'cultivar': 9,
+    'family': 1, 'genus': 2, 'species': 3, 'subspecies': 4, 'variety': 5, 'form': 6, 'grex': 8, 'cultivar': 9,
 };
 
 const COLUMN_RANK_MAP: Record<string, number> = {
@@ -131,7 +131,7 @@ const COLUMN_GROUPS: ColumnGroup[] = [
                 tooltip: 'Taxonomic Rank', 
                 defaultWidth: 110, 
                 filterType: 'multi-select', 
-                filterOptions: ['Family', 'Genus', 'Species', 'Subspecies', 'Variety', 'Subvariety', 'Form', 'Subform', 'Cultivar', 'Unranked'], 
+                filterOptions: ['Family', 'Genus', 'Species', 'Subspecies', 'Variety', 'Subvariety', 'Form', 'Subform', 'Cultivar', 'Unranked', 'agamosp.', 'Convariety', 'ecas.', 'grex', 'lusus', 'microf.', 'microgène', 'micromorphe', 'modif.', 'monstr.', 'mut.', 'nid', 'nothof.', 'nothosubsp.', 'nothovar.', 'positio', 'proles', 'provar.', 'psp.', 'stirps', 'subap.', 'sublusus', 'subproles', 'subspecioid', 'subsubsp.'], 
                 lockWidth: true, 
                 defaultOn: false 
             },
@@ -141,7 +141,7 @@ const COLUMN_GROUPS: ColumnGroup[] = [
                 tooltip: 'Taxonomic Status', 
                 defaultWidth: 110, 
                 filterType: 'multi-select', 
-                filterOptions: ['Accepted', 'Synonym', 'Unplaced', 'Registered', 'Provisional', 'Artificial Hybrid'], 
+                filterOptions: ['Accepted', 'Synonym', 'Unplaced', 'Registered', 'Provisional', 'Artificial Hybrid', 'Illegitimate', 'Invalid', 'Local Biotype', 'Misapplied', 'Orthographic', 'Provisionally Accepted', 'External to WCVP'], 
                 defaultOn: false 
             },
             { id: 'family', label: 'Family', tooltip: 'Family', defaultWidth: 120, filterType: 'text', defaultOn: false },
@@ -162,7 +162,7 @@ const COLUMN_GROUPS: ColumnGroup[] = [
                 tooltip: 'Infraspecific Rank', 
                 defaultWidth: 80, 
                 filterType: 'multi-select', 
-                filterOptions: ['NULL', 'subsp.', 'var.', 'subvar.', 'f.', 'subf.'],
+                filterOptions: ['NULL', 'subsp.', 'var.', 'subvar.', 'f.', 'subf.', 'agamosp.', 'convar.', 'ecas.', 'grex', 'lusus', 'microf.', 'microgène', 'micromorphe', 'modif.', 'monstr.', 'mut.', 'nid', 'nothof.', 'nothosubsp.', 'nothovar.', 'positio', 'proles', 'provar.', 'psp.', 'stirps', 'subap.', 'sublusus', 'subproles', 'subspecioid', 'subsubsp.', 'group', 'unterrasse'],
                 hideHeaderIcons: true, 
                 headerAlign: 'center', 
                 lockWidth: true, 
@@ -335,40 +335,23 @@ const DataGrid: React.FC<DataGridProps> = ({
       if (groupBy.length === 0) return taxa as TreeRow[];
       
       const outputRows: TreeRow[] = [];
-
-      // HELPER: Consistent bucket key normalization
       const bucketKey = (row: Taxon, depth: number) => {
-          const field = groupBy[depth];
-          const rawVal = getRowValue(row, field);
-          if (rawVal === undefined || rawVal === null || rawVal === '') return 'unspecified';
-          
-          if (field === 'infraspecies') {
-              const rank = row.infraspecific_rank || '';
-              const epithet = row.infraspecies || '';
-              return `${rank} ${epithet}`.trim().toLowerCase();
-          }
-          
-          return String(rawVal).replace(/^[×x]\s?/i, '').trim().toLowerCase();
+          const val = String(getRowValue(row, groupBy[depth]) || '');
+          // Normalize hybrid symbols for grouping to prevent duplicate virtual-roots
+          return val.replace(/^[×x]\s?/i, '').trim();
       };
       
-      // HELPER: Find if a record exists that should serve as the header for this group
       const findHeaderTaxon = (candidates: Taxon[], field: string, value: string): Taxon | undefined => {
-          if (value === 'unspecified') return undefined;
-          
           return candidates.find(t => {
+             const rowVal = String(getRowValue(t, field)).replace(/^[×x]\s?/i, '').trim();
+             const valMatches = rowVal === value;
+             if (!valMatches) return false;
              const rank = (t.taxon_rank as string || '').toLowerCase();
-             const trName = String(getRowValue(t, field)).replace(/^[×x]\s?/i, '').trim().toLowerCase();
-             
-             if (field === 'infraspecies') {
-                 const combined = `${t.infraspecific_rank || ''} ${t.infraspecies || ''}`.trim().toLowerCase();
-                 return combined === value && ['variety', 'subspecies', 'form'].includes(rank);
-             }
-             
-             if (field === 'family' && rank === 'family') return trName === value;
-             if (field === 'genus' && rank === 'genus') return trName === value;
-             if (field === 'species' && rank === 'species') return trName === value;
-             
-             return trName === value && rank === field;
+             if (field === 'family') return rank === 'family';
+             if (field === 'genus') return rank === 'genus';
+             if (field === 'species') return rank === 'species';
+             if (field === 'infraspecies') return ['variety', 'subspecies', 'form'].includes(rank);
+             return rank === field.toLowerCase();
           });
       };
 
@@ -378,10 +361,8 @@ const DataGrid: React.FC<DataGridProps> = ({
               subset.forEach(t => outputRows.push({ ...t, depth, tree_path: `${parentPath}/${t.id}` }));
               return;
           }
-
           const field = groupBy[depth];
           const groups: Record<string, Taxon[]> = {};
-          
           subset.forEach(row => { 
               const val = bucketKey(row, depth); 
               if (!groups[val]) groups[val] = []; 
@@ -391,44 +372,35 @@ const DataGrid: React.FC<DataGridProps> = ({
           Object.keys(groups).sort().forEach(key => {
               const groupItems = groups[key];
               const path = `${parentPath}/${key}`;
-              
-              if (key === 'unspecified') { 
-                  processLevel(groupItems, depth + 1, parentPath); 
-                  return; 
-              }
-
+              if (key === '' || key === 'undefined' || key === 'null') { processLevel(groupItems, depth + 1, parentPath); return; }
               const headerTaxon = findHeaderTaxon(groupItems, field, key);
               const itemsWithoutHeader = headerTaxon ? groupItems.filter(i => i.id !== headerTaxon.id) : groupItems;
               const firstChild = groupItems[0];
-
               const headerRow: TreeRow = headerTaxon ? { ...headerTaxon } : {
                   id: `virtual-${path}`,
                   is_virtual: true,
-                  taxon_rank: field === 'infraspecies' ? (firstChild?.taxon_rank || 'Infraspecies') : (field.charAt(0).toUpperCase() + field.slice(1)) as any, 
-                  taxon_name: key.charAt(0).toUpperCase() + key.slice(1), 
+                  taxon_rank: field.charAt(0).toUpperCase() + field.slice(1) as any, 
+                  name: key,
+                  taxon_name: key, 
                   taxon_status: 'Accepted',
                   family: firstChild?.family,
                   genus: firstChild?.genus,
                   genus_hybrid: firstChild?.genus_hybrid,
                   species: firstChild?.species,
                   species_hybrid: firstChild?.species_hybrid,
-                  infraspecific_rank: firstChild?.infraspecific_rank,
-                  infraspecies: firstChild?.infraspecies,
                   alternative_names: [], reference_links: [], created_at: 0
               } as any;
-
               headerRow.is_tree_header = true;
               headerRow.tree_expanded = !collapsedGroups.has(path);
-              (headerRow as any).child_count = headerTaxon ? (headerTaxon.descendant_count || 0) : groupItems.length;
+              (headerRow as any).child_count = headerTaxon ? headerTaxon.descendant_count : groupItems.length;
               headerRow.depth = depth;
               headerRow.tree_path = path;
-              
               outputRows.push(headerRow);
               if (headerRow.tree_expanded) processLevel(itemsWithoutHeader, depth + 1, path);
           });
       };
-
-      processLevel(taxa, 0, 'root');
+      const rootPath = 'root';
+      processLevel(taxa, 0, rootPath);
       return outputRows;
   }, [taxa, groupBy, collapsedGroups]);
 
@@ -447,7 +419,7 @@ const DataGrid: React.FC<DataGridProps> = ({
           const field = groupBy[depth];
           const groups: Record<string, Taxon[]> = {};
           subset.forEach(row => {
-              const val = String(getRowValue(row, field) || '').replace(/^[×x]\s?/i, '').trim().toLowerCase();
+              const val = String(getRowValue(row, field) || '').replace(/^[×x]\s?/i, '').trim();
               if (val === '' || val === 'undefined' || val === 'null') return;
               if (!groups[val]) groups[val] = [];
               groups[val].push(row);
@@ -643,20 +615,7 @@ const DataGrid: React.FC<DataGridProps> = ({
            </tbody>
         </table>
       </div>
-      {showLegend && (
-          <div ref={legendRef} className="absolute bottom-4 right-4 w-72 bg-white border border-slate-200 rounded-lg shadow-2xl z-50 p-4 animate-in fade-in slide-in-from-bottom-2 duration-200">
-              <div className="flex justify-between items-center mb-3"><div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Rank Color Guide</div><button onClick={() => setShowLegend(false)} className="text-slate-400 hover:text-slate-600"><X size={14}/></button></div>
-              <div className="space-y-2">
-                  {Object.entries(activeColorMap).map(([rank, color]) => (
-                      <div key={rank} className="flex items-center gap-2"><div className={`w-3 h-3 rounded-full bg-${color}-500 shadow-sm`}></div><span className="text-xs font-bold text-slate-600 capitalize">{rank}</span></div>
-                  ))}
-                  <div className="mt-4 pt-3 border-t border-slate-100"><div className="flex items-center gap-2 opacity-50"><div className="w-3 h-3 rounded-full bg-slate-400"></div><span className="text-[10px] font-bold text-slate-500 italic">Serif font indicates Virtual/Aggregate Row</span></div></div>
-              </div>
-          </div>
-      )}
     </div>
   );
 };
 export default DataGrid;
-// Placeholder for missing icons
-const X = ({ size, className }: { size: number, className?: string }) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M18 6 6 18M6 6l12 12"/></svg>;
