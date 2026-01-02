@@ -1,5 +1,48 @@
-
 import { Taxon, UserPreferences } from '../types';
+
+/**
+ * assembleScientificName: Deterministically builds a botanical name from parts.
+ * ADR-005: Standards enforcement MUST be algorithmic.
+ */
+export const assembleScientificName = (p: Partial<Taxon>): string => {
+  let parts: string[] = [];
+  
+  if (p.genus && p.genus !== 'null') {
+    const isGenusHybrid = p.genus_hybrid === '×' || p.genus_hybrid === 'x' || p.genus_hybrid === 'true';
+    const gh = isGenusHybrid ? '× ' : '';
+    // Strip existing symbols before applying standard ones
+    const cleanGenus = String(p.genus).trim().replace(/^[×x+]\s?/i, '');
+    if (cleanGenus) {
+        parts.push(`${gh}${cleanGenus.charAt(0).toUpperCase()}${cleanGenus.slice(1).toLowerCase()}`);
+    }
+  }
+  
+  if (p.species && p.species !== 'null') {
+    const isSpeciesHybrid = p.species_hybrid === '×' || p.species_hybrid === 'x' || p.species_hybrid === 'true';
+    const sh = isSpeciesHybrid ? '× ' : '';
+    const cleanSpecies = String(p.species).trim().replace(/^[×x+]\s?/i, '');
+    if (cleanSpecies) {
+        parts.push(`${sh}${cleanSpecies.toLowerCase()}`);
+    }
+  }
+  
+  if (p.infraspecific_rank && p.infraspecific_rank !== 'null' && p.infraspecies && p.infraspecies !== 'null') {
+    const rank = String(p.infraspecific_rank).trim();
+    const epithet = String(p.infraspecies).trim().toLowerCase();
+    if (rank && epithet) {
+        parts.push(`${rank} ${epithet}`);
+    }
+  }
+  
+  if (p.cultivar && p.cultivar !== 'null') {
+    const cleanCultivar = String(p.cultivar).trim().replace(/['"]/g, '');
+    if (cleanCultivar) {
+        parts.push(`'${cleanCultivar}'`);
+    }
+  }
+  
+  return parts.join(' ').trim();
+};
 
 export const formatScientificName = (taxon: Taxon, prefs: UserPreferences = { hybrid_spacing: 'space', auto_enrichment: false, color_theme: 'option2a', search_mode: 'prefix' }): string => {
   let name = taxon.name || ''; 

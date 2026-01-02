@@ -27,8 +27,12 @@ We adopt a **Hybrid Validation Pipeline** based on the following four principles
 ### 4. The "Design-Time" vs. "Runtime" Distinction
 *   **Principle:** Use the **Senior Lead Engineer (Design-Time AI)** to write robust, tested code that handles complex botanical rules, rather than asking a **Flash Model (Runtime AI)** to attempt those rules repeatedly for every user interaction.
 
+### 5. The Latency Hierarchy
+*   **Principle:** Deterministic code is executed in microseconds; AI inference is measured in seconds. 
+*   **Strategy:** Any UI interaction requiring "Immediate Feedback" (Typing, Sorting, Formatting) must use Algorithms. AI is strictly reserved for "Asynchronous Discovery" where the user initiates a request and expects a processing delay.
+
 ## Consequences
-*   **Consistency:** Plant names will follow strict, repeatable patterns regardless of the AI model's "mood" or temperature settings.
+*   **Consistency:** Plant name formatting will follow strict, repeatable patterns regardless of the AI model's "mood" or temperature settings.
 *   **Performance:** The app will feel faster as fewer operations require a round-trip to the Gemini servers.
 *   **Development Cost:** This requires more intentional engineering during design-time (writing the regex and logic) but results in a lower technical debt and a more professional-grade tool.
 *   **Maintenance:** The `geminiService.ts` will become thinner, focusing only on "Translation," while utility folders will grow to handle "Standardization."

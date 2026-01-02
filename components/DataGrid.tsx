@@ -1,4 +1,3 @@
-
 // DO NOT add any new files, classes, or namespaces.
 import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { Taxon, UserPreferences, ColorTheme } from '../types';
@@ -336,11 +335,16 @@ const DataGrid: React.FC<DataGridProps> = ({
       if (groupBy.length === 0) return taxa as TreeRow[];
       
       const outputRows: TreeRow[] = [];
-      const bucketKey = (row: Taxon, depth: number) => String(getRowValue(row, groupBy[depth]) || '');
+      const bucketKey = (row: Taxon, depth: number) => {
+          const val = String(getRowValue(row, groupBy[depth]) || '');
+          // Normalize hybrid symbols for grouping to prevent duplicate virtual-roots
+          return val.replace(/^[×x]\s?/i, '').trim();
+      };
       
       const findHeaderTaxon = (candidates: Taxon[], field: string, value: string): Taxon | undefined => {
           return candidates.find(t => {
-             const valMatches = String(getRowValue(t, field)) === value;
+             const rowVal = String(getRowValue(t, field)).replace(/^[×x]\s?/i, '').trim();
+             const valMatches = rowVal === value;
              if (!valMatches) return false;
              const rank = (t.taxon_rank as string || '').toLowerCase();
              if (field === 'family') return rank === 'family';
@@ -415,7 +419,7 @@ const DataGrid: React.FC<DataGridProps> = ({
           const field = groupBy[depth];
           const groups: Record<string, Taxon[]> = {};
           subset.forEach(row => {
-              const val = String(getRowValue(row, field) || '');
+              const val = String(getRowValue(row, field) || '').replace(/^[×x]\s?/i, '').trim();
               if (val === '' || val === 'undefined' || val === 'null') return;
               if (!groups[val]) groups[val] = [];
               groups[val].push(row);
@@ -598,8 +602,8 @@ const DataGrid: React.FC<DataGridProps> = ({
                                if (COLUMN_RANK_MAP[col.id] && COLUMN_RANK_MAP[col.id] < rowRankLevel) isDimmed = true;
                                if (col.id === 'taxon_rank') displayVal = <span className={`px-2 py-0.5 text-[10px] rounded border font-bold bg-${baseColor}-100 ${getTextClass(baseColor)} border-${baseColor}-200 normal-case`}>{displayVal}</span>;
                                else if (col.id === 'taxon_name') displayVal = formatFullScientificName(tr, preferences);
-                               else if (col.id === 'taxon_status') { let b = 'bg-slate-100 text-slate-500'; if (val === 'Accepted' || val === 'Registered') b = 'bg-green-50 text-green-700 border-green-200 border'; displayVal = <span className={`px-2 py-0.5 text-[10px] rounded font-bold ${b} normal-case`}>{displayVal || '-'}</span>; }
-                               else if (col.id === 'actions') displayVal = <div className="flex items-center justify-center gap-1"><button onClick={(e) => { e.stopPropagation(); setExpandedRows(prev => { const n = new Set(prev); n.has(tr.id) ? n.delete(tr.id) : n.add(tr.id); return n; }); }} className={`p-1.5 rounded shadow-sm ${isExpanded ? 'bg-slate-800 text-white' : 'bg-white border border-slate-200 text-slate-500 hover:text-slate-800'}`}>{isExpanded ? <ChevronUpIcon size={14}/> : <ChevronDownIcon size={14}/>}</button>{['genus', 'species', 'subspecies', 'variety', 'form'].includes(r) && <button onClick={(e) => { e.stopPropagation(); onAction?.('mine', tr); }} className="p-1.5 bg-indigo-50 border border-indigo-200 rounded text-indigo-600 hover:bg-indigo-100 shadow-sm"><PickaxeIcon size={14} /></button>}<button onClick={(e) => { e.stopPropagation(); onAction?.('enrich', tr); }} className="p-1.5 bg-amber-50 border border-amber-200 rounded text-amber-600 hover:bg-amber-100 shadow-sm"><Wand2Icon size={14} /></button></div>;
+                               else if (col.id === 'taxon_status') { let b = 'bg-slate-100 text-slate-500'; if (val === 'Accepted' || val === 'Registered' || val === 'Artificial Hybrid') b = 'bg-green-50 text-green-700 border-green-200 border'; displayVal = <span className={`px-2 py-0.5 text-[10px] rounded font-bold ${b} normal-case`}>{displayVal || '-'}</span>; }
+                               else if (col.id === 'actions') displayVal = <div className="flex items-center justify-center gap-1"><button onClick={(e) => { e.stopPropagation(); setExpandedRows(prev => { const n = new Set(prev); n.has(tr.id) ? n.delete(tr.id) : n.add(tr.id); return n; }); }} className={`p-1.5 rounded shadow-sm ${isExpanded ? 'bg-slate-800 text-white' : 'bg-white border border-slate-200 text-slate-500 hover:text-slate-800'}`}>{isExpanded ? <ChevronUpIcon size={14}/> : <ChevronDownIcon size={14}/>}</button>{['genus', 'species', 'subspecies', 'variety', 'form'].includes(r) && <button onClick={(e) => { e.stopPropagation(); onAction?.('enrich', tr); }} title="Analyze & Find Details" className="p-1.5 bg-indigo-50 border border-indigo-200 rounded text-indigo-600 hover:bg-indigo-100 shadow-sm"><PickaxeIcon size={14} /></button>}<button onClick={(e) => { e.stopPropagation(); onAction?.('enrich', tr); }} title="Enrich Data Layer" className="p-1.5 bg-amber-50 border border-amber-200 rounded text-amber-600 hover:bg-amber-100 shadow-sm"><Wand2Icon size={14} /></button></div>;
                                return <td key={col.id} className={`p-2 border-r border-slate-50 truncate overflow-hidden max-w-0 ${col.headerAlign === 'center' ? 'text-center' : ''}`} title={String(val || '')}><span className={`${isBold ? "font-bold" : ""} ${isDimmed ? "font-normal" : ""} ${isBold ? (baseColor === 'slate' ? "text-slate-900" : `text-${baseColor}-900`) : (isDimmed ? "text-slate-400" : "")}`}>{displayVal}</span></td>;
                            })}
                         </tr>

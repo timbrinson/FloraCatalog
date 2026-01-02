@@ -22,7 +22,7 @@ Genus Hybrids
     x Amarine tubergenii
     x Amarine tubergenii 'Anastasia'
     x Amarine tubergenii 'Aphrodite'
-    x Amarine tubergenii 'Tomoko'
+    × Amarine tubergenii 'Tomoko'
     x Amarygia
     x Hippeastrelia 'Durga Pradhan'
     x Hippeastrelia 'Mystique'
@@ -45,6 +45,7 @@ Species Hybrids
     Aloe x nobilis 'Variegata'
     Crassula x perforata 'Ivory Towers'
     Crassula x perforata 'Moonglow'
+    Crinum × powellii
     Crinum x baconi  'Belle of Seville'
     Crinum x baconi  'Fourth of July'
     Crinum x baconi  'Maurine Spinks'
@@ -82,6 +83,7 @@ Species Hybrids
     Habranthus x robustus 'Candy Cane'
     Habranthus x robustus 'Pink Flamingos'
     Hippeastrum x johnsonii
+    Lycoris × jacksoniana 'Ueki'
     Lycoris x rosea 'Berry Awesome'
     Lycoris x rosea 'Burning Hearts'
     Lycoris x rosea 'Caldwell's Best Pink'
@@ -111,14 +113,14 @@ Species Hybrids
     Lycoris x rosea 'Satsumhiryu'
     Lycoris x rosea 'Ueki'
     Lycoris x straminea 'Red Hot Lover'
-    Salvia x jamensis 'Elk Raspberry Moose'
+    Salvia × jamensis 'Elk Raspberry Moose'
     Salvia x jamensis 'Ignition Cranberry Sage'
     Salvia x jamensis 'Ignition Fuchsia'
     Salvia x jamensis 'Ignition Purple'
     Salvia x jamensis 'Maraschino'
     Salvia x jamensis 'Nachtvlinder'
     Salvia x jamensis 'Red Velvet'
-    Salvia x jamensis 'Royal Bumble'
+    Salvia × jamensis 'Royal Bumble'
 
 Subspecies
 

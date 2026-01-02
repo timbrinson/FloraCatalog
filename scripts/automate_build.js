@@ -1,9 +1,9 @@
-
 /**
- * AUTOMATED DATABASE BUILDER (CLI) v2.18
+ * AUTOMATED DATABASE BUILDER (CLI) v2.25.1
  * 
  * Orchestrates the transformation of raw WCVP data into the FloraCatalog database.
  * Optimized for free-tier environments using granular segmented iterative hierarchy.
+ * v2.25.1: Self-healing population logic and improved segment range filtering.
  */
 
 import pg from 'pg';
@@ -43,7 +43,6 @@ const FILE_SCHEMA = 'scripts/wcvp_schema.sql.txt';
 const FILE_OPTIMIZE = 'scripts/optimize_indexes.sql.txt';
 
 // Granular segments to prevent Supabase connection resets
-// UPDATED: Added ranges to catch leading symbols (+, ×) common in hybrids
 const SEGMENTS = [
     { label: "Symbols (+, etc)", start: " ", end: "A" },
     { label: "A", start: "A", end: "B" },
@@ -72,6 +71,10 @@ const SEGMENTS = [
 
 // --- SQL TEMPLATES ---
 
+/**
+ * buildPopulateQuery: Comprehensive column list for high-fidelity transfer.
+ * Includes NOT EXISTS to allow safe resumes.
+ */
 const buildPopulateQuery = (start, end) => `
     INSERT INTO app_taxa (
         wcvp_id, ipni_id, taxon_rank, taxon_status, family, genus_hybrid, 
@@ -94,8 +97,9 @@ const buildPopulateQuery = (start, end) => `
         accepted_plant_name_id, basionym_plant_name_id, 
         replaced_synonym_author, homotypic_synonym, 
         parent_plant_name_id, powo_id, hybrid_formula, reviewed, 1
-    FROM wcvp_import
+    FROM wcvp_import w
     WHERE taxon_name >= '${start}' AND taxon_name < '${end}'
+      AND NOT EXISTS (SELECT 1 FROM app_taxa a WHERE a.wcvp_id = w.plant_name_id)
     ON CONFLICT (wcvp_id) DO NOTHING;
 `;
 
@@ -135,6 +139,27 @@ const getPythonCommand = () => {
     catch (e) { return 'python'; }
 };
 
+/**
+ * selectSegments: Filters segments based on user input for targeted recovery.
+ */
+const selectSegments = async () => {
+    console.log("\nAvailable Ranges: A, D, H, M, S, T, W, or 'All'");
+    const filter = await askQuestion("Target alphabetical range (Enter to skip A-S): ");
+    
+    if (!filter || filter.toLowerCase() === 'all') return SEGMENTS;
+    
+    const startChar = filter.toUpperCase();
+    const filtered = SEGMENTS.filter(s => s.start >= startChar || s.label.startsWith(startChar));
+    
+    if (filtered.length === 0) {
+        warn(`No segments found for '${filter}'. Falling back to All.`);
+        return SEGMENTS;
+    }
+    
+    log(`Selected ${filtered.length} segments starting from range '${filtered[0].label}'.`);
+    return filtered;
+};
+
 // --- STEPS ---
 
 async function stepPrepareData() {
@@ -172,18 +197,17 @@ async function stepImportStream(client) {
     catch (e) { throw new Error(`Streaming failed: ${e.message}`); }
 }
 
-async function stepPopulate(client) {
-    log("Populating 'app_taxa' in granular segments...");
+async function stepPopulate(client, segments) {
+    log("Populating 'app_taxa' in segments...");
     await client.query("SET statement_timeout = 0;");
     
-    // Ensure data source 1 exists
     await client.query(`
         INSERT INTO app_data_sources (id, name, version, citation_text, url, trust_level)
         VALUES (1, 'WCVP', '14', 'Kew Gardens WCVP', 'https://powo.science.kew.org/', 5)
         ON CONFLICT (id) DO NOTHING;
     `);
 
-    for (const seg of SEGMENTS) {
+    for (const seg of segments) {
         log(`Processing Segment: ${seg.label}...`);
         await client.query(buildPopulateQuery(seg.start, seg.end));
     }
@@ -199,10 +223,10 @@ async function stepIndexes(client) {
     `);
 }
 
-async function stepLink(client) {
-    log("Linking Parents (Granular Segmentation)...");
+async function stepLink(client, segments) {
+    log("Linking Parents (Segmented)...");
     await client.query("SET statement_timeout = 0;");
-    for (const seg of SEGMENTS) {
+    for (const seg of segments) {
         log(`Linking Segment: ${seg.label}...`);
         const q = `
             UPDATE app_taxa child
@@ -216,13 +240,12 @@ async function stepLink(client) {
     }
 }
 
-async function stepHierarchy(client) {
-    log("Calculating Hierarchy Paths (Ltree - Granular Iterative)...");
+async function stepHierarchy(client, segments) {
+    log("Calculating Hierarchy Paths (Ltree - Segmented Iterative)...");
     await client.query("SET statement_timeout = 0;");
     
-    // 1. Initialize Level 0 (Roots) - Segmented
     log("Initializing Level 0 (Roots)...");
-    for (const seg of SEGMENTS) {
+    for (const seg of segments) {
         log(`Level 0: Segment ${seg.label}...`);
         await client.query(`
             UPDATE app_taxa 
@@ -233,14 +256,13 @@ async function stepHierarchy(client) {
         `);
     }
 
-    // 2. Iteratively process Level 1..N - Segmented
     let level = 1;
     let totalUpdated = 0;
     while (true) {
         let levelUpdated = 0;
         log(`Processing Level ${level}...`);
         
-        for (const seg of SEGMENTS) {
+        for (const seg of segments) {
             const res = await client.query(`
                 UPDATE app_taxa child
                 SET hierarchy_path = parent.hierarchy_path || text2ltree(replace(child.id::text, '-', '_'))
@@ -261,19 +283,15 @@ async function stepHierarchy(client) {
         log(`Level ${level} complete: ${levelUpdated} rows updated.`);
         totalUpdated += levelUpdated;
         level++;
-        
-        if (level > 20) {
-            warn("Safety cutoff reached (Level 20).");
-            break;
-        }
+        if (level > 20) break;
     }
     log(`Hierarchy built for ${totalUpdated} descendants.`);
 }
 
-async function stepCounts(client) {
-    log("Calculating Descendant Counts (Granular)...");
+async function stepCounts(client, segments) {
+    log("Calculating Descendant Counts (Segmented)...");
     await client.query("SET statement_timeout = 0;");
-    for (const seg of SEGMENTS) {
+    for (const seg of segments) {
         log(`Counting Segment: ${seg.label}...`);
         await client.query(buildCountsQuery(seg.start, seg.end));
     }
@@ -289,7 +307,7 @@ async function stepOptimize(client) {
 // --- MAIN LOOP ---
 
 async function main() {
-    console.log("\n🌿 FLORA CATALOG - DATABASE AUTOMATION v2.18 🌿\n");
+    console.log("\n🌿 FLORA CATALOG - DATABASE AUTOMATION v2.25.1 🌿\n");
     process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
     let dbUrl = process.env.DATABASE_URL;
     let finalConfig;
@@ -311,37 +329,45 @@ async function main() {
     
     client.on('error', (e) => {
         err(`Database Connection Error: ${e.message}`);
-        if (e.code === 'ECONNRESET') {
-            warn("Connection reset. Free tier limits reached. Please restart and resume.");
-        }
         process.exit(1);
     });
 
     try {
         await client.connect();
         log("✅ Connection Successful!");
+        
         const steps = [
             { id: '1', name: "Prepare Data (Python)", fn: () => stepPrepareData() },
             { id: '2', name: "Build Schema (Reset)", fn: () => stepBuildSchema(client) },
             { id: '3', name: "Import CSV (Stream)", fn: () => stepImportStream(client) },
-            { id: '4', name: "Populate App Taxa (Granular)", fn: () => stepPopulate(client) },
+            { id: '4', name: "Populate App Taxa (Segmented)", fn: (segs) => stepPopulate(client, segs) },
             { id: '5', name: "Build Indexes", fn: () => stepIndexes(client) },
-            { id: '6', name: "Link Parents (Granular)", fn: () => stepLink(client) },
-            { id: '7', name: "Build Hierarchy (Granular Iterative)", fn: () => stepHierarchy(client) },
-            { id: '8', name: "Calc Counts (Granular)", fn: () => stepCounts(client) },
+            { id: '6', name: "Link Parents (Segmented)", fn: (segs) => stepLink(client, segs) },
+            { id: '7', name: "Build Hierarchy (Segmented Iterative)", fn: (segs) => stepHierarchy(client, segs) },
+            { id: '8', name: "Calc Counts (Segmented)", fn: (segs) => stepCounts(client, segs) },
             { id: '9', name: "Optimize", fn: () => stepOptimize(client) }
         ];
+
         console.log("\n--- MENU ---");
         steps.forEach(s => console.log(`${s.id}. Step ${s.id}: ${s.name}`));
         const choice = (await askQuestion("\nSelect option: ")).toUpperCase();
         const startIndex = steps.findIndex(s => s.id === choice);
+        
         if (startIndex === -1) { err("Invalid selection"); process.exit(1); }
+
+        // Targeted Segments for Steps 4, 6, 7, 8
+        let targetSegments = SEGMENTS;
+        const segmentedSteps = ['4', '6', '7', '8'];
+        if (segmentedSteps.includes(choice)) {
+            targetSegments = await selectSegments();
+        }
+
         for (let i = startIndex; i < steps.length; i++) {
             const step = steps[i];
             console.log(`\n--- [Step ${step.id}/${steps.length}] ${step.name} ---`);
-            await step.fn();
+            await step.fn(targetSegments);
         }
-        log("\n✅ Automation Complete!");
+        log("\n✅ Automation Task Complete!");
     } catch (e) { 
         err(`Build failed: ${e.message}`); 
     } finally { 

@@ -115,9 +115,16 @@ The `scripts/automate_build.js` is an interactive CLI that guides the Admin thro
 | **8** | **Counts** | Auto | SQL | Calculates descendant counts for the UI grid. |
 | **9** | **Performance** | Auto | SQL | Runs `scripts/optimize_indexes.sql.txt`. |
 
+## 7. Segmented Recovery (New)
+If a load fails or data is missing (e.g., records T-Z), you can use the **Segment Filter** in Steps 4, 6, 7, and 8.
+1.  Choose the step from the menu.
+2.  Enter the start letter (e.g., 'T').
+3.  The script will skip segments A-S and process only the targeted range.
+4.  The population step (Step 4) now uses `NOT EXISTS` logic to prevent duplicates during recovery.
+
 ---
 
-## 7. Execution
+## 8. Execution
 
 1.  **Open your terminal** and ensure you are in the `FloraCatalog` root directory.
 2.  **Start the Process:**
@@ -133,7 +140,7 @@ The `scripts/automate_build.js` is an interactive CLI that guides the Admin thro
 
 ---
 
-## 8. Troubleshooting Common Errors
+## 9. Troubleshooting Common Errors
 
 ### A. Error: `connect EHOSTUNREACH [IPv6 Address]`
 *   **Cause:** Local network or computer doesn't support IPv6.

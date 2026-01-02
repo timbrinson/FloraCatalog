@@ -3,53 +3,49 @@ import { GoogleGenAI, Type } from "@google/genai";
 import { Taxon, Link, Synonym, SearchCandidate } from "../types";
 
 /**
- * identifyTaxonomy: Parses natural language input into a structured taxonomic hierarchy.
+ * identifyTaxonomy: Parses natural language input into a comprehensive lineage object.
+ * ADR-005: AI is restricted to "Extraction". Standards enforcement is handled by the app.
+ * Performance: Switched to Flash for faster structured extraction (2-4s avg).
  */
-export async function identifyTaxonomy(query: string): Promise<any[]> {
+export async function identifyTaxonomy(query: string): Promise<any> {
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   const response = await ai.models.generateContent({
-    model: 'gemini-3-pro-preview',
-    contents: `Act as a world-class botanical taxonomist. Parse the following plant name into a strict hierarchy using snake_case properties.
-    Input: "${query}"
+    model: 'gemini-3-flash-preview',
+    contents: `Extract the taxonomic lineage for the plant name: "${query}".
     
-    Rules:
-    1. Align with the World Checklist of Vascular Plants (WCVP).
-    2. Correct misspellings and identify the "Accepted" name if the input is a synonym.
-    3. CULTIVAR RULE: If a cultivar is detected (e.g. 'Bloodgood'), the 'name' property for that specific array item MUST be the cultivar name WITHOUT single quotes (e.g. "Bloodgood"), and 'taxon_rank' MUST be "Cultivar".
-    4. SPECIES RULE: The species item in the array MUST NOT contain the cultivar name in its 'name' property.
-    5. For the 'taxon_name' of a cultivar, wrap the name in single quotes (e.g. "Acer palmatum 'Bloodgood'").
-    6. HYBRID RULE: Set is_hybrid=true if the taxon is a known hybrid (using × or x in the input).
-    7. FIELD CONTENT: For the 'genus', 'species', 'infraspecies', and 'cultivar' properties, provide ONLY the specific name or epithet for that rank level (e.g. 'palmatum', NOT 'Acer palmatum').`,
+    Rules for Extraction:
+    1. Align with scientific standards (WCVP / ICN / ICNCP).
+    2. Provide the raw literals for EVERY rank in the hierarchy.
+    3. MISSING RANKS: If a rank (like species or infraspecies) is not present in the input, return NULL for that field.
+    4. STATUS: Identify the most likely WCVP status (Accepted, Synonym, Unresolved).
+    5. CULTIVAR: Extract as raw text (e.g. 'Bloodgood', not "'Bloodgood'").
+    6. TARGET RANK: Identify the most specific rank provided in the string.`,
     config: {
       responseMimeType: "application/json",
       responseSchema: {
-        type: Type.ARRAY,
-        items: {
-          type: Type.OBJECT,
-          properties: {
-            taxon_rank: { type: Type.STRING, description: "e.g. Genus, Species, Variety, Subspecies, Cultivar" },
-            name: { type: Type.STRING, description: "The specific epithet OR cultivar name alone" },
-            taxon_name: { type: Type.STRING, description: "The full scientific name including parents" },
-            family: { type: Type.STRING },
+        type: Type.OBJECT,
+        properties: {
+            target_rank: { type: Type.STRING, description: "Genus, Species, Variety, Subspecies, Cultivar" },
+            family: { type: Type.STRING, nullable: true },
             genus: { type: Type.STRING },
-            species: { type: Type.STRING },
-            infraspecies: { type: Type.STRING },
-            infraspecific_rank: { type: Type.STRING, description: "e.g. var., subsp., f." },
-            cultivar: { type: Type.STRING, description: "The cultivar name alone if rank is Cultivar" },
-            is_hybrid: { type: Type.BOOLEAN, description: "True if this rank level is a hybrid" },
-            taxon_status: { type: Type.STRING, description: "Accepted, Synonym, or Unresolved" }
-          },
-          required: ["taxon_rank", "name", "taxon_name", "taxon_status", "is_hybrid"]
-        }
+            genus_hybrid: { type: Type.BOOLEAN },
+            species: { type: Type.STRING, nullable: true },
+            species_hybrid: { type: Type.BOOLEAN },
+            infraspecific_rank: { type: Type.STRING, description: "Abbreviation like 'var.' or 'subsp.'", nullable: true },
+            infraspecies: { type: Type.STRING, nullable: true },
+            cultivar: { type: Type.STRING, nullable: true },
+            taxon_status: { type: Type.STRING }
+        },
+        required: ["target_rank", "genus", "taxon_status"]
       }
     }
   });
 
   try {
-    return JSON.parse(response.text || "[]");
+    return JSON.parse(response.text || "{}");
   } catch (e) {
     console.error("Failed to parse identity JSON", e);
-    return [];
+    return null;
   }
 }
 

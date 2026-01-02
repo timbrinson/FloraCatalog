@@ -1,4 +1,3 @@
-
 import { getSupabase, getIsOffline } from './supabaseClient';
 import { Taxon, Synonym, Link, DataSource } from '../types';
 
@@ -82,7 +81,6 @@ const mapToDB = (taxon: Taxon) => {
     hybrid_formula: clean(taxon.hybrid_formula),
     taxon_authors: clean(taxon.taxon_authors),
     primary_author: clean(taxon.primary_author),
-    parenthetical_author: clean(taxon.parenthetical_author),
     publication_author: clean(taxon.publication_author),
     replaced_synonym_author: clean(taxon.replaced_synonym_author),
     place_of_publication: clean(taxon.place_of_publication),
@@ -237,28 +235,39 @@ export const dataService = {
     return mapFromDB(data);
   },
 
-  async findTaxonByName(name: string): Promise<Taxon | null> {
+  /**
+   * findTaxonByName: Matches names against DB, handling synonym redirection metadata.
+   */
+  async findTaxonByName(name: string): Promise<(Taxon & { accepted_name_found?: string }) | null> {
       if (getIsOffline()) return null;
       const cleanName = name.trim();
+      
       const { data, error } = await getSupabase()
           .from(DB_TABLE)
           .select('*, details:app_taxon_details(*)')
           .ilike('taxon_name', cleanName)
-          .limit(100);
+          .limit(5);
 
       if (error || !data || data.length === 0) return null;
-      const acceptedMatch = data.find(t => t.taxon_status === 'Accepted');
-      if (acceptedMatch) return mapFromDB(acceptedMatch);
-      const synonymWithLink = data.find(t => t.accepted_plant_name_id && t.accepted_plant_name_id !== t.wcvp_id);
-      if (synonymWithLink) {
-          const { data: target, error: targetError } = await getSupabase()
+      
+      // Artificial Hybrid is considered an Accepted form of designation
+      const bestMatch = data.find(t => t.taxon_status === 'Accepted' || t.taxon_status === 'Artificial Hybrid') || data[0];
+      const mapped = mapFromDB(bestMatch);
+
+      // Synonym Redirection Logic
+      if (bestMatch.taxon_status === 'Synonym' && bestMatch.accepted_plant_name_id) {
+          const { data: accepted } = await getSupabase()
               .from(DB_TABLE)
-              .select('*, details:app_taxon_details(*)')
-              .eq('wcvp_id', synonymWithLink.accepted_plant_name_id)
+              .select('taxon_name')
+              .eq('wcvp_id', bestMatch.accepted_plant_name_id)
               .maybeSingle();
-          if (!targetError && target) return mapFromDB(target);
+          
+          if (accepted) {
+              return { ...mapped, accepted_name_found: accepted.taxon_name };
+          }
       }
-      return mapFromDB(data[0]);
+
+      return mapped;
   },
 
   async createTaxon(taxon: Taxon): Promise<Taxon> {
