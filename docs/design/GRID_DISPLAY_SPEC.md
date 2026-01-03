@@ -1,21 +1,25 @@
 # Specification: Data Grid Display Engine
 
 ## 1. Visual Weight Matrix
-To maintain high density and readability, the grid applies visual weights based on the **Row Rank**.
+To maintain high density and readability, the grid applies visual weights based on the **Row Rank**. Only the column matching the row's specific rank is **Bold**. All parent columns are **Dimmed**.
 
-| Row Rank | Genus Col | Species Col | Infraspecies Col | Cultivar Col |
-| :--- | :--- | :--- | :--- | :--- |
-| **Genus** | **Bold** | (none) | (none) | (none) |
-| **Species** | Dimmed | **Bold** | (none) | (none) |
-| **Infraspecies** | Dimmed | Dimmed | **Bold** | (none) |
-| **Cultivar (Generic)** | Dimmed | *italic "(none)"* | *italic "(none)"* | **Bold** |
-| **Cultivar (Species)** | Dimmed | Dimmed | *italic "(none)"* | **Bold** |
-| **Cultivar (Infra)** | Dimmed | Dimmed | Dimmed | **Bold** |
+| Row Rank | Family Col | Genus Col | Species Col | Infraspecies Col | Cultivar Col |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **Family** | **Bold** | (none) | (none) | (none) | (none) |
+| **Genus** | Dimmed | **Bold** | (none) | (none) | (none) |
+| **Species** | Dimmed | Dimmed | **Bold** | (none) | (none) |
+| **Infraspecies** | Dimmed | Dimmed | Dimmed | **Bold** | (none) |
+| **Cultivar** | Dimmed | Dimmed | Dimmed | Dimmed | **Bold** |
+
+**Special Case: Holder Rows / Virtual Roots**
+For "Holder Rows" (where a level is skipped, e.g., a Generic Cultivar), the identifying column for that rank displays the placeholder **(none)**.
+- **Bold Placeholder:** If the row *represents* that rank (e.g., a Species Virtual Root row), the `(none)` is styled as `italic font-normal text-slate-400 opacity-60`.
+- **Dimmed Placeholder:** If the row is a child of a holder (e.g., a Cultivar row showing its parentage), the `(none)` is styled as `font-normal text-slate-300 opacity-40`.
 
 **Visual Constants:**
 - **Bold:** `font-bold text-slate-900`
 - **Dimmed:** `font-normal text-slate-400`
-- **Virtual Header:** Border-bottom 2px, distinct background.
+- **Virtual Row Background:** Uses the standard background color assigned to that Rank in the active theme.
 
 ---
 
@@ -24,24 +28,30 @@ When filtering results in a child (e.g., Cultivar), the parent records might not
 
 ### Logic:
 1. **The "Replace Virtuals" Rule:** If a virtual header is created for a Genus or Species, and a real record for that Genus/Species exists in the current `taxa` array, the Virtual row is replaced by the Real row.
-2. **The "None" Placeholder:** For cultivars without a species, a virtual "Holder Row" is inserted into the Species column with the value `(none)` to keep hierarchical alignment.
+2. **Gap-Filling Integrity:** For every branch that leads to a Cultivar, the engine ensures a row exists for every rank in the chain. 
+    *   *Example:* Genus → `(none)` (Species Virtual Root) → `(none)` (Infraspecies Virtual Root) → 'Cultivar Name'.
+3. **Deterministic IDs:** Virtual rows use a structured Internal ID: `virtual:none:[parent-uuid]`.
 
 ---
 
 ## 3. Sorting & Grouping Logic
 
 ### The "Generic First" Rule:
-Within a Genus group, rows should sort in the following order:
-1. **Generic Cultivars** (e.g. *Agave* 'Blue Glow')
-2. **Species** (alphabetical)
-3. **Infraspecies** (alphabetical)
+Sorting within any group prioritizes the Virtual Root (the "Generic" entries) before alphabetical listings.
+- **At Genus Level:** 
+    1. The `(none)` Species Virtual Root (if it exists) always sorts to position #1.
+    2. All real Species follow in alphabetical order.
+- **At Species Level:**
+    1. The `(none)` Infraspecies Virtual Root (if it exists) always sorts to position #1.
+    2. All real Infraspecies follow in alphabetical order.
 
 ### Tree Mode Hierarchy:
-- **Level 1:** Family (Virtual or Real)
-- **Level 2:** Genus
-- **Level 3:** Species (or "Generic" virtual root)
-- **Level 4:** Infraspecies (or "Species-level" virtual root)
-- **Level 5:** Cultivars
+The depth of the tree is dynamic based on column visibility.
+- **Level 1:** Family. **Rule:** This level is only shown if the "Family" column is in `visibleColumns`. If hidden, the tree root begins at Genus.
+- **Level 2:** Genus.
+- **Level 3:** Species (or "Species Virtual Root" holder for Generic Cultivars).
+- **Level 4:** Infraspecies (or "Infraspecies Virtual Root" holder for Species-level Cultivars).
+- **Level 5:** Cultivars.
 
 ---
 
