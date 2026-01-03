@@ -1,8 +1,17 @@
 # Version History
 
+## v2.26.2 - Lineage Hydration & Grouping Fix
+**Date:** June 25, 2025
+**Status:** (Current Release)
+
+### Hierarchical Integrity
+- **Recursive Ancestor Hydration:** Implemented Stage 2 of the "Replace Virtuals" rule. When filtering for children, the system now identifies missing parent IDs and recursively fetches the real records from the database, preventing ghost virtual rows (e.g. searching for "Agave parryi" now correctly loads the real "Agave" record as the header).
+- **Tree Bucketing Fix:** Resolved a grouping bug where the "Rank Guard" logic prematurely forced parents into the (none) bucket. Real ancestors are now correctly promoted to group headers.
+- **Hierarchy Awareness:** Enhanced the promotion engine to scan the global hydrated pool instead of just the immediate filtered result set.
+
 ## v2.26.1 - Stability Restoration
 **Date:** June 24, 2025
-**Status:** (Current Release)
+**Status:** (Historical)
 
 ### Stability & UX
 - **Stability Restoration:** Reverted DataGrid grouping logic to a known stable state following internal errors and UI regressions. 
@@ -42,5 +51,3 @@
 ### Documentation & Alignment
 - **Governance Audit:** Synchronized `README.md` and `DOCUMENTATION_STRATEGY.md` with the new computational principles.
 - **Version Alignment:** Synchronized version strings across `package.json`, `AddPlantModal.tsx`, and all documentation files.
-
-[... Rest of file preserved exactly as provided ...]

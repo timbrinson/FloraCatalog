@@ -15,35 +15,22 @@ import {
   AlertCircle
 } from 'lucide-react';
 
-interface DataGridProps {
-  taxa: Taxon[];
-  onAction?: (action: 'mine' | 'enrich', taxon: Taxon) => void;
-  onUpdate?: (id: string, updates: Partial<Taxon>) => void;
-  preferences: UserPreferences;
-  onPreferenceChange?: (newPrefs: UserPreferences) => void;
-  totalRecords: number;
-  isLoadingMore: boolean;
-  onLoadMore: () => void;
-  sortConfig: { key: string; direction: 'asc' | 'desc' };
-  onSortChange: (key: string, direction: 'asc' | 'desc') => void;
-  filters: Record<string, any>;
-  onFilterChange: (key: string, value: any) => void;
-  error?: string | null;
-}
-
-const RANK_HIERARCHY: Record<string, number> = {
-    'family': 1, 'genus': 2, 'species': 3, 'subspecies': 4, 'variety': 5, 'form': 6, 'grex': 8, 'cultivar': 9,
-};
-
-const COLUMN_RANK_MAP: Record<string, number> = {
+// Implementation of Grid Display Spec v2.26.2
+const RANK_LEVELS: Record<string, number> = {
     'family': 1,
     'genus': 2,
-    'genus_hybrid': 2,
     'species': 3,
-    'species_hybrid': 3,
-    'infraspecific_rank': 5,
-    'infraspecies': 5,
-    'cultivar': 9
+    'subspecies': 4, 'variety': 4, 'form': 4, 'subvariety': 4, 'subform': 4, 'infraspecies': 4,
+    'cultivar': 5,
+    'unranked': 99
+};
+
+const COL_RANK_LEVELS: Record<string, number> = {
+    'family': 1,
+    'genus': 2, 'genus_hybrid': 2,
+    'species': 3, 'species_hybrid': 3,
+    'infraspecific_rank': 4, 'infraspecies': 4,
+    'cultivar': 5
 };
 
 type ThemeMap = Record<string, string>;
@@ -85,6 +72,7 @@ type TreeRow = Taxon & {
     depth?: number;
     tree_path?: string;
     is_virtual?: boolean; 
+    is_holder?: boolean;
 };
 
 interface ColumnConfig { 
@@ -232,8 +220,31 @@ const ALL_COLUMNS = COLUMN_GROUPS.flatMap(g => g.columns);
 
 const isTechnicalColumn = (colId: string) => colId === 'id' || colId.endsWith('_id') || colId === 'first_published';
 
+const genericFirstSort = (a: string, b: string) => {
+    if (a === '(none)') return -1;
+    if (b === '(none)') return 1;
+    return a.localeCompare(b);
+};
+
+interface DataGridProps {
+    taxa: Taxon[];
+    ancestors?: Taxon[]; // REMOTE ancestors fetched via Stage 2 Hydration
+    onAction?: (action: 'mine' | 'enrich', taxon: Taxon) => void;
+    onUpdate?: (id: string, updates: Partial<Taxon>) => void;
+    preferences: UserPreferences;
+    onPreferenceChange?: (prefs: UserPreferences) => void;
+    totalRecords: number;
+    isLoadingMore: boolean;
+    onLoadMore: () => void;
+    sortConfig: { key: string, direction: 'asc' | 'desc' };
+    onSortChange: (key: string, direction: string) => void;
+    filters: Record<string, any>;
+    onFilterChange: (key: string, value: any) => void;
+    error?: string | null;
+}
+
 const DataGrid: React.FC<DataGridProps> = ({ 
-    taxa, onAction, onUpdate, preferences, onPreferenceChange,
+    taxa, ancestors = [], onAction, onUpdate, preferences, onPreferenceChange,
     totalRecords, isLoadingMore, onLoadMore, 
     sortConfig, onSortChange,
     filters, onFilterChange,
@@ -244,18 +255,18 @@ const DataGrid: React.FC<DataGridProps> = ({
   };
 
   const [visibleColumns, setVisibleColumns] = useState<Set<string>>(() => {
-      const saved = loadState<string[]>('grid_visible_cols_rev12', []);
+      const saved = loadState<string[]>('grid_visible_cols_rev13', []);
       if (saved.length > 0) return new Set(saved);
       return new Set(ALL_COLUMNS.filter(c => c.defaultOn).map(c => c.id));
   });
   
   const [columnOrder, setColumnOrder] = useState<string[]>(() => {
-      const saved = loadState<string[]>('grid_col_order_rev12', []);
+      const saved = loadState<string[]>('grid_col_order_rev13', []);
       if (saved.length > 0) return saved;
       return ALL_COLUMNS.map(c => c.id);
   });
   
-  const [colWidths, setColWidths] = useState<Record<string, number>>(() => loadState('grid_col_widths_rev12', Object.fromEntries(ALL_COLUMNS.map(c => [c.id, c.defaultWidth]))));
+  const [colWidths, setColWidths] = useState<Record<string, number>>(() => loadState('grid_col_widths_rev13', Object.fromEntries(ALL_COLUMNS.map(c => [c.id, c.defaultWidth]))));
   const [isHierarchyMode, setIsHierarchyMode] = useState<boolean>(true);
   const [groupBy, setGroupBy] = useState<string[]>([]);
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
@@ -291,9 +302,9 @@ const DataGrid: React.FC<DataGridProps> = ({
       }
   }, [isHierarchyMode, visibleColumns]);
 
-  useEffect(() => localStorage.setItem('grid_visible_cols_rev12', JSON.stringify(Array.from(visibleColumns))), [visibleColumns]);
-  useEffect(() => localStorage.setItem('grid_col_order_rev12', JSON.stringify(columnOrder)), [columnOrder]);
-  useEffect(() => localStorage.setItem('grid_col_widths_rev12', JSON.stringify(colWidths)), [colWidths]);
+  useEffect(() => localStorage.setItem('grid_visible_cols_rev13', JSON.stringify(Array.from(visibleColumns))), [visibleColumns]);
+  useEffect(() => localStorage.setItem('grid_col_order_rev13', JSON.stringify(columnOrder)), [columnOrder]);
+  useEffect(() => localStorage.setItem('grid_col_widths_rev13', JSON.stringify(colWidths)), [colWidths]);
 
   useEffect(() => {
       const handleClickOutside = (event: MouseEvent) => {
@@ -309,6 +320,9 @@ const DataGrid: React.FC<DataGridProps> = ({
   const totalTableWidth = useMemo(() => activeColumns.reduce((sum, col) => sum + (colWidths[col.id] || col.defaultWidth), 0), [activeColumns, colWidths]);
   const activeColorMap = useMemo(() => THEMES[preferences.color_theme] || THEMES['option1a'], [preferences.color_theme]);
 
+  // Combined pool for promotion
+  const allTaxaPool = useMemo(() => [...taxa, ...ancestors], [taxa, ancestors]);
+
   const getRowValue = (row: Taxon, colId: string) => {
        const tr = row as TreeRow;
        if (colId === 'descendant_count') { return tr.is_tree_header ? (tr as any).child_count : (tr.descendant_count || 0); }
@@ -316,6 +330,8 @@ const DataGrid: React.FC<DataGridProps> = ({
        const rank = (row.taxon_rank || '').toLowerCase();
        if (rank === 'family' && colId === 'genus') return '';
        
+       if (tr.is_holder && COL_RANK_LEVELS[colId] === RANK_LEVELS[rank]) return '(none)';
+
        return row[colId as keyof Taxon];
   };
 
@@ -335,18 +351,24 @@ const DataGrid: React.FC<DataGridProps> = ({
       if (groupBy.length === 0) return taxa as TreeRow[];
       
       const outputRows: TreeRow[] = [];
-      const bucketKey = (row: Taxon, depth: number) => {
-          const val = String(getRowValue(row, groupBy[depth]) || '');
-          // Normalize hybrid symbols for grouping to prevent duplicate virtual-roots
-          return val.replace(/^[×x]\s?/i, '').trim();
-      };
       
-      const findHeaderTaxon = (candidates: Taxon[], field: string, value: string): Taxon | undefined => {
-          return candidates.find(t => {
+      const bucketKey = (row: Taxon, depth: number) => {
+          const field = groupBy[depth];
+          const val = String(row[field as keyof Taxon] || '').replace(/^[×x]\s?/i, '').trim();
+          return val || '(none)';
+      };
+
+      /**
+       * findHeaderTaxon: Now scans the ENTIRE hydrated pool (Stage 2 remote promotion).
+       */
+      const findHeaderTaxon = (field: string, value: string): Taxon | undefined => {
+          if (value === '(none)') return undefined;
+          return allTaxaPool.find(t => {
              const rowVal = String(getRowValue(t, field)).replace(/^[×x]\s?/i, '').trim();
              const valMatches = rowVal === value;
              if (!valMatches) return false;
              const rank = (t.taxon_rank as string || '').toLowerCase();
+             
              if (field === 'family') return rank === 'family';
              if (field === 'genus') return rank === 'genus';
              if (field === 'species') return rank === 'species';
@@ -355,8 +377,8 @@ const DataGrid: React.FC<DataGridProps> = ({
           });
       };
 
-      const processLevel = (subset: Taxon[], depth: number, parentPath: string) => {
-          if (!subset) return;
+      const processLevel = (subset: Taxon[], depth: number, parentPath: string, parentRecord?: Taxon) => {
+          if (!subset || subset.length === 0) return;
           if (depth >= groupBy.length) {
               subset.forEach(t => outputRows.push({ ...t, depth, tree_path: `${parentPath}/${t.id}` }));
               return;
@@ -369,40 +391,44 @@ const DataGrid: React.FC<DataGridProps> = ({
               groups[val].push(row); 
           });
 
-          Object.keys(groups).sort().forEach(key => {
+          Object.keys(groups).sort(genericFirstSort).forEach(key => {
               const groupItems = groups[key];
               const path = `${parentPath}/${key}`;
-              if (key === '' || key === 'undefined' || key === 'null') { processLevel(groupItems, depth + 1, parentPath); return; }
-              const headerTaxon = findHeaderTaxon(groupItems, field, key);
+              
+              // Promoting ancestors from combined pool
+              const headerTaxon = findHeaderTaxon(field, key);
               const itemsWithoutHeader = headerTaxon ? groupItems.filter(i => i.id !== headerTaxon.id) : groupItems;
               const firstChild = groupItems[0];
+              
               const headerRow: TreeRow = headerTaxon ? { ...headerTaxon } : {
-                  id: `virtual-${path}`,
+                  id: `virtual:none:${parentRecord?.id || 'root'}:${field}`,
                   is_virtual: true,
-                  taxon_rank: field.charAt(0).toUpperCase() + field.slice(1) as any, 
+                  is_holder: key === '(none)',
+                  taxon_rank: (field === 'infraspecies' ? 'Infraspecies' : field.charAt(0).toUpperCase() + field.slice(1)) as any, 
                   name: key,
                   taxon_name: key, 
                   taxon_status: 'Accepted',
-                  family: firstChild?.family,
-                  genus: firstChild?.genus,
-                  genus_hybrid: firstChild?.genus_hybrid,
-                  species: firstChild?.species,
-                  species_hybrid: firstChild?.species_hybrid,
+                  family: parentRecord?.family || firstChild?.family,
+                  genus: parentRecord?.genus || firstChild?.genus,
+                  genus_hybrid: parentRecord?.genus_hybrid || firstChild?.genus_hybrid,
+                  species: parentRecord?.species || firstChild?.species,
+                  species_hybrid: parentRecord?.species_hybrid || firstChild?.species_hybrid,
+                  infraspecies: key === '(none)' && field === 'infraspecies' ? undefined : firstChild?.infraspecies,
                   alternative_names: [], reference_links: [], created_at: 0
               } as any;
+              
               headerRow.is_tree_header = true;
               headerRow.tree_expanded = !collapsedGroups.has(path);
-              (headerRow as any).child_count = headerTaxon ? headerTaxon.descendant_count : groupItems.length;
+              (headerRow as any).child_count = headerTaxon ? (headerTaxon.descendant_count || 0) : groupItems.length;
               headerRow.depth = depth;
               headerRow.tree_path = path;
               outputRows.push(headerRow);
-              if (headerRow.tree_expanded) processLevel(itemsWithoutHeader, depth + 1, path);
+              if (headerRow.tree_expanded) processLevel(itemsWithoutHeader, depth + 1, path, headerRow);
           });
       };
-      const rootPath = 'root';
-      processLevel(taxa, 0, rootPath);
+      processLevel(taxa, 0, 'root');
       return outputRows;
-  }, [taxa, groupBy, collapsedGroups]);
+  }, [taxa, ancestors, groupBy, collapsedGroups, allTaxaPool]);
 
   const toggleGroup = (path: string) => {
       const next = new Set(collapsedGroups);
@@ -419,15 +445,14 @@ const DataGrid: React.FC<DataGridProps> = ({
           const field = groupBy[depth];
           const groups: Record<string, Taxon[]> = {};
           subset.forEach(row => {
-              const val = String(getRowValue(row, field) || '').replace(/^[×x]\s?/i, '').trim();
-              if (val === '' || val === 'undefined' || val === 'null') return;
+              const val = String(getRowValue(row, field) || '').replace(/^[×x]\s?/i, '').trim() || '(none)';
               if (!groups[val]) groups[val] = [];
               groups[val].push(row);
           });
           Object.keys(groups).forEach(key => {
               const path = `${parentPath}/${key}`;
               allPathsWithDepths.push({ path, depth });
-              if (depth < groupBy.length) walk(groups[key], depth + 1, path);
+              walk(groups[key], depth + 1, path);
           });
       };
       walk(taxa, 0, 'root');
@@ -435,9 +460,28 @@ const DataGrid: React.FC<DataGridProps> = ({
       setCollapsedGroups(newCollapsed);
   };
 
-  const handleResizeStart = (e: React.MouseEvent, colId: string) => { e.preventDefault(); e.stopPropagation(); resizingRef.current = { colId, startX: e.clientX, startWidth: colWidths[colId] || 100 }; document.addEventListener('mousemove', handleResizeMove); document.addEventListener('mouseup', handleResizeEnd); document.body.style.cursor = 'col-resize'; };
-  const handleResizeMove = useCallback((e: MouseEvent) => { if (!resizingRef.current) return; const { colId, startWidth } = resizingRef.current; const diff = e.clientX - resizingRef.current.startX; setColWidths(prev => ({ ...prev, [colId]: Math.max(30, startWidth + diff) })); }, []);
-  const handleResizeEnd = useCallback(() => { resizingRef.current = null; document.removeEventListener('mousemove', handleResizeMove); document.removeEventListener('mouseup', handleResizeEnd); document.body.style.cursor = ''; }, [handleResizeMove]);
+  const handleResizeMove = useCallback((e: MouseEvent) => { 
+    if (!resizingRef.current) return; 
+    const { colId, startWidth } = resizingRef.current; 
+    const diff = e.clientX - resizingRef.current.startX; 
+    setColWidths(prev => ({ ...prev, [colId]: Math.max(30, startWidth + diff) })); 
+  }, []);
+
+  const handleResizeEnd = useCallback(() => { 
+    resizingRef.current = null; 
+    document.removeEventListener('mousemove', handleResizeMove); 
+    document.removeEventListener('mouseup', handleResizeEnd); 
+    document.body.style.cursor = ''; 
+  }, [handleResizeMove]);
+
+  const handleResizeStart = (e: React.MouseEvent, colId: string) => { 
+    e.preventDefault(); 
+    e.stopPropagation(); 
+    resizingRef.current = { colId, startX: e.clientX, startWidth: colWidths[colId] || 100 }; 
+    document.addEventListener('mousemove', handleResizeMove); 
+    document.addEventListener('mouseup', handleResizeEnd); 
+    document.body.style.cursor = 'col-resize'; 
+  };
   
   const autoFitContent = () => {
       const canvas = document.createElement('canvas'); const context = canvas.getContext('2d'); if (!context) return; context.font = '14px Inter, sans-serif';
@@ -488,7 +532,7 @@ const DataGrid: React.FC<DataGridProps> = ({
              {error && (<div className="flex items-center gap-1.5 px-3 py-1 bg-red-50 text-red-600 rounded-full border border-red-100 animate-in fade-in duration-300 max-w-[300px] truncate" title={error}><AlertCircle size={14} className="flex-shrink-0" /><span className="font-bold truncate">{error}</span></div>)}
              {isHierarchyMode && (
                  <div className="flex items-center gap-1 bg-white border border-slate-200 rounded p-0.5 ml-2 shadow-sm">
-                     {groupBy.map((level, idx) => (<button key={level} onClick={() => expandTreeLevel(idx)} className="px-2 py-0.5 text-[10px] font-bold text-slate-600 hover:bg-slate-100 rounded" title={`Collapse all at Level ${idx + 1}`}>{idx + 1}</button>))}
+                     {[1, 2, 3, 4].map((idx) => (<button key={idx} onClick={() => expandTreeLevel(idx-1)} className="px-2 py-0.5 text-[10px] font-bold text-slate-600 hover:bg-slate-100 rounded" title={`Collapse all at Level ${idx}`}>{idx}</button>))}
                      <div className="w-px h-3 bg-slate-200 mx-1"></div>
                      <button onClick={toggleAllGroups} className="px-2 py-0.5 text-[10px] font-bold text-leaf-600 hover:bg-leaf-50 rounded">{isAnyGroupCollapsed ? 'Expand All' : 'Collapse All'}</button>
                  </div>
@@ -586,25 +630,55 @@ const DataGrid: React.FC<DataGridProps> = ({
            <tbody className="divide-y divide-slate-100">
               {gridRows.map(row => {
                   const tr = row as TreeRow; const isExpanded = expandedRows.has(tr.id); const rankKey = String(tr.taxon_rank).toLowerCase(); const baseColor = activeColorMap[rankKey] || 'slate'; const isHybrid = tr.genus_hybrid === '×' || tr.genus_hybrid === 'x' || tr.species_hybrid === '×' || tr.species_hybrid === 'x';
+                  const rowLevel = RANK_LEVELS[rankKey] || 99;
                   return (
                      <React.Fragment key={tr.id}>
-                        <tr className={`hover:bg-blue-50/50 transition-colors ${isExpanded ? 'bg-blue-50/50' : (baseColor === 'slate' ? (isHybrid ? 'bg-slate-50 saturate-50' : '') : `bg-${baseColor}-50 ${isHybrid ? 'saturate-50' : ''}`)} ${tr.is_tree_header ? 'cursor-pointer group/header border-b-2 border-slate-200' : ''}`} onClick={tr.is_tree_header ? () => toggleGroup(tr.tree_path || '') : undefined}>
+                        <tr className={`hover:bg-blue-50/50 transition-colors ${isExpanded ? 'bg-blue-50/50' : (baseColor === 'slate' ? (isHybrid ? 'bg-slate-50 saturate-50' : '') : `bg-${baseColor}-50 ${isHybrid ? 'saturate-50' : ''}`)} ${tr.is_tree_header ? 'cursor-pointer group/header border-b-2 border-slate-200 font-medium' : ''}`} onClick={tr.is_tree_header ? () => toggleGroup(tr.tree_path || '') : undefined}>
                            {activeColumns.map(col => {
+                               const colLevel = COL_RANK_LEVELS[col.id];
+                               const val = getRowValue(tr, col.id);
+                               
                                if (col.id === 'tree_control') return <td key={col.id} className={`p-2 border-r border-slate-200 ${tr.is_tree_header ? '' : 'border-slate-50'}`} style={{ paddingLeft: `${(tr.depth || 0) * 20}px` }}>{tr.is_tree_header && <span className={`transform transition-transform inline-block ${tr.tree_expanded ? 'rotate-90' : ''}`}><ChevronRightIcon size={14} /></span>}</td>;
                                if (col.id === 'descendant_count') return <td key={col.id} className="p-2 border-r border-slate-200 text-xs text-center text-slate-400 font-mono">{tr.is_tree_header ? (tr as any).child_count : (tr.descendant_count || '')}</td>;
-                               const val = getRowValue(tr, col.id); 
+                               if (col.id === 'actions') return <td key={col.id} className="p-2 border-r border-slate-200 text-center"><div className="flex items-center justify-center gap-1"><button onClick={(e) => { e.stopPropagation(); setExpandedRows(prev => { const n = new Set(prev); n.has(tr.id) ? n.delete(tr.id) : n.add(tr.id); return n; }); }} className={`p-1.5 rounded shadow-sm ${isExpanded ? 'bg-slate-800 text-white' : 'bg-white border border-slate-200 text-slate-500 hover:text-slate-800'}`}>{isExpanded ? <ChevronUpIcon size={14}/> : <ChevronDownIcon size={14}/>}</button>{['genus', 'species', 'subspecies', 'variety', 'form'].includes(rankKey) && <button onClick={(e) => { e.stopPropagation(); onAction?.('enrich', tr); }} title="Analyze & Find Details" className="p-1.5 bg-indigo-50 border border-indigo-200 rounded text-indigo-600 hover:bg-indigo-100 shadow-sm"><PickaxeIcon size={14} /></button>}<button onClick={(e) => { e.stopPropagation(); onAction?.('enrich', tr); }} title="Enrich Data Layer" className="p-1.5 bg-amber-50 border border-amber-200 rounded text-amber-600 hover:bg-amber-100 shadow-sm"><Wand2Icon size={14} /></button></div></td>;
+
                                let displayVal: React.ReactNode = '';
                                if (typeof val === 'string' || typeof val === 'number') { displayVal = val; } else if (typeof val === 'boolean') { displayVal = val ? 'Yes' : 'No'; }
                                if ((col.id === 'genus_hybrid' || col.id === 'species_hybrid') && (val === 'x' || val === 'X' || val === '×')) displayVal = '×';
-                               let isBold = false; const r = rankKey; const coreCols = ['genus', 'species', 'cultivar', 'infraspecies', 'infraspecific_rank', 'taxon_name', 'genus_hybrid', 'species_hybrid'];
-                               if (coreCols.includes(col.id)) { if (r === col.id) isBold = true; if ((col.id === 'infraspecies' || col.id === 'infraspecific_rank') && ['variety','subspecies','form'].includes(r)) isBold = true; if (col.id === 'taxon_name') isBold = true; if (col.id === 'genus_hybrid' && r === 'genus') isBold = true; if (col.id === 'species_hybrid' && r === 'species') isBold = true; }
-                               let isDimmed = false; let rowRankLevel = RANK_HIERARCHY[r] || 99; if (['subspecies', 'variety', 'form'].includes(r)) rowRankLevel = 5;
-                               if (COLUMN_RANK_MAP[col.id] && COLUMN_RANK_MAP[col.id] < rowRankLevel) isDimmed = true;
+
+                               // Visual Weight Matrix Implementation
+                               let isBold = false;
+                               let isDimmed = false;
+                               let placeholderStyle = "";
+
+                               if (colLevel) {
+                                  if (colLevel === rowLevel) {
+                                     isBold = true;
+                                     if (val === '(none)') placeholderStyle = "italic font-normal text-slate-400 opacity-60";
+                                  } else if (colLevel < rowLevel) {
+                                     isDimmed = true;
+                                     if (val === '(none)' || !val) {
+                                        displayVal = '(none)';
+                                        placeholderStyle = "font-normal text-slate-300 opacity-40";
+                                     }
+                                  }
+                               }
+
                                if (col.id === 'taxon_rank') displayVal = <span className={`px-2 py-0.5 text-[10px] rounded border font-bold bg-${baseColor}-100 ${getTextClass(baseColor)} border-${baseColor}-200 normal-case`}>{displayVal}</span>;
-                               else if (col.id === 'taxon_name') displayVal = formatFullScientificName(tr, preferences);
+                               else if (col.id === 'taxon_name') displayVal = tr.is_holder ? <span className="italic opacity-60">(none)</span> : formatFullScientificName(tr, preferences);
                                else if (col.id === 'taxon_status') { let b = 'bg-slate-100 text-slate-500'; if (val === 'Accepted' || val === 'Registered' || val === 'Artificial Hybrid') b = 'bg-green-50 text-green-700 border-green-200 border'; displayVal = <span className={`px-2 py-0.5 text-[10px] rounded font-bold ${b} normal-case`}>{displayVal || '-'}</span>; }
-                               else if (col.id === 'actions') displayVal = <div className="flex items-center justify-center gap-1"><button onClick={(e) => { e.stopPropagation(); setExpandedRows(prev => { const n = new Set(prev); n.has(tr.id) ? n.delete(tr.id) : n.add(tr.id); return n; }); }} className={`p-1.5 rounded shadow-sm ${isExpanded ? 'bg-slate-800 text-white' : 'bg-white border border-slate-200 text-slate-500 hover:text-slate-800'}`}>{isExpanded ? <ChevronUpIcon size={14}/> : <ChevronDownIcon size={14}/>}</button>{['genus', 'species', 'subspecies', 'variety', 'form'].includes(r) && <button onClick={(e) => { e.stopPropagation(); onAction?.('enrich', tr); }} title="Analyze & Find Details" className="p-1.5 bg-indigo-50 border border-indigo-200 rounded text-indigo-600 hover:bg-indigo-100 shadow-sm"><PickaxeIcon size={14} /></button>}<button onClick={(e) => { e.stopPropagation(); onAction?.('enrich', tr); }} title="Enrich Data Layer" className="p-1.5 bg-amber-50 border border-amber-200 rounded text-amber-600 hover:bg-amber-100 shadow-sm"><Wand2Icon size={14} /></button></div>;
-                               return <td key={col.id} className={`p-2 border-r border-slate-50 truncate overflow-hidden max-w-0 ${col.headerAlign === 'center' ? 'text-center' : ''}`} title={String(val || '')}><span className={`${isBold ? "font-bold" : ""} ${isDimmed ? "font-normal" : ""} ${isBold ? (baseColor === 'slate' ? "text-slate-900" : `text-${baseColor}-900`) : (isDimmed ? "text-slate-400" : "")}`}>{displayVal}</span></td>;
+
+                               const baseTextClass = isBold 
+                                 ? (baseColor === 'slate' ? "font-bold text-slate-900" : `font-bold text-${baseColor}-900`)
+                                 : (isDimmed ? "font-normal text-slate-400" : "text-slate-600");
+
+                               return (
+                                 <td key={col.id} className={`p-2 border-r border-slate-50 truncate overflow-hidden max-w-0 ${col.headerAlign === 'center' ? 'text-center' : ''}`} title={String(val || '')}>
+                                   <span className={`${placeholderStyle || baseTextClass}`}>
+                                     {displayVal}
+                                   </span>
+                                 </td>
+                               );
                            })}
                         </tr>
                         {isExpanded && !tr.is_virtual && (<tr><td colSpan={activeColumns.length} className="bg-slate-50/50 p-0 border-b border-slate-200 shadow-inner"><div className="p-4 border-l-4 border-slate-500 bg-white m-2 rounded-r-lg shadow-sm"><DetailsPanel taxon={tr} onUpdate={(updates) => onUpdate?.(tr.id, updates)} /></div></td></tr>)}

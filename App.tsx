@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Loader2, Leaf, Activity, Settings, Plus } from 'lucide-react';
 import { Taxon, LoadingState, UserPreferences, ActivityItem, ActivityStatus } from './types';
@@ -19,11 +18,13 @@ export default function App() {
   const [showActivityPanel, setShowActivityPanel] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
   const [taxa, setTaxa] = useState<Taxon[]>([]);
+  const [ancestors, setAncestors] = useState<Taxon[]>([]); // Cache for remote ancestors
   const [offset, setOffset] = useState(0);
   const [hasMore, setHasMore] = useState(true);
   const [totalRecords, setTotalRecords] = useState(0);
   const [isFetchingMore, setIsFetchingMore] = useState(false);
   const isFetchingRef = useRef(false);
+  const isHydratingRef = useRef(false);
   const [sortConfig, setSortConfig] = useState<{ key: string, direction: 'asc' | 'desc' }>({ key: 'taxon_name', direction: 'asc' });
   const [gridFilters, setGridFilters] = useState<Record<string, any>>({ taxon_status: ['Accepted'] });
   const [isOffline, setIsOffline] = useState(getIsOffline());
@@ -59,8 +60,12 @@ export default function App() {
       try {
           isFetchingRef.current = true;
           setErrorDetails(null);
-          if (isNewSearch) setLoadingState(LoadingState.LOADING);
-          else setIsFetchingMore(true);
+          if (isNewSearch) {
+              setLoadingState(LoadingState.LOADING);
+              setAncestors([]); // Clear ancestor cache on new search
+          } else {
+              setIsFetchingMore(true);
+          }
           
           const limit = 100;
           const { data, count } = await dataService.getTaxa({ 
@@ -93,6 +98,44 @@ export default function App() {
       } finally { isFetchingRef.current = false; }
   };
 
+  /**
+   * Stage 2: Recursive Ancestor Hydration
+   * Finds parent_ids that aren't in the current dataset and fetches them.
+   */
+  useEffect(() => {
+      if (getIsOffline() || taxa.length === 0 || isHydratingRef.current) return;
+
+      const existingIds = new Set([...taxa.map(t => t.id), ...ancestors.map(t => t.id)]);
+      const missingParentIds = new Set<string>();
+
+      // Check primary taxa
+      taxa.forEach(t => {
+          if (t.parent_id && !existingIds.has(t.parent_id)) missingParentIds.add(t.parent_id);
+      });
+      // Check existing ancestors for deeper lineage
+      ancestors.forEach(t => {
+          if (t.parent_id && !existingIds.has(t.parent_id)) missingParentIds.add(t.parent_id);
+      });
+
+      if (missingParentIds.size > 0) {
+          const hydrate = async () => {
+              isHydratingRef.current = true;
+              const newAncestors: Taxon[] = [];
+              for (const id of Array.from(missingParentIds)) {
+                  try {
+                      const parent = await dataService.getTaxonById(id);
+                      if (parent) newAncestors.push(parent);
+                  } catch (e) { console.error("Hydration error", id, e); }
+              }
+              if (newAncestors.length > 0) {
+                  setAncestors(prev => [...prev, ...newAncestors]);
+              }
+              isHydratingRef.current = false;
+          };
+          hydrate();
+      }
+  }, [taxa, ancestors]);
+
   useEffect(() => { 
     setOffset(0); 
     fetchBatch(0, true); 
@@ -106,6 +149,7 @@ export default function App() {
       try {
           await dataService.updateTaxon(id, updates);
           setTaxa(prev => prev.map(t => t.id === id ? { ...t, ...updates } : t));
+          setAncestors(prev => prev.map(t => t.id === id ? { ...t, ...updates } : t));
       } catch (e: any) {
           alert(`Failed to update: ${e.message}`);
       }
@@ -165,7 +209,22 @@ export default function App() {
         ) : isHardError || isActuallyEmpty ? (
           <EmptyState isOffline={isOffline} loadingState={loadingState} errorDetails={errorDetails} onOpenSettings={() => setShowSettingsModal(true)} onRetry={() => fetchBatch(0, true)} />
         ) : (
-          <DataGrid taxa={taxa} preferences={preferences} onPreferenceChange={setPreferences} onUpdate={handleTaxonUpdate} onAction={handleAction} totalRecords={totalRecords} isLoadingMore={isFetchingMore || loadingState === LoadingState.LOADING} onLoadMore={handleLoadMore} sortConfig={sortConfig} onSortChange={(key, direction) => setSortConfig({ key, direction: direction as 'asc' | 'desc' })} filters={gridFilters} onFilterChange={handleFilterChange} error={loadingState === LoadingState.ERROR ? errorDetails : null} />
+          <DataGrid 
+            taxa={taxa} 
+            ancestors={ancestors} // Pass ancestors for promotion
+            preferences={preferences} 
+            onPreferenceChange={setPreferences} 
+            onUpdate={handleTaxonUpdate} 
+            onAction={handleAction} 
+            totalRecords={totalRecords} 
+            isLoadingMore={isFetchingMore || loadingState === LoadingState.LOADING} 
+            onLoadMore={handleLoadMore} 
+            sortConfig={sortConfig} 
+            onSortChange={(key, direction) => setSortConfig({ key, direction: direction as 'asc' | 'desc' })} 
+            filters={gridFilters} 
+            onFilterChange={handleFilterChange} 
+            error={loadingState === LoadingState.ERROR ? errorDetails : null} 
+          />
         )}
       </main>
 

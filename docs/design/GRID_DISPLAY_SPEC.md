@@ -27,10 +27,12 @@ For "Holder Rows" (where a level is skipped, e.g., a Generic Cultivar), the iden
 When filtering results in a child (e.g., Cultivar), the parent records might not be loaded or might not exist in the database as "standalone" records.
 
 ### Logic:
-1. **The "Replace Virtuals" Rule:** If a virtual header is created for a Genus or Species, and a real record for that Genus/Species exists in the current `taxa` array, the Virtual row is replaced by the Real row.
+1. **The "Replace Virtuals" Rule:**
+    - **Stage 1 (Local Pool):** If a virtual header is created, the engine first scans all loaded results. If a match is found, the virtual is replaced.
+    - **Stage 2 (Remote Hydration):** If a parent is missing from the local pool, the application must identify the `parent_id` and perform a **Hydration Fetch**. Once the parent record is retrieved, it is added to the "Ancestor Cache" and promoted to the grid header.
 2. **Gap-Filling Integrity:** For every branch that leads to a Cultivar, the engine ensures a row exists for every rank in the chain. 
     *   *Example:* Genus → `(none)` (Species Virtual Root) → `(none)` (Infraspecies Virtual Root) → 'Cultivar Name'.
-3. **Deterministic IDs:** Virtual rows use a structured Internal ID: `virtual:none:[parent-uuid]`.
+3. **Deterministic IDs:** Virtual rows use a structured Internal ID: `virtual:none:[parent-uuid]:[field]`.
 
 ---
 
