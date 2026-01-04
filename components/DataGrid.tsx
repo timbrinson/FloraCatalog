@@ -324,7 +324,7 @@ const DataGrid: React.FC<DataGridProps> = ({
 
   /**
    * AUTHORITY REGISTRY PASS (ADR-006)
-   * Builds the allTaxaPool and a secondary Map for label resolution.
+   * Builds a Map for deterministically resolving labels from ID buckets.
    */
   const { allTaxaPool, authorityRegistry } = useMemo(() => {
     const registry = new Map<string, TreeRow>();
@@ -334,26 +334,8 @@ const DataGrid: React.FC<DataGridProps> = ({
     taxa.forEach(t => registry.set(t.id, { ...t, origin_type: 'result' }));
     
     const pool = Array.from(registry.values());
-
-    // Pass 2: Recursive Authority Healing (Legacy Support)
-    pool.forEach(row => {
-        if (row.parent_id && registry.has(row.parent_id)) {
-            const parent = registry.get(row.parent_id)!;
-            if (!parent.family && row.family) parent.family = row.family;
-            if (!parent.genus && row.genus && (parent.taxon_rank || '').toLowerCase() === 'genus') parent.genus = row.genus;
-        }
-    });
-
-    const healLineage = (row: TreeRow) => {
-        if (!row.parent_id || !registry.has(row.parent_id)) return;
-        const parent = registry.get(row.parent_id)!;
-        if (parent.family) row.family = parent.family;
-        if (parent.genus && (row.taxon_rank || '').toLowerCase() !== 'genus') row.genus = parent.genus;
-        if (parent.species && !['genus', 'species'].includes((row.taxon_rank || '').toLowerCase())) row.species = parent.species;
-    };
-
-    pool.sort((a, b) => (RANK_LEVELS[String(a.taxon_rank).toLowerCase()] || 99) - (RANK_LEVELS[String(b.taxon_rank).toLowerCase()] || 99))
-        .forEach(healLineage);
+    // NOTE: Object-level mutation healing loop removed in v2.27.2 
+    // because walkLineage logic now handles inheritance dynamically.
 
     return { allTaxaPool: pool, authorityRegistry: registry };
   }, [taxa, ancestors]);

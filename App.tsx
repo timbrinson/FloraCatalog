@@ -21,7 +21,8 @@ export default function App() {
   // Data State
   const [taxa, setTaxa] = useState<Taxon[]>([]);
   const [ancestors, setAncestors] = useState<Taxon[]>([]);
-  const [offset, setOffset] = useState(0);
+  // Fix: Corrected malformed useState hook syntax for offset
+  const [offset, setOffset] = useState<number>(0);
   const [hasMore, setHasMore] = useState(true);
   const [totalRecords, setTotalRecords] = useState(0);
   const [isFetchingMore, setIsFetchingMore] = useState(false);
@@ -43,7 +44,7 @@ export default function App() {
       color_theme: 'option2a',
       search_mode: 'prefix',
       debug_mode: false,
-      grouping_strategy: 'attribute'
+      grouping_strategy: 'path'
   });
   const [activities, setActivities] = useState<ActivityItem[]>([]);
   const cancelledActivityIds = useRef<Set<string>>(new Set());

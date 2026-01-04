@@ -32,18 +32,19 @@ When filtering results in a child (e.g., Cultivar), the parent records might not
     - **Stage 2 (Remote Hydration):** If a parent is missing from the local pool, the application must identify the `parent_id` and perform a **Hydration Fetch**. Once the parent record is retrieved, it is added to the "Ancestor Cache" and promoted to the grid header.
 2. **Gap-Filling Integrity:** For every branch that leads to a Cultivar, the engine ensures a row exists for every rank in the chain. 
     *   *Example:* Genus → `(none)` (Species Virtual Root) → `(none)` (Infraspecies Virtual Root) → 'Cultivar Name'.
-3. **Deterministic IDs:** Virtual rows use a structured Internal ID: `virtual:none:[parent-uuid]:[field]`.
+3. **Deterministic IDs:** Virtual rows use a structured Internal ID: `virtual:[bucketId]:[parentId]`.
 
 ---
 
 ## 3. Sorting & Grouping Logic (ADR-006 Update)
 
 ### Authority-Based Bucketing:
-To prevent duplicate hierarchy headers caused by inconsistent metadata (e.g., a child missing its family name), the grid groups rows based on **ID Lineage** rather than string attributes.
-1. **The Authority Registry:** During the tree-walk, the engine identifies the record with the most complete data for each ID in the `hierarchy_path`. This is the "Authority."
-2. **Lineage Walk:** The grid buckets rows by the first N segments of their `hierarchy_path`. 
-    *   *Example:* All rows whose path begins with `root.id_family_1` are forced into the same top-level bucket.
-3. **Label Resolution:** When rendering a bucket header, the name is resolved by looking up the bucket's ID in the Authority Registry. If the record for the Genus has the name "Agapanthus" but a child record has `genus: null`, both rows will still correctly group under the "Agapanthus" authority header.
+To prevent duplicate hierarchy headers caused by inconsistent metadata, the grid groups rows based on **Literal-ID Hybrid** bucketing:
+
+1. **The Authority Registry:** During the tree-walk, the engine builds a map of every unique ID in the pool to its most complete metadata record.
+2. **Family Bucketing (Literal):** Rows are grouped by their `family` string literal. If a record has a null family, it recursively climbs its `parent_id` chain to inherit the family name from its physical ancestor in the registry.
+3. **Genus & Below Bucketing (ID):** Rows are grouped by the UUID segments in their `hierarchy_path`. All rows sharing Ancestor ID `X` at a specific level are forced into Bucket `X`.
+4. **Label Resolution:** When rendering a bucket header, the name is resolved by looking up the bucket's identity (string or UUID) in the Authority Registry.
 
 ### The "Generic First" Rule:
 Sorting within any group prioritizes the Virtual Root (the "Generic" entries) before alphabetical listings.
