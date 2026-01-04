@@ -16,7 +16,7 @@ import {
 } from 'lucide-react';
 
 
-// Implementation of Grid Display Spec v2.27.3
+// Implementation of Grid Display Spec v2.27.1
 const RANK_LEVELS: Record<string, number> = {
     'family': 1,
     'genus': 2,
@@ -134,7 +134,7 @@ const COLUMN_GROUPS: ColumnGroup[] = [
                 filterOptions: ['Accepted', 'Synonym', 'Unplaced', 'Registered', 'Provisional', 'Artificial Hybrid', 'Illegitimate', 'Invalid', 'Local Biotype', 'Misapplied', 'Orthographic', 'Provisionally Accepted', 'External to WCVP'], 
                 defaultOn: false 
             },
-            { id: 'family', label: 'Family', tooltip: 'Family', defaultWidth: 120, filterType: 'text', defaultOn: true },
+            { id: 'family', label: 'Family', tooltip: 'Family', defaultWidth: 120, filterType: 'text', defaultOn: false },
             { id: 'hybrid_formula', label: 'Hybrid Formula', tooltip: 'Hybrid Formula', defaultWidth: 180, filterType: 'text', defaultOn: false },
         ]
     },
@@ -386,8 +386,8 @@ const DataGrid: React.FC<DataGridProps> = ({
   };
 
   /**
-   * walkLineage (v2.27.3 Refinement)
-   * Fixed family bucketing and label resolution using standard rank positional fallbacks.
+   * walkLineage (v2.27.2 Refinement)
+   * Implements "Climbing Rank discovery" to handle new records without hierarchy_paths.
    */
   const walkLineage = (subset: Taxon[], depth: number, parentPath: string, parentRecord?: Taxon): TreeRow[] => {
       const outputRows: TreeRow[] = [];
@@ -401,6 +401,7 @@ const DataGrid: React.FC<DataGridProps> = ({
           return outputRows;
       }
 
+      // Rank Matching Helper
       const isRankMatch = (rank: string, target: string) => {
           const r = rank.toLowerCase();
           const t = target.toLowerCase();
@@ -408,38 +409,35 @@ const DataGrid: React.FC<DataGridProps> = ({
           return r === t;
       };
 
+      // Rank Segment Resolver: Deterministically finds the ID for a specific level
       const getTargetIdForRank = (row: Taxon, targetRank: string): string => {
-          const t = targetRank.toLowerCase();
+          // 1. Path segment lookup (Authoritative)
           if (row.hierarchy_path) {
               const segments = row.hierarchy_path.split('.');
-              // POSITIONAL FALLBACK for Standard Ranks
-              if (t === 'family' && segments[1]) return segments[1].replace(/_/g, '-');
-              if (t === 'genus' && segments[2]) return segments[2].replace(/_/g, '-');
-              if (t === 'species' && segments[3]) return segments[3].replace(/_/g, '-');
-              
               for (let i = 1; i < segments.length; i++) {
                   const id = segments[i].replace(/_/g, '-');
                   const auth = authorityRegistry.get(id);
                   if (auth && isRankMatch(auth.taxon_rank || '', targetRank)) return id;
               }
           }
+          // 2. Direct identity (if record is the target rank)
           if (isRankMatch(row.taxon_rank || '', targetRank)) return row.id;
           
-          // CRITICAL FALLBACK: Use string attribute for ID generation if record is unhydrated
-          if (t === 'family' && row.family) return row.family;
-          if (t === 'genus' && row.genus) return row.genus;
-
+          // 3. Parent-chain climbing (For new records without paths)
           let curr: Taxon | undefined = row;
           while (curr && curr.parent_id) {
               const parent: Taxon | undefined = authorityRegistry.get(curr.parent_id);
               if (parent) {
                   if (isRankMatch(parent.taxon_rank || '', targetRank)) return parent.id;
                   curr = parent;
-              } else break;
+              } else {
+                  break;
+              }
           }
           return '(none)';
       };
 
+      // Grouping logic: Use Rank Resolver for bucket identity
       const groupMap = new Map<string, Taxon[]>();
       const groupOrder: string[] = [];
 
@@ -452,6 +450,7 @@ const DataGrid: React.FC<DataGridProps> = ({
           groupMap.get(segmentId)!.push(row);
       });
 
+      // Special case: Ensure '(none)' bucket sorts first if it exists
       const sortedKeys = groupOrder.sort((a, b) => {
           if (a === '(none)') return -1;
           if (b === '(none)') return 1;
@@ -464,6 +463,7 @@ const DataGrid: React.FC<DataGridProps> = ({
           const isHolder = segmentId === '(none)';
           
           let headerTaxon: TreeRow | undefined = authorityRegistry.get(segmentId);
+          
           if (!headerTaxon || isHolder) {
               headerTaxon = groupItems.find(t => isRankMatch(t.taxon_rank || '', field)) as TreeRow | undefined;
           }
@@ -471,22 +471,21 @@ const DataGrid: React.FC<DataGridProps> = ({
           const itemsToRecurse = headerTaxon ? groupItems.filter(i => i.id !== headerTaxon!.id) : groupItems;
           const currentRankLevel = RANK_LEVELS[field] || 0;
           
+          // Rank-Exhaustion Guard: Don't pass rows "down" if they are peers or higher ranks
           const filteredRecurseItems = itemsToRecurse.filter(t => {
               const r = (t.taxon_rank || '').toLowerCase();
               return (RANK_LEVELS[r] || 99) > currentRankLevel;
           });
 
           const firstChild = groupItems[0];
-          
-          // RESOLVE LABEL: If segmentId is a string name (fallback), use it. Otherwise use generic labels.
           const headerRow: TreeRow = headerTaxon ? { ...headerTaxon, origin_type: headerTaxon.origin_type || 'ancestor' } : {
               id: `virtual:${segmentId}:${parentRecord?.id || 'root'}`,
               is_virtual: true,
               is_holder: isHolder,
               origin_type: 'virtual',
               taxon_rank: (field === 'infraspecies' ? 'Infraspecies' : field.charAt(0).toUpperCase() + field.slice(1)) as any,
-              name: isHolder ? '(none)' : segmentId,
-              taxon_name: isHolder ? '(none)' : segmentId,
+              name: isHolder ? '(none)' : (segmentId === '(unlinked)' ? '(unlinked)' : segmentId),
+              taxon_name: isHolder ? '(none)' : (segmentId === '(unlinked)' ? '(unlinked)' : segmentId),
               taxon_status: 'Accepted',
               family: field === 'family' ? segmentId : (parentRecord?.family || firstChild?.family),
               genus: field === 'genus' ? segmentId : (depth >= 1 ? (parentRecord?.genus || firstChild?.genus) : undefined),
@@ -831,7 +830,6 @@ const DataGrid: React.FC<DataGridProps> = ({
                                    )}
                                </td>;
                                if (col.id === 'descendant_count') return <td key={col.id} className="p-2 border-r border-slate-200 text-xs text-center text-slate-400 font-mono">{tr.is_tree_header ? (tr as any).child_count : (tr.descendant_count || '')}</td>;
-                               {/* Fix: use ChevronDownIcon instead of ChevronDown */}
                                if (col.id === 'actions') return <td key={col.id} className="p-2 border-r border-slate-200 text-center"><div className="flex items-center justify-center gap-1"><button onClick={(e) => { e.stopPropagation(); setExpandedRows(prev => { const n = new Set(prev); n.has(tr.id) ? n.delete(tr.id) : n.add(tr.id); return n; }); }} className={`p-1.5 rounded shadow-sm ${isExpanded ? 'bg-slate-800 text-white' : 'bg-white border border-slate-200 text-slate-500 hover:text-slate-800'}`}>{isExpanded ? <ChevronUpIcon size={14}/> : <ChevronDownIcon size={14}/>}</button>{['genus', 'species', 'subspecies', 'variety', 'form'].includes(rankKey) && <button onClick={(e) => { e.stopPropagation(); onAction?.('enrich', tr); }} title="Analyze & Find Details" className="p-1.5 bg-indigo-50 border border-indigo-200 rounded text-indigo-600 hover:bg-indigo-100 shadow-sm"><PickaxeIcon size={14} /></button>}<button onClick={(e) => { e.stopPropagation(); onAction?.('enrich', tr); }} title="Enrich Data Layer" className="p-1.5 bg-amber-50 border border-amber-200 rounded text-amber-600 hover:bg-amber-100 shadow-sm"><Wand2Icon size={14} /></button></div></td>;
 
                                let displayVal: React.ReactNode = '';
