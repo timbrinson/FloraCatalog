@@ -69,3 +69,10 @@ If the development environment flags a compilation, linting, or runtime error, t
 For all application tiers, **Database Literals are the sovereign naming standard.** 
 - Properties in TypeScript interfaces, API service objects, and React state/props must match the PostgreSQL column names exactly (using `snake_case`).
 - Human-centric conventions (like `camelCase` in JavaScript) are deprecated for this project to eliminate the "Mapping Tax" and ensure AI-driven code reliability.
+
+## 13. The Evolution Cleanup Rule
+**Objective:** Prevent the accumulation of "technical debt" and "context drift" after intense development or bug-fixing sessions.
+**Requirement:** After any significant cycle of "trial-and-error" or complex bug resolution, the AI MUST:
+1.  **Identify Extraneous Code:** Scan the affected components for variables, console logs, or logic branches that were part of a "trial" but are no longer used by the final solution.
+2.  **Documentation Sync:** Compare the final technical implementation with existing `docs/` (ADRs, Specs, Data Mapping). Identify any descriptions that are now inaccurate.
+3.  **Proactive Suggestion:** Before closing the task, the AI must ask: *"We have reached a stable state. Should I perform a Cleanup Pass to remove trial code and synchronize documentation with the current implementation?"*

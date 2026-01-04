@@ -1,8 +1,16 @@
 # Version History
 
+## v2.27.2 - Governance & Protocol Cleanup
+**Date:** July 03, 2025
+**Status:** Current Release
+
+### Project Governance
+- **Evolution Cleanup Rule:** Codified Section 13 in `AI_DEVELOPMENT_PROTOCOL.md`. The system now proactively reminds the human architect to clean up extraneous code and sync documentation after complex evolution cycles.
+- **Maintenance Baseline:** Established a "Clean Slate" standard for moving between major feature tasks.
+
 ## v2.27.1 - Family Hierarchy Fix
 **Date:** July 02, 2025
-**Status:** Current Release
+**Status:** (Historical)
 
 ### Hierarchical Integrity (ADR-006 Extension)
 - **Literal-ID Hybrid Grouping:** Implemented a specialized resolver for the Family rank. While Genus and below use UUID-based bucketing, Families now use string-literal bucketing (e.g., "Amaryllidaceae") to account for the lack of physical Family records in WCVP.
