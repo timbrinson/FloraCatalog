@@ -1,4 +1,3 @@
-
 export type ColorTheme = 'option1a' | 'option1b' | 'option2a' | 'option2b';
 
 export interface UserPreferences {
@@ -8,6 +7,7 @@ export interface UserPreferences {
   fit_screen_max_ratio?: number;
   color_theme: ColorTheme;
   search_mode: 'prefix' | 'fuzzy'; 
+  debug_mode?: boolean;
 }
 
 export enum LoadingState {

@@ -36,7 +36,14 @@ When filtering results in a child (e.g., Cultivar), the parent records might not
 
 ---
 
-## 3. Sorting & Grouping Logic
+## 3. Sorting & Grouping Logic (ADR-006 Update)
+
+### Authority-Based Bucketing:
+To prevent duplicate hierarchy headers caused by inconsistent metadata (e.g., a child missing its family name), the grid groups rows based on **ID Lineage** rather than string attributes.
+1. **The Authority Registry:** During the tree-walk, the engine identifies the record with the most complete data for each ID in the `hierarchy_path`. This is the "Authority."
+2. **Lineage Walk:** The grid buckets rows by the first N segments of their `hierarchy_path`. 
+    *   *Example:* All rows whose path begins with `root.id_family_1` are forced into the same top-level bucket.
+3. **Label Resolution:** When rendering a bucket header, the name is resolved by looking up the bucket's ID in the Authority Registry. If the record for the Genus has the name "Agapanthus" but a child record has `genus: null`, both rows will still correctly group under the "Agapanthus" authority header.
 
 ### The "Generic First" Rule:
 Sorting within any group prioritizes the Virtual Root (the "Generic" entries) before alphabetical listings.

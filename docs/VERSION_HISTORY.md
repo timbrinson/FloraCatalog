@@ -1,5 +1,14 @@
 # Version History
 
+## v2.27.0 - Authority-Based Grouping
+**Date:** July 01, 2025
+**Status:** (Planned Architectural Overhaul)
+
+### Hierarchical Sovereignty (ADR-006)
+- **ID-Based Bucketing:** Abandoned string-based grouping (e.g. `row.family`) in favor of `hierarchy_path` ID segments. This resolves the "Double Family" bug where records with null metadata split from their lineage.
+- **Authority Registry:** Implemented a resolution layer that finds the "Best Metadata Record" for every ID in the pool to ensure consistent labeling of ID-based buckets.
+- **Lineage Anchoring:** Child records now strictly follow the bucketing established by their parent IDs, ensuring data errors in result sets (like missing names) do not break hierarchical findability.
+
 ## v2.26.2 - Lineage Hydration & Grouping Fix
 **Date:** June 25, 2025
 **Status:** (Current Release)

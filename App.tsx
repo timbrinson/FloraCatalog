@@ -17,14 +17,21 @@ export default function App() {
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [showActivityPanel, setShowActivityPanel] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
+  
+  // Data State
   const [taxa, setTaxa] = useState<Taxon[]>([]);
-  const [ancestors, setAncestors] = useState<Taxon[]>([]); // Cache for remote ancestors
+  const [ancestors, setAncestors] = useState<Taxon[]>([]);
   const [offset, setOffset] = useState(0);
   const [hasMore, setHasMore] = useState(true);
   const [totalRecords, setTotalRecords] = useState(0);
   const [isFetchingMore, setIsFetchingMore] = useState(false);
-  const isFetchingRef = useRef(false);
+  const [isSearching, setIsSearching] = useState(false);
+
+  // Consistency & Race Condition Ref refs
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const activeQueryIdRef = useRef<string | null>(null);
   const isHydratingRef = useRef(false);
+
   const [sortConfig, setSortConfig] = useState<{ key: string, direction: 'asc' | 'desc' }>({ key: 'taxon_name', direction: 'asc' });
   const [gridFilters, setGridFilters] = useState<Record<string, any>>({ taxon_status: ['Accepted'] });
   const [isOffline, setIsOffline] = useState(getIsOffline());
@@ -34,7 +41,8 @@ export default function App() {
       auto_fit_max_width: 400,
       fit_screen_max_ratio: 4.0,
       color_theme: 'option2a',
-      search_mode: 'prefix'
+      search_mode: 'prefix',
+      debug_mode: false
   });
   const [activities, setActivities] = useState<ActivityItem[]>([]);
   const cancelledActivityIds = useRef<Set<string>>(new Set());
@@ -55,18 +63,26 @@ export default function App() {
       const currentOfflineStatus = getIsOffline();
       setIsOffline(currentOfflineStatus);
       if (currentOfflineStatus) { setLoadingState(LoadingState.IDLE); return; }
-      if (isFetchingRef.current) return;
+      
+      const queryId = crypto.randomUUID();
+      if (isNewSearch) {
+          if (abortControllerRef.current) abortControllerRef.current.abort();
+          activeQueryIdRef.current = queryId;
+          abortControllerRef.current = new AbortController();
+          setIsSearching(true);
+          setOffset(0);
+          setTotalRecords(0);
+          setErrorDetails(null);
+          
+          // CRITICAL: We no longer clear ancestors here. 
+          // We wait until the new data arrives to swap them ATOMICALLY.
+      } else {
+          setIsFetchingMore(true);
+      }
+
+      const thisQueryId = activeQueryIdRef.current;
       
       try {
-          isFetchingRef.current = true;
-          setErrorDetails(null);
-          if (isNewSearch) {
-              setLoadingState(LoadingState.LOADING);
-              setAncestors([]); // Clear ancestor cache on new search
-          } else {
-              setIsFetchingMore(true);
-          }
-          
           const limit = 100;
           const { data, count } = await dataService.getTaxa({ 
             offset: currentOffset, 
@@ -78,44 +94,50 @@ export default function App() {
             search_mode: preferences.search_mode 
           });
           
+          if (thisQueryId !== activeQueryIdRef.current) return;
+
           if (isNewSearch) { 
+              // ATOMIC SWAP: Discard old results and old ancestors in the same cycle.
+              // This prevents "Orphan Frames" where children lose their parents for a single render.
               setTaxa(data); 
+              setAncestors([]); 
               if (count !== -1) setTotalRecords(count);
-              else if (data.length === 0) setTotalRecords(0);
+              setLoadingState(LoadingState.SUCCESS);
           } else {
-              setTaxa(prev => [...prev, ...data]);
+              setTaxa(prev => {
+                  const ids = new Set(prev.map(t => t.id));
+                  return [...prev, ...data.filter(t => !ids.has(t.id))];
+              });
           }
           
           setHasMore(data.length === limit);
-          setLoadingState(LoadingState.SUCCESS);
           setIsInitialized(true);
-          setIsFetchingMore(false);
       } catch (e: any) {
+          if (e.name === 'AbortError') return;
+          if (thisQueryId !== activeQueryIdRef.current) return;
+          
           setErrorDetails(e.message || "Database error.");
           setLoadingState(LoadingState.ERROR);
-          setIsFetchingMore(false);
-          if (!isInitialized && taxa.length > 0) setIsInitialized(true);
-      } finally { isFetchingRef.current = false; }
+      } finally {
+          if (thisQueryId === activeQueryIdRef.current) {
+              setIsFetchingMore(false);
+              setIsSearching(false);
+          }
+      }
   };
 
   /**
-   * Stage 2: Recursive Ancestor Hydration
-   * Finds parent_ids that aren't in the current dataset and fetches them.
+   * Stage 2: Isolated Lineage Hydration
    */
   useEffect(() => {
       if (getIsOffline() || taxa.length === 0 || isHydratingRef.current) return;
 
+      const currentQueryId = activeQueryIdRef.current;
       const existingIds = new Set([...taxa.map(t => t.id), ...ancestors.map(t => t.id)]);
       const missingParentIds = new Set<string>();
 
-      // Check primary taxa
-      taxa.forEach(t => {
-          if (t.parent_id && !existingIds.has(t.parent_id)) missingParentIds.add(t.parent_id);
-      });
-      // Check existing ancestors for deeper lineage
-      ancestors.forEach(t => {
-          if (t.parent_id && !existingIds.has(t.parent_id)) missingParentIds.add(t.parent_id);
-      });
+      taxa.forEach(t => { if (t.parent_id && !existingIds.has(t.parent_id)) missingParentIds.add(t.parent_id); });
+      ancestors.forEach(t => { if (t.parent_id && !existingIds.has(t.parent_id)) missingParentIds.add(t.parent_id); });
 
       if (missingParentIds.size > 0) {
           const hydrate = async () => {
@@ -123,12 +145,18 @@ export default function App() {
               const newAncestors: Taxon[] = [];
               for (const id of Array.from(missingParentIds)) {
                   try {
+                      if (currentQueryId !== activeQueryIdRef.current) break;
                       const parent = await dataService.getTaxonById(id);
                       if (parent) newAncestors.push(parent);
-                  } catch (e) { console.error("Hydration error", id, e); }
+                  } catch (e) { /* ignore */ }
               }
-              if (newAncestors.length > 0) {
-                  setAncestors(prev => [...prev, ...newAncestors]);
+
+              if (currentQueryId === activeQueryIdRef.current && newAncestors.length > 0) {
+                  setAncestors(prev => {
+                      const ids = new Set(prev.map(p => p.id));
+                      const uniqueNew = newAncestors.filter(a => !ids.has(a.id));
+                      return [...prev, ...uniqueNew];
+                  });
               }
               isHydratingRef.current = false;
           };
@@ -136,14 +164,32 @@ export default function App() {
       }
   }, [taxa, ancestors]);
 
+  /**
+   * Stage 3: Ancestor Pruning (Anti-Stuck Safeguard)
+   */
+  useEffect(() => {
+    if (taxa.length === 0) {
+      if (ancestors.length > 0) setAncestors([]);
+      return;
+    }
+    
+    setAncestors(prev => {
+      const filtered = prev.filter(a => {
+        const isDirectParent = taxa.some(t => t.parent_id === a.id);
+        const isIndirectParent = prev.some(other => other.parent_id === a.id && taxa.some(t => t.parent_id === other.id));
+        return isDirectParent || isIndirectParent;
+      });
+      return filtered.length === prev.length ? prev : filtered;
+    });
+  }, [taxa]);
+
   useEffect(() => { 
-    setOffset(0); 
     fetchBatch(0, true); 
   }, [gridFilters, sortConfig, preferences.search_mode]);
 
   const handleFilterChange = (key: string, value: any) => setGridFilters(prev => ({ ...prev, [key]: value }));
   const handleSettingsClose = () => { setShowSettingsModal(false); if (!getIsOffline()) fetchBatch(0, true); };
-  const handleLoadMore = () => { if (!hasMore || isFetchingRef.current || loadingState === LoadingState.LOADING) return; const n = offset + 100; setOffset(n); fetchBatch(n, false); };
+  const handleLoadMore = () => { if (!hasMore || isSearching || isFetchingMore) return; const n = offset + 100; setOffset(n); fetchBatch(n, false); };
   
   const handleTaxonUpdate = async (id: string, updates: Partial<Taxon>) => {
       try {
@@ -204,20 +250,20 @@ export default function App() {
       </header>
 
       <main className="flex-1 overflow-hidden p-4 relative">
-        {(!isInitialized && loadingState === LoadingState.LOADING) ? (
+        {(!isInitialized && loadingState === LoadingState.LOADING && !isSearching) ? (
           <div className="h-full flex items-center justify-center"><Loader2 className="animate-spin text-leaf-600" size={48} /></div>
         ) : isHardError || isActuallyEmpty ? (
           <EmptyState isOffline={isOffline} loadingState={loadingState} errorDetails={errorDetails} onOpenSettings={() => setShowSettingsModal(true)} onRetry={() => fetchBatch(0, true)} />
         ) : (
           <DataGrid 
             taxa={taxa} 
-            ancestors={ancestors} // Pass ancestors for promotion
+            ancestors={ancestors} 
             preferences={preferences} 
             onPreferenceChange={setPreferences} 
             onUpdate={handleTaxonUpdate} 
             onAction={handleAction} 
             totalRecords={totalRecords} 
-            isLoadingMore={isFetchingMore || loadingState === LoadingState.LOADING} 
+            isLoadingMore={isFetchingMore || isSearching} 
             onLoadMore={handleLoadMore} 
             sortConfig={sortConfig} 
             onSortChange={(key, direction) => setSortConfig({ key, direction: direction as 'asc' | 'desc' })} 
