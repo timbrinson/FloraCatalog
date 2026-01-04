@@ -42,7 +42,8 @@ export default function App() {
       fit_screen_max_ratio: 4.0,
       color_theme: 'option2a',
       search_mode: 'prefix',
-      debug_mode: false
+      debug_mode: false,
+      grouping_strategy: 'attribute'
   });
   const [activities, setActivities] = useState<ActivityItem[]>([]);
   const cancelledActivityIds = useRef<Set<string>>(new Set());

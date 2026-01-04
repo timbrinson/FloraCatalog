@@ -16,7 +16,7 @@ import {
 } from 'lucide-react';
 
 
-// Implementation of Grid Display Spec v2.26.2
+// Implementation of Grid Display Spec v2.27.3
 const RANK_LEVELS: Record<string, number> = {
     'family': 1,
     'genus': 2,
@@ -134,7 +134,7 @@ const COLUMN_GROUPS: ColumnGroup[] = [
                 filterOptions: ['Accepted', 'Synonym', 'Unplaced', 'Registered', 'Provisional', 'Artificial Hybrid', 'Illegitimate', 'Invalid', 'Local Biotype', 'Misapplied', 'Orthographic', 'Provisionally Accepted', 'External to WCVP'], 
                 defaultOn: false 
             },
-            { id: 'family', label: 'Family', tooltip: 'Family', defaultWidth: 120, filterType: 'text', defaultOn: false },
+            { id: 'family', label: 'Family', tooltip: 'Family', defaultWidth: 120, filterType: 'text', defaultOn: true },
             { id: 'hybrid_formula', label: 'Hybrid Formula', tooltip: 'Hybrid Formula', defaultWidth: 180, filterType: 'text', defaultOn: false },
         ]
     },
@@ -323,12 +323,10 @@ const DataGrid: React.FC<DataGridProps> = ({
   const activeColorMap = useMemo(() => THEMES[preferences.color_theme] || THEMES['option1a'], [preferences.color_theme]);
 
   /**
-   * allTaxaPool: Recursive Authority Healing (Fix for Scenario B)
-   * This pass ensures that every record in the local pool correctly represents its lineage.
-   * If a Genus has a family, all of its children will now share that family string,
-   * regardless of inconsistencies in the original database record.
+   * AUTHORITY REGISTRY PASS (ADR-006)
+   * Builds the allTaxaPool and a secondary Map for label resolution.
    */
-  const allTaxaPool = useMemo(() => {
+  const { allTaxaPool, authorityRegistry } = useMemo(() => {
     const registry = new Map<string, TreeRow>();
     
     // Pass 1: Build basic registry from result set + ancestors
@@ -337,8 +335,7 @@ const DataGrid: React.FC<DataGridProps> = ({
     
     const pool = Array.from(registry.values());
 
-    // Pass 2: Upward Healing (Children teach parents)
-    // If a Genus record exists but is missing its Family, we look for any child that HAS it.
+    // Pass 2: Recursive Authority Healing (Legacy Support)
     pool.forEach(row => {
         if (row.parent_id && registry.has(row.parent_id)) {
             const parent = registry.get(row.parent_id)!;
@@ -347,24 +344,18 @@ const DataGrid: React.FC<DataGridProps> = ({
         }
     });
 
-    // Pass 3: Downward Recursive Healing (Parents anchor children)
-    // This is the CRITICAL fix for the "Double Family" bug. 
-    // It ensures that every record inheriting from a parent follows the parent's bucketing.
     const healLineage = (row: TreeRow) => {
         if (!row.parent_id || !registry.has(row.parent_id)) return;
         const parent = registry.get(row.parent_id)!;
-        
-        // Children inherit higher-rank attributes from the established parent authority
         if (parent.family) row.family = parent.family;
         if (parent.genus && (row.taxon_rank || '').toLowerCase() !== 'genus') row.genus = parent.genus;
         if (parent.species && !['genus', 'species'].includes((row.taxon_rank || '').toLowerCase())) row.species = parent.species;
     };
 
-    // Sort by rank to ensure inheritance flows Family -> Genus -> Species -> Child
     pool.sort((a, b) => (RANK_LEVELS[String(a.taxon_rank).toLowerCase()] || 99) - (RANK_LEVELS[String(b.taxon_rank).toLowerCase()] || 99))
         .forEach(healLineage);
 
-    return pool;
+    return { allTaxaPool: pool, authorityRegistry: registry };
   }, [taxa, ancestors]);
 
   const getRowValue = (row: Taxon, colId: string) => {
@@ -394,92 +385,212 @@ const DataGrid: React.FC<DataGridProps> = ({
       }
   };
 
-  const gridRows = useMemo((): TreeRow[] => {
-      if (!taxa || taxa.length === 0) return [];
-      if (groupBy.length === 0) return taxa.map(t => ({ ...t, origin_type: 'result' } as TreeRow));
-      
+  /**
+   * walkLineage (v2.27.3 Refinement)
+   * Fixed family bucketing and label resolution using standard rank positional fallbacks.
+   */
+  const walkLineage = (subset: Taxon[], depth: number, parentPath: string, parentRecord?: Taxon): TreeRow[] => {
       const outputRows: TreeRow[] = [];
+      const field = groupBy[depth];
       
-      const bucketKey = (row: Taxon, depth: number, parentRecord?: Taxon) => {
-          const field = groupBy[depth];
-          
-          // AUTHORITY BUCKETING: If we are grouped under a parent record, we MUST stay in its bucket
-          // for the shared rank levels.
-          if (parentRecord && field === (parentRecord.taxon_rank || '').toLowerCase()) {
-              return String(parentRecord.taxon_name || '').replace(/^[×x]\s?/i, '').trim();
-          }
-          
-          const val = String(row[field as keyof Taxon] || '').replace(/^[×x]\s?/i, '').trim();
-          return val || '(none)';
+      if (!field || depth >= groupBy.length) {
+          subset.forEach(t => {
+              const tr = t as TreeRow;
+              outputRows.push({ ...tr, depth, tree_path: `${parentPath}/${t.id}`, origin_type: tr.origin_type || 'result' });
+          });
+          return outputRows;
+      }
+
+      const isRankMatch = (rank: string, target: string) => {
+          const r = rank.toLowerCase();
+          const t = target.toLowerCase();
+          if (t === 'infraspecies') return ['subspecies', 'variety', 'form', 'infraspecies'].includes(r);
+          return r === t;
       };
 
-      const findHeaderTaxon = (field: string, value: string): Taxon | undefined => {
-          if (value === '(none)') return undefined;
-          return allTaxaPool.find(t => {
+      const getTargetIdForRank = (row: Taxon, targetRank: string): string => {
+          const t = targetRank.toLowerCase();
+          if (row.hierarchy_path) {
+              const segments = row.hierarchy_path.split('.');
+              // POSITIONAL FALLBACK for Standard Ranks
+              if (t === 'family' && segments[1]) return segments[1].replace(/_/g, '-');
+              if (t === 'genus' && segments[2]) return segments[2].replace(/_/g, '-');
+              if (t === 'species' && segments[3]) return segments[3].replace(/_/g, '-');
+              
+              for (let i = 1; i < segments.length; i++) {
+                  const id = segments[i].replace(/_/g, '-');
+                  const auth = authorityRegistry.get(id);
+                  if (auth && isRankMatch(auth.taxon_rank || '', targetRank)) return id;
+              }
+          }
+          if (isRankMatch(row.taxon_rank || '', targetRank)) return row.id;
+          
+          // CRITICAL FALLBACK: Use string attribute for ID generation if record is unhydrated
+          if (t === 'family' && row.family) return row.family;
+          if (t === 'genus' && row.genus) return row.genus;
+
+          let curr: Taxon | undefined = row;
+          while (curr && curr.parent_id) {
+              const parent: Taxon | undefined = authorityRegistry.get(curr.parent_id);
+              if (parent) {
+                  if (isRankMatch(parent.taxon_rank || '', targetRank)) return parent.id;
+                  curr = parent;
+              } else break;
+          }
+          return '(none)';
+      };
+
+      const groupMap = new Map<string, Taxon[]>();
+      const groupOrder: string[] = [];
+
+      subset.forEach(row => {
+          const segmentId = getTargetIdForRank(row, field);
+          if (!groupMap.has(segmentId)) {
+              groupMap.set(segmentId, []);
+              groupOrder.push(segmentId);
+          }
+          groupMap.get(segmentId)!.push(row);
+      });
+
+      const sortedKeys = groupOrder.sort((a, b) => {
+          if (a === '(none)') return -1;
+          if (b === '(none)') return 1;
+          return groupOrder.indexOf(a) - groupOrder.indexOf(b);
+      });
+
+      sortedKeys.forEach(segmentId => {
+          const groupItems = groupMap.get(segmentId)!;
+          const path = `${parentPath}/${segmentId}`;
+          const isHolder = segmentId === '(none)';
+          
+          let headerTaxon: TreeRow | undefined = authorityRegistry.get(segmentId);
+          if (!headerTaxon || isHolder) {
+              headerTaxon = groupItems.find(t => isRankMatch(t.taxon_rank || '', field)) as TreeRow | undefined;
+          }
+
+          const itemsToRecurse = headerTaxon ? groupItems.filter(i => i.id !== headerTaxon!.id) : groupItems;
+          const currentRankLevel = RANK_LEVELS[field] || 0;
+          
+          const filteredRecurseItems = itemsToRecurse.filter(t => {
+              const r = (t.taxon_rank || '').toLowerCase();
+              return (RANK_LEVELS[r] || 99) > currentRankLevel;
+          });
+
+          const firstChild = groupItems[0];
+          
+          // RESOLVE LABEL: If segmentId is a string name (fallback), use it. Otherwise use generic labels.
+          const headerRow: TreeRow = headerTaxon ? { ...headerTaxon, origin_type: headerTaxon.origin_type || 'ancestor' } : {
+              id: `virtual:${segmentId}:${parentRecord?.id || 'root'}`,
+              is_virtual: true,
+              is_holder: isHolder,
+              origin_type: 'virtual',
+              taxon_rank: (field === 'infraspecies' ? 'Infraspecies' : field.charAt(0).toUpperCase() + field.slice(1)) as any,
+              name: isHolder ? '(none)' : segmentId,
+              taxon_name: isHolder ? '(none)' : segmentId,
+              taxon_status: 'Accepted',
+              family: field === 'family' ? segmentId : (parentRecord?.family || firstChild?.family),
+              genus: field === 'genus' ? segmentId : (depth >= 1 ? (parentRecord?.genus || firstChild?.genus) : undefined),
+              species: field === 'species' ? segmentId : (depth >= 2 ? (parentRecord?.species || firstChild?.species) : undefined),
+              alternative_names: [], reference_links: [], created_at: 0
+          } as any;
+
+          headerRow.is_tree_header = true;
+          headerRow.tree_expanded = !collapsedGroups.has(path);
+          (headerRow as any).child_count = headerTaxon ? (headerTaxon.descendant_count || 0) : groupItems.length;
+          headerRow.depth = depth;
+          headerRow.tree_path = path;
+          
+          outputRows.push(headerRow);
+          if (headerRow.tree_expanded && (filteredRecurseItems.length > 0 || isHolder)) {
+              outputRows.push(...walkLineage(filteredRecurseItems, depth + 1, path, headerRow));
+          }
+      });
+
+      return outputRows;
+  };
+
+  /**
+   * walkAttributes (Legacy Implementation)
+   */
+  const walkAttributes = (subset: Taxon[], depth: number, parentPath: string, parentRecord?: Taxon): TreeRow[] => {
+      const outputRows: TreeRow[] = [];
+      const field = groupBy[depth];
+      if (!field || depth >= groupBy.length) {
+          subset.forEach(t => {
+              const tr = t as TreeRow;
+              outputRows.push({ ...tr, depth, tree_path: `${parentPath}/${t.id}`, origin_type: tr.origin_type || 'result' });
+          });
+          return outputRows;
+      }
+
+      const groups: Record<string, Taxon[]> = {};
+      subset.forEach(row => { 
+          let val = '(none)';
+          if (parentRecord && field === (parentRecord.taxon_rank || '').toLowerCase()) {
+              val = String(parentRecord.taxon_name || '').replace(/^[×x]\s?/i, '').trim();
+          } else {
+              val = String(row[field as keyof Taxon] || '').replace(/^[×x]\s?/i, '').trim() || '(none)';
+          }
+          if (!groups[val]) groups[val] = []; 
+          groups[val].push(row); 
+      });
+
+      Object.keys(groups).sort(genericFirstSort).forEach(key => {
+          const groupItems = groups[key];
+          const path = `${parentPath}/${key}`;
+          const isHolder = key === '(none)';
+
+          const headerTaxon = allTaxaPool.find(t => {
              const rowVal = String(getRowValue(t, field)).replace(/^[×x]\s?/i, '').trim();
-             const valMatches = rowVal === value;
-             if (!valMatches) return false;
+             if (rowVal !== key) return false;
              const rank = (t.taxon_rank as string || '').toLowerCase();
-             
              if (field === 'family') return rank === 'family';
              if (field === 'genus') return rank === 'genus';
              if (field === 'species') return rank === 'species';
              if (field === 'infraspecies') return ['variety', 'subspecies', 'form'].includes(rank);
              return rank === field.toLowerCase();
           });
-      };
 
-      const processLevel = (subset: Taxon[], depth: number, parentPath: string, parentRecord?: Taxon) => {
-          if (!subset || subset.length === 0) return;
-          if (depth >= groupBy.length) {
-              subset.forEach(t => {
-                  const tr = t as TreeRow;
-                  outputRows.push({ ...tr, depth, tree_path: `${parentPath}/${t.id}`, origin_type: tr.origin_type || 'result' });
-              });
-              return;
-          }
-          const field = groupBy[depth];
-          const groups: Record<string, Taxon[]> = {};
-          subset.forEach(row => { 
-              const val = bucketKey(row, depth, parentRecord); 
-              if (!groups[val]) groups[val] = []; 
-              groups[val].push(row); 
-          });
+          const itemsWithoutHeader = headerTaxon ? groupItems.filter(i => i.id !== headerTaxon.id) : groupItems;
+          const firstChild = groupItems[0];
+          
+          const headerRow: TreeRow = headerTaxon ? { ...headerTaxon, origin_type: 'ancestor' } : {
+              id: `virtual:none:${parentRecord?.id || 'root'}:${field}:${key}`,
+              is_virtual: true,
+              is_holder: isHolder,
+              origin_type: 'virtual',
+              taxon_rank: (field === 'infraspecies' ? 'Infraspecies' : field.charAt(0).toUpperCase() + field.slice(1)) as any, 
+              name: key,
+              taxon_name: key, 
+              taxon_status: 'Accepted',
+              family: field === 'family' ? key : (parentRecord?.family || firstChild?.family),
+              genus: field === 'genus' ? key : (depth >= 1 ? (parentRecord?.genus || firstChild?.genus) : undefined),
+              species: field === 'species' ? key : (depth >= 2 ? (parentRecord?.species || firstChild?.species) : undefined),
+              alternative_names: [], reference_links: [], created_at: 0
+          } as any;
+          
+          headerRow.is_tree_header = true;
+          headerRow.tree_expanded = !collapsedGroups.has(path);
+          (headerRow as any).child_count = headerTaxon ? (headerTaxon.descendant_count || 0) : groupItems.length;
+          headerRow.depth = depth;
+          headerRow.tree_path = path;
+          outputRows.push(headerRow);
+          if (headerRow.tree_expanded) outputRows.push(...walkAttributes(itemsWithoutHeader, depth + 1, path, headerRow));
+      });
 
-          Object.keys(groups).sort(genericFirstSort).forEach(key => {
-              const groupItems = groups[key];
-              const path = `${parentPath}/${key}`;
-              const headerTaxon = findHeaderTaxon(field, key);
-              const itemsWithoutHeader = headerTaxon ? groupItems.filter(i => i.id !== headerTaxon.id) : groupItems;
-              const firstChild = groupItems[0];
-              
-              const headerRow: TreeRow = headerTaxon ? { ...headerTaxon, origin_type: 'ancestor' } : {
-                  id: `virtual:none:${parentRecord?.id || 'root'}:${field}:${key}`,
-                  is_virtual: true,
-                  is_holder: key === '(none)',
-                  origin_type: 'virtual',
-                  taxon_rank: (field === 'infraspecies' ? 'Infraspecies' : field.charAt(0).toUpperCase() + field.slice(1)) as any, 
-                  name: key,
-                  taxon_name: key, 
-                  taxon_status: 'Accepted',
-                  family: field === 'family' ? key : (parentRecord?.family || firstChild?.family),
-                  genus: field === 'genus' ? key : (depth >= 1 ? (parentRecord?.genus || firstChild?.genus) : undefined),
-                  species: field === 'species' ? key : (depth >= 2 ? (parentRecord?.species || firstChild?.species) : undefined),
-                  alternative_names: [], reference_links: [], created_at: 0
-              } as any;
-              
-              headerRow.is_tree_header = true;
-              headerRow.tree_expanded = !collapsedGroups.has(path);
-              (headerRow as any).child_count = headerTaxon ? (headerTaxon.descendant_count || 0) : groupItems.length;
-              headerRow.depth = depth;
-              headerRow.tree_path = path;
-              outputRows.push(headerRow);
-              if (headerRow.tree_expanded) processLevel(itemsWithoutHeader, depth + 1, path, headerRow);
-          });
-      };
-      processLevel(taxa, 0, 'root');
       return outputRows;
-  }, [taxa, allTaxaPool, groupBy, collapsedGroups]);
+  };
+
+  const gridRows = useMemo((): TreeRow[] => {
+      if (!taxa || taxa.length === 0) return [];
+      if (groupBy.length === 0) return taxa.map(t => ({ ...t, origin_type: 'result' } as TreeRow));
+      
+      if (preferences.grouping_strategy === 'path') {
+          return walkLineage(taxa, 0, 'root');
+      } else {
+          return walkAttributes(taxa, 0, 'root');
+      }
+  }, [taxa, allTaxaPool, authorityRegistry, groupBy, collapsedGroups, preferences.grouping_strategy, visibleColumns]);
 
   const toggleGroup = (path: string) => {
       const next = new Set(collapsedGroups);
@@ -575,14 +686,9 @@ const DataGrid: React.FC<DataGridProps> = ({
   const toggleSearchMode = () => onPreferenceChange?.({ ...preferences, search_mode: preferences.search_mode === 'prefix' ? 'fuzzy' : 'prefix' });
   const toggleDebugMode = () => onPreferenceChange?.({ ...preferences, debug_mode: !preferences.debug_mode });
 
-  /**
-   * tableVersionKey: Hard-Reconciliation Trigger (Scenario A fix)
-   * By changing the key of the <tbody>, we force React to discard the old DOM 
-   * and rebuild it. This kills "Zombie" rows that have lost their context.
-   */
   const tableVersionKey = useMemo(() => {
-    return `${groupBy.join('-')}-${JSON.stringify(filters)}-${taxa.length}-${sortConfig.key}-${sortConfig.direction}-${preferences.debug_mode}`;
-  }, [groupBy, filters, taxa.length, sortConfig, preferences.debug_mode]);
+    return `${groupBy.join('-')}-${JSON.stringify(filters)}-${taxa.length}-${sortConfig.key}-${sortConfig.direction}-${preferences.debug_mode}-${preferences.grouping_strategy}`;
+  }, [groupBy, filters, taxa.length, sortConfig, preferences.debug_mode, preferences.grouping_strategy]);
 
   return (
     <div className="bg-white rounded-xl shadow border border-slate-200 overflow-hidden flex flex-col h-full relative">
@@ -705,7 +811,6 @@ const DataGrid: React.FC<DataGridProps> = ({
                       else if (tr.origin_type === 'result') debugClass = "bg-green-50/50 ring-1 ring-inset ring-green-200";
                   }
 
-                  // STABLE KEY: Use origin prefix + tree path to prevent reconciliation drift
                   const rowKey = `${tr.origin_type || 'row'}-${tr.tree_path || tr.id}-${idx}`;
 
                   return (
@@ -714,8 +819,9 @@ const DataGrid: React.FC<DataGridProps> = ({
                            {activeColumns.map(col => {
                                const colLevel = COL_RANK_LEVELS[col.id];
                                const val = getRowValue(tr, col.id);
+                               const depthIndent = (tr.depth || 0) * 20;
                                
-                               if (col.id === 'tree_control') return <td key={col.id} className={`p-2 border-r border-slate-200 relative ${tr.is_tree_header ? '' : 'border-slate-50'}`} style={{ paddingLeft: `${(tr.depth || 0) * 20}px` }}>
+                               if (col.id === 'tree_control') return <td key={col.id} className={`p-2 border-r border-slate-200 relative ${tr.is_tree_header ? '' : 'border-slate-50'}`} style={{ paddingLeft: `${depthIndent}px` }}>
                                    {tr.is_tree_header && <span className={`transform transition-transform inline-block ${tr.tree_expanded ? 'rotate-90' : ''}`}><ChevronRightIcon size={14} /></span>}
                                    {preferences.debug_mode && (
                                        <div className="absolute top-0 right-0 p-0.5 text-[8px] font-mono leading-none flex flex-col items-end pointer-events-none opacity-40">
@@ -725,6 +831,7 @@ const DataGrid: React.FC<DataGridProps> = ({
                                    )}
                                </td>;
                                if (col.id === 'descendant_count') return <td key={col.id} className="p-2 border-r border-slate-200 text-xs text-center text-slate-400 font-mono">{tr.is_tree_header ? (tr as any).child_count : (tr.descendant_count || '')}</td>;
+                               {/* Fix: use ChevronDownIcon instead of ChevronDown */}
                                if (col.id === 'actions') return <td key={col.id} className="p-2 border-r border-slate-200 text-center"><div className="flex items-center justify-center gap-1"><button onClick={(e) => { e.stopPropagation(); setExpandedRows(prev => { const n = new Set(prev); n.has(tr.id) ? n.delete(tr.id) : n.add(tr.id); return n; }); }} className={`p-1.5 rounded shadow-sm ${isExpanded ? 'bg-slate-800 text-white' : 'bg-white border border-slate-200 text-slate-500 hover:text-slate-800'}`}>{isExpanded ? <ChevronUpIcon size={14}/> : <ChevronDownIcon size={14}/>}</button>{['genus', 'species', 'subspecies', 'variety', 'form'].includes(rankKey) && <button onClick={(e) => { e.stopPropagation(); onAction?.('enrich', tr); }} title="Analyze & Find Details" className="p-1.5 bg-indigo-50 border border-indigo-200 rounded text-indigo-600 hover:bg-indigo-100 shadow-sm"><PickaxeIcon size={14} /></button>}<button onClick={(e) => { e.stopPropagation(); onAction?.('enrich', tr); }} title="Enrich Data Layer" className="p-1.5 bg-amber-50 border border-amber-200 rounded text-amber-600 hover:bg-amber-100 shadow-sm"><Wand2Icon size={14} /></button></div></td>;
 
                                let displayVal: React.ReactNode = '';
@@ -751,7 +858,14 @@ const DataGrid: React.FC<DataGridProps> = ({
                                }
 
                                if (col.id === 'taxon_rank') displayVal = <span className={`px-2 py-0.5 text-[10px] rounded border font-bold bg-${baseColor}-100 ${getTextClass(baseColor)} border-${baseColor}-200 normal-case`}>{displayVal}</span>;
-                               else if (col.id === 'taxon_name') displayVal = tr.is_holder ? <span className="italic opacity-60">(none)</span> : formatFullScientificName(tr, preferences);
+                               else if (col.id === 'taxon_name') {
+                                 const content = tr.is_holder ? <span className="italic opacity-60">(none)</span> : formatFullScientificName(tr, preferences);
+                                 displayVal = (
+                                    <div style={{ paddingLeft: `${depthIndent}px` }} className="flex items-center">
+                                        {content}
+                                    </div>
+                                 );
+                               }
                                else if (col.id === 'taxon_status') { let b = 'bg-slate-100 text-slate-500'; if (val === 'Accepted' || val === 'Registered' || val === 'Artificial Hybrid') b = 'bg-green-50 text-green-700 border-green-200 border'; displayVal = <span className={`px-2 py-0.5 text-[10px] rounded font-bold ${b} normal-case`}>{displayVal || '-'}</span>; }
 
                                const baseTextClass = isBold 

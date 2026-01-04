@@ -8,6 +8,7 @@ export interface UserPreferences {
   color_theme: ColorTheme;
   search_mode: 'prefix' | 'fuzzy'; 
   debug_mode?: boolean;
+  grouping_strategy: 'attribute' | 'path';
 }
 
 export enum LoadingState {
