@@ -387,7 +387,7 @@ const DataGrid: React.FC<DataGridProps> = ({
 
   /**
    * walkLineage (v2.27.2 Refinement)
-   * Implements "Climbing Rank discovery" to handle new records without hierarchy_paths.
+   * Implements Literal-ID Hybrid for Families and ID-Sovereignty for Genus/below.
    */
   const walkLineage = (subset: Taxon[], depth: number, parentPath: string, parentRecord?: Taxon): TreeRow[] => {
       const outputRows: TreeRow[] = [];
@@ -411,7 +411,29 @@ const DataGrid: React.FC<DataGridProps> = ({
 
       // Rank Segment Resolver: Deterministically finds the ID for a specific level
       const getTargetIdForRank = (row: Taxon, targetRank: string): string => {
-          // 1. Path segment lookup (Authoritative)
+          // SPECIAL CASE: Family Rank (Literal-Based Discovery)
+          if (targetRank === 'family') {
+              if (row.family) return row.family;
+              // Climb Parent Chain to find the record that carries the family metadata
+              let curr: Taxon | undefined = row;
+              while (curr && curr.parent_id) {
+                  const auth = authorityRegistry.get(curr.parent_id);
+                  if (auth?.family) return auth.family;
+                  curr = auth;
+              }
+              // Secondary fallback: Extract Genus ID from path and check its authority
+              if (row.hierarchy_path) {
+                  const segs = row.hierarchy_path.split('.');
+                  if (segs.length > 1) {
+                      const genusId = segs[1].replace(/_/g, '-');
+                      const genusAuth = authorityRegistry.get(genusId);
+                      if (genusAuth?.family) return genusAuth.family;
+                  }
+              }
+              return '(none)';
+          }
+
+          // ID-SOVEREIGNTY: Genus and below (UUID-Based)
           if (row.hierarchy_path) {
               const segments = row.hierarchy_path.split('.');
               for (let i = 1; i < segments.length; i++) {
@@ -420,10 +442,8 @@ const DataGrid: React.FC<DataGridProps> = ({
                   if (auth && isRankMatch(auth.taxon_rank || '', targetRank)) return id;
               }
           }
-          // 2. Direct identity (if record is the target rank)
           if (isRankMatch(row.taxon_rank || '', targetRank)) return row.id;
           
-          // 3. Parent-chain climbing (For new records without paths)
           let curr: Taxon | undefined = row;
           while (curr && curr.parent_id) {
               const parent: Taxon | undefined = authorityRegistry.get(curr.parent_id);
@@ -462,6 +482,8 @@ const DataGrid: React.FC<DataGridProps> = ({
           const path = `${parentPath}/${segmentId}`;
           const isHolder = segmentId === '(none)';
           
+          // Family level resolution uses segmentId as the label directly
+          const isFamilyRank = field === 'family';
           let headerTaxon: TreeRow | undefined = authorityRegistry.get(segmentId);
           
           if (!headerTaxon || isHolder) {
@@ -471,7 +493,6 @@ const DataGrid: React.FC<DataGridProps> = ({
           const itemsToRecurse = headerTaxon ? groupItems.filter(i => i.id !== headerTaxon!.id) : groupItems;
           const currentRankLevel = RANK_LEVELS[field] || 0;
           
-          // Rank-Exhaustion Guard: Don't pass rows "down" if they are peers or higher ranks
           const filteredRecurseItems = itemsToRecurse.filter(t => {
               const r = (t.taxon_rank || '').toLowerCase();
               return (RANK_LEVELS[r] || 99) > currentRankLevel;
@@ -484,8 +505,8 @@ const DataGrid: React.FC<DataGridProps> = ({
               is_holder: isHolder,
               origin_type: 'virtual',
               taxon_rank: (field === 'infraspecies' ? 'Infraspecies' : field.charAt(0).toUpperCase() + field.slice(1)) as any,
-              name: isHolder ? '(none)' : (segmentId === '(unlinked)' ? '(unlinked)' : segmentId),
-              taxon_name: isHolder ? '(none)' : (segmentId === '(unlinked)' ? '(unlinked)' : segmentId),
+              name: isHolder ? '(none)' : (isFamilyRank ? segmentId : (segmentId === '(unlinked)' ? '(unlinked)' : segmentId)),
+              taxon_name: isHolder ? '(none)' : (isFamilyRank ? segmentId : (segmentId === '(unlinked)' ? '(unlinked)' : segmentId)),
               taxon_status: 'Accepted',
               family: field === 'family' ? segmentId : (parentRecord?.family || firstChild?.family),
               genus: field === 'genus' ? segmentId : (depth >= 1 ? (parentRecord?.genus || firstChild?.genus) : undefined),

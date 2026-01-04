@@ -1,8 +1,18 @@
 # Version History
 
+## v2.27.1 - Family Hierarchy Fix
+**Date:** July 02, 2025
+**Status:** Current Release
+
+### Hierarchical Integrity (ADR-006 Extension)
+- **Literal-ID Hybrid Grouping:** Implemented a specialized resolver for the Family rank. While Genus and below use UUID-based bucketing, Families now use string-literal bucketing (e.g., "Amaryllidaceae") to account for the lack of physical Family records in WCVP.
+- **Ancestral Family Recovery:** Implemented a recursive "climb" for records missing family metadata. If a record has a null family, the engine traverses its `parent_id` chain to the parent Genus and inherits the family name from the authority record.
+- **Virtual Header Resolution:** Fixed label resolution for Family-level virtual headers, ensuring they display the literal family name instead of non-existent UUIDs.
+- **Fixed Fragmentation:** Resolved the "Double Family" bug where cultivars like 'Back in Black' would split into a separate `(none)` tree. They are now correctly consolidated under their physical lineage.
+
 ## v2.27.0 - Authority-Based Grouping
 **Date:** July 01, 2025
-**Status:** (Planned Architectural Overhaul)
+**Status:** (Historical Milestone)
 
 ### Hierarchical Sovereignty (ADR-006)
 - **ID-Based Bucketing:** Abandoned string-based grouping (e.g. `row.family`) in favor of `hierarchy_path` ID segments. This resolves the "Double Family" bug where records with null metadata split from their lineage.
@@ -11,10 +21,10 @@
 
 ## v2.26.2 - Lineage Hydration & Grouping Fix
 **Date:** June 25, 2025
-**Status:** (Current Release)
+**Status:** (Historical)
 
 ### Hierarchical Integrity
-- **Recursive Ancestor Hydration:** Implemented Stage 2 of the "Replace Virtuals" rule. When filtering for children, the system now identifies missing parent IDs and recursively fetches the real records from the database, preventing ghost virtual rows (e.g. searching for "Agave parryi" now correctly loads the real "Agave" record as the header).
+- **Recursive Ancestor Hydration:** Implemented Stage 2 of the "Replace Virtuals" rule. When filtering for children, the system now identifies missing parent IDs and recursively fetches the real records from the database, preventing ghost virtual rows.
 - **Tree Bucketing Fix:** Resolved a grouping bug where the "Rank Guard" logic prematurely forced parents into the (none) bucket. Real ancestors are now correctly promoted to group headers.
 - **Hierarchy Awareness:** Enhanced the promotion engine to scan the global hydrated pool instead of just the immediate filtered result set.
 
@@ -41,7 +51,7 @@
 **Status:** (Historical)
 
 ### Tooling Improvements
-- **Segmented Automation:** Enhanced `automate_build.js` with target range filtering. This allows developers to recover specific missing alphabetical batches (like T-Z) without re-running the entire 1.4M row pipeline.
+- **Segmented Automation:** Enhanced `automate_build.js` with target range filtering. This allows developers to recover specific missing alphabetical batches without re-running the entire 1.4M row pipeline.
 - **Iterative Ltree Refinement:** Optimized Step 7 of the build process to run iterative updates per segment, reducing Postgres memory pressure during large hierarchical builds.
 
 ### Nomenclature & Hybrid Intelligence
