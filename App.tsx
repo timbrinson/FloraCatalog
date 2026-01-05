@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Loader2, Leaf, Activity, Settings, Plus } from 'lucide-react';
 import { Taxon, LoadingState, UserPreferences, ActivityItem, ActivityStatus } from './types';
 import { dataService } from './services/dataService';
-import { getIsOffline } from './services/supabaseClient';
+import { getIsOffline, reloadClient } from './services/supabaseClient';
 import EmptyState from './components/EmptyState';
 import DataGrid from './components/DataGrid';
 import ConfirmDialog from './components/ConfirmDialog';
@@ -27,10 +27,11 @@ export default function App() {
   const [isFetchingMore, setIsFetchingMore] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
 
-  // Consistency & Race Condition Ref refs
+  // Refs for non-reactive tracking
   const abortControllerRef = useRef<AbortController | null>(null);
   const activeQueryIdRef = useRef<string | null>(null);
   const isHydratingRef = useRef(false);
+  const settingsLoadedRef = useRef(false);
 
   const [sortConfig, setSortConfig] = useState<{ key: string, direction: 'asc' | 'desc' }>({ key: 'taxon_name', direction: 'asc' });
   const [gridFilters, setGridFilters] = useState<Record<string, any>>({ taxon_status: ['Accepted'] });
@@ -45,11 +46,98 @@ export default function App() {
       debug_mode: false,
       grouping_strategy: 'path'
   });
+
   const [activities, setActivities] = useState<ActivityItem[]>([]);
   const cancelledActivityIds = useRef<Set<string>>(new Set());
   const [confirmState, setConfirmState] = useState<{
     isOpen: boolean; title: string; message: string; confirmLabel?: string; isDestructive?: boolean; onConfirm: () => void;
   }>({ isOpen: false, title: '', message: '', onConfirm: () => {} });
+
+  const [initialLayout, setInitialLayout] = useState<{
+      visibleColumns?: Set<string>;
+      columnOrder?: string[];
+      colWidths?: Record<string, number>;
+  }>({});
+  
+  const latestLayoutRef = useRef<{
+      visibleColumns: string[];
+      columnOrder: string[];
+      colWidths: Record<string, number>;
+  } | null>(null);
+
+  const [gridKey, setGridKey] = useState(0);
+
+  /**
+   * loadGlobalSettings: Fetch configuration from database
+   */
+  const loadGlobalSettings = async () => {
+    console.log("🔍 [App.LoadSettings] Querying Database for global settings...");
+    try {
+        const saved = await dataService.getGlobalSettings();
+        if (saved && Object.keys(saved).length > 0) {
+            console.log("🔍 [App.LoadSettings] Database settings FOUND:", saved);
+            if (saved.preferences) setPreferences(saved.preferences);
+            if (saved.filters) setGridFilters(saved.filters);
+            
+            const layoutUpdate = {
+                visibleColumns: Array.isArray(saved.visibleColumns) ? new Set<string>(saved.visibleColumns) : undefined,
+                columnOrder: Array.isArray(saved.columnOrder) ? saved.columnOrder : undefined,
+                colWidths: (saved.colWidths && typeof saved.colWidths === 'object') ? saved.colWidths : undefined
+            };
+            setInitialLayout(layoutUpdate);
+            settingsLoadedRef.current = true;
+            return true;
+        } else {
+            console.log("🔍 [App.LoadSettings] Database settings EMPTY or UNAVAILABLE.");
+            return false;
+        }
+    } catch (e) {
+        console.error("❌ [App.LoadSettings] Error during fetch:", e);
+        return false;
+    }
+  };
+
+  /**
+   * INITIAL STARTUP: Orchestrates the first settings load but avoids hanging
+   */
+  useEffect(() => {
+    const init = async () => {
+      console.log("🔍 [App.init] Starting startup sequence...");
+      
+      // Attempt 1: Immediate
+      const success = await loadGlobalSettings();
+      
+      // If failed, the interval watcher below will keep trying once online.
+      // But we set initialized to TRUE here to let the app mount and show settings/empty states.
+      if (!success) {
+          console.warn("🔍 [App.init] Initial settings fetch yielded no results. Connection might be pending.");
+      }
+      
+      setIsInitialized(true);
+    };
+    init();
+  }, []);
+
+  /**
+   * CONNECTION WATCHER: Automatically retries settings load when coming online
+   */
+  useEffect(() => {
+    const interval = setInterval(() => {
+        const currentOffline = getIsOffline();
+        
+        // If we were offline and now we're online, or if settings haven't loaded yet...
+        if ((isOffline && !currentOffline) || (!settingsLoadedRef.current && !currentOffline)) {
+            console.log(`🌐 [App.Watcher] Client ready (Offline: ${currentOffline}). Attempting settings sync...`);
+            setIsOffline(currentOffline);
+            if (!currentOffline) {
+                loadGlobalSettings();
+            }
+        } else if (isOffline !== currentOffline) {
+            setIsOffline(currentOffline);
+        }
+    }, 1500);
+    return () => clearInterval(interval);
+  }, [isOffline]);
 
   const isFiltering = useMemo(() => {
     return Object.entries(gridFilters).some(([key, value]) => {
@@ -60,36 +148,36 @@ export default function App() {
     });
   }, [gridFilters]);
 
-  /**
-   * INITIAL LOAD: Fetch Global Settings from DB
-   */
-  useEffect(() => {
-    const init = async () => {
-      if (!getIsOffline()) {
-        const saved = await dataService.getGlobalSettings();
-        if (saved) {
-          if (saved.preferences) setPreferences(saved.preferences);
-          if (saved.filters) setGridFilters(saved.filters);
-        }
-      }
-    };
-    init();
-  }, []);
-
-  /**
-   * PERSISTENCE: Save settings to DB on change (debounced)
-   */
-  useEffect(() => {
-    if (isInitialized && !getIsOffline()) {
-      const timer = setTimeout(() => {
-        dataService.saveGlobalSettings({
-          preferences,
-          filters: gridFilters
+  const handleSaveLayout = async () => {
+    if (getIsOffline() || !latestLayoutRef.current) return;
+    try {
+        await dataService.saveGlobalSettings({
+            preferences,
+            filters: gridFilters,
+            visibleColumns: latestLayoutRef.current.visibleColumns,
+            columnOrder: latestLayoutRef.current.columnOrder,
+            colWidths: latestLayoutRef.current.colWidths
         });
-      }, 1000);
-      return () => clearTimeout(timer);
+        alert("Layout and settings saved to database.");
+    } catch (e: any) {
+        alert(`Failed to save: ${e.message}`);
     }
-  }, [preferences, gridFilters, isInitialized]);
+  };
+
+  const handleReloadLayout = async () => {
+    console.log("🔄 [App.Reload] User selected Reload Settings action.");
+    if (getIsOffline()) {
+        alert("App is offline. Cannot reload from database.");
+        return;
+    }
+    const success = await loadGlobalSettings();
+    if (success) {
+        setGridKey(prev => prev + 1);
+        alert("Settings reloaded from database.");
+    } else {
+        alert("No saved settings found in database.");
+    }
+  };
 
   const fetchBatch = async (currentOffset: number, isNewSearch: boolean) => {
       const currentOfflineStatus = getIsOffline();
@@ -138,11 +226,9 @@ export default function App() {
           }
           
           setHasMore(data.length === limit);
-          setIsInitialized(true);
       } catch (e: any) {
           if (e.name === 'AbortError') return;
           if (thisQueryId !== activeQueryIdRef.current) return;
-          
           setErrorDetails(e.message || "Database error.");
           setLoadingState(LoadingState.ERROR);
       } finally {
@@ -153,16 +239,11 @@ export default function App() {
       }
   };
 
-  /**
-   * Stage 2: Isolated Lineage Hydration
-   */
   useEffect(() => {
       if (getIsOffline() || taxa.length === 0 || isHydratingRef.current) return;
-
       const currentQueryId = activeQueryIdRef.current;
       const existingIds = new Set([...taxa.map(t => t.id), ...ancestors.map(t => t.id)]);
       const missingParentIds = new Set<string>();
-
       taxa.forEach(t => { if (t.parent_id && !existingIds.has(t.parent_id)) missingParentIds.add(t.parent_id); });
       ancestors.forEach(t => { if (t.parent_id && !existingIds.has(t.parent_id)) missingParentIds.add(t.parent_id); });
 
@@ -177,7 +258,6 @@ export default function App() {
                       if (parent) newAncestors.push(parent);
                   } catch (e) { /* ignore */ }
               }
-
               if (currentQueryId === activeQueryIdRef.current && newAncestors.length > 0) {
                   setAncestors(prev => {
                       const ids = new Set(prev.map(p => p.id));
@@ -191,15 +271,11 @@ export default function App() {
       }
   }, [taxa, ancestors]);
 
-  /**
-   * Stage 3: Ancestor Pruning (Anti-Stuck Safeguard)
-   */
   useEffect(() => {
     if (taxa.length === 0) {
       if (ancestors.length > 0) setAncestors([]);
       return;
     }
-    
     setAncestors(prev => {
       const filtered = prev.filter(a => {
         const isDirectParent = taxa.some(t => t.parent_id === a.id);
@@ -211,8 +287,8 @@ export default function App() {
   }, [taxa]);
 
   useEffect(() => { 
-    fetchBatch(0, true); 
-  }, [gridFilters, sortConfig, preferences.search_mode]);
+    if (isInitialized) fetchBatch(0, true); 
+  }, [gridFilters, sortConfig, preferences.search_mode, isInitialized]);
 
   const handleFilterChange = (key: string, value: any) => setGridFilters(prev => ({ ...prev, [key]: value }));
   const handleSettingsClose = () => { setShowSettingsModal(false); if (!getIsOffline()) fetchBatch(0, true); };
@@ -274,12 +350,13 @@ export default function App() {
       </header>
 
       <main className="flex-1 overflow-hidden p-4 relative">
-        {(!isInitialized && loadingState === LoadingState.LOADING && !isSearching) ? (
+        {(!isInitialized) ? (
           <div className="h-full flex items-center justify-center"><Loader2 className="animate-spin text-leaf-600" size={48} /></div>
         ) : isHardError || isActuallyEmpty ? (
           <EmptyState isOffline={isOffline} loadingState={loadingState} errorDetails={errorDetails} onOpenSettings={() => setShowSettingsModal(true)} onRetry={() => fetchBatch(0, true)} />
         ) : (
           <DataGrid 
+            key={gridKey}
             taxa={taxa} 
             ancestors={ancestors} 
             preferences={preferences} 
@@ -293,12 +370,26 @@ export default function App() {
             onSortChange={(key, direction) => setSortConfig({ key, direction: direction as 'asc' | 'desc' })} 
             filters={gridFilters} 
             onFilterChange={handleFilterChange} 
-            error={loadingState === LoadingState.ERROR ? errorDetails : null} 
+            error={loadingState === LoadingState.ERROR ? errorDetails : null}
+            visibleColumns={initialLayout.visibleColumns}
+            columnOrder={initialLayout.columnOrder}
+            colWidths={initialLayout.colWidths}
+            onLayoutUpdate={(layout) => { latestLayoutRef.current = layout; }}
           />
         )}
       </main>
 
-      {showSettingsModal && (<SettingsModal isOpen={showSettingsModal} onClose={handleSettingsClose} preferences={preferences} onUpdate={setPreferences} onMaintenanceComplete={handleMaintenanceComplete} />)}
+      {showSettingsModal && (
+        <SettingsModal 
+            isOpen={showSettingsModal} 
+            onClose={handleSettingsClose} 
+            preferences={preferences} 
+            onUpdate={setPreferences} 
+            onMaintenanceComplete={handleMaintenanceComplete} 
+            onSaveLayout={handleSaveLayout}
+            onReloadLayout={handleReloadLayout}
+        />
+      )}
       {showAddModal && (<AddPlantModal isOpen={showAddModal} onClose={() => setShowAddModal(false)} onSuccess={handleAddSuccess} onAddActivity={handleAddActivity} />)}
       {confirmState.isOpen && (<ConfirmDialog isOpen={confirmState.isOpen} title={confirmState.title} message={confirmState.message} confirmLabel={confirmState.confirmLabel} isDestructive={confirmState.isDestructive} onConfirm={confirmState.onConfirm} onCancel={() => setConfirmState(prev => ({ ...prev, isOpen: false }))} />)}
     </div>

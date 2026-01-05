@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Settings, Layout, Zap, Palette, Database, Save, Search as SearchIcon, Cpu, AlertTriangle, RefreshCw, Loader2, Trash2, Bug, Network, RotateCcw } from 'lucide-react';
+import { X, Settings, Layout, Zap, Palette, Database, Save, Search as SearchIcon, Cpu, AlertTriangle, RefreshCw, Loader2, Trash2, Bug, Network, RotateCcw, Download } from 'lucide-react';
 import { UserPreferences, ColorTheme } from '../types';
 import { reloadClient, MANUAL_URL, MANUAL_KEY } from '../services/supabaseClient';
 import { dataService } from '../services/dataService';
@@ -11,9 +11,11 @@ interface SettingsModalProps {
   preferences: UserPreferences;
   onUpdate: (newPrefs: UserPreferences) => void;
   onMaintenanceComplete?: () => void;
+  onSaveLayout?: () => void;
+  onReloadLayout?: () => void;
 }
 
-const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, preferences, onUpdate, onMaintenanceComplete }) => {
+const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, preferences, onUpdate, onMaintenanceComplete, onSaveLayout, onReloadLayout }) => {
   if (!isOpen) return null;
 
   const [dbUrl, setDbUrl] = useState(localStorage.getItem('supabase_url') || MANUAL_URL);
@@ -36,11 +38,11 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, preferen
       const colors: Record<ColorTheme, Record<string, string>> = {
           'option1a': { genus: 'orange', species: 'amber', variety: 'green', cultivar: 'blue' },
           'option1b': { genus: 'blue', species: 'green', variety: 'amber', cultivar: 'orange' },
-          'option2a': { genus: 'green', species: 'amber', variety: 'orange', cultivar: 'blue' },
-          'option2b': { genus: 'blue', species: 'orange', variety: 'amber', cultivar: 'green' }
+          'option2a': { genus: 'green', species: 'amber', variety: 'orange', cultivar: 'sky' },
+          'option2b': { genus: 'sky', species: 'orange', variety: 'amber', cultivar: 'green' }
       };
       const c = colors[theme][role] || 'slate';
-      return `bg-${c}-50 border-${c}-200 text-${c}-900`;
+      return `bg-${c}-50 border-${c}-200 text-${c}-500 font-bold`;
   };
 
   const saveConnection = () => {
@@ -105,13 +107,34 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, preferen
         <div className="space-y-8">
             <div>
                 <div className="flex justify-between items-center mb-3">
-                    <h4 className="text-sm font-bold text-slate-700 uppercase tracking-wide flex items-center gap-2"><Database size={14}/> Database Connection</h4>
+                    <h4 className="text-sm font-bold text-slate-700 uppercase tracking-wide flex items-center gap-2"><Layout size={14}/> Persistence</h4>
                     <button onClick={resetToSystemDefaults} className="flex items-center gap-1 text-[10px] font-bold text-red-600 uppercase hover:underline"><RotateCcw size={10}/> Reset Defaults</button>
                 </div>
                 <div className="bg-slate-50 p-4 rounded-lg border border-slate-200 space-y-3">
+                    <p className="text-[10px] text-slate-500 mb-2">Save your current grid layout, filters, and theme preferences to the cloud.</p>
+                    <div className="grid grid-cols-2 gap-3">
+                        <button 
+                            onClick={onSaveLayout} 
+                            className="flex items-center justify-center gap-2 py-2.5 bg-slate-800 text-white rounded-lg hover:bg-slate-900 text-xs font-bold shadow-sm transition-all"
+                        >
+                            <Save size={14} /> Save Layout
+                        </button>
+                        <button 
+                            onClick={onReloadLayout} 
+                            className="flex items-center justify-center gap-2 py-2.5 bg-white border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 text-xs font-bold shadow-sm transition-all"
+                        >
+                            <Download size={14} /> Reload
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div>
+                <h4 className="text-sm font-bold text-slate-700 uppercase tracking-wide mb-3 flex items-center gap-2"><Database size={14}/> Database Connection</h4>
+                <div className="bg-slate-50 p-4 rounded-lg border border-slate-200 space-y-3">
                     <div><label className="block text-xs font-bold text-slate-600 mb-1">Project URL</label><input type="text" className="w-full text-xs p-2 border border-slate-300 rounded outline-none font-mono" value={dbUrl} onChange={(e) => setDbUrl(e.target.value)} /></div>
                     <div><label className="block text-xs font-bold text-slate-600 mb-1">Anon Key</label><input type="password" className="w-full text-xs p-2 border border-slate-300 rounded outline-none font-mono" value={dbKey} onChange={(e) => setDbKey(e.target.value)} /></div>
-                    <button onClick={saveConnection} className="w-full flex items-center justify-center gap-2 py-2 bg-leaf-600 text-white rounded hover:bg-leaf-700 text-xs font-bold"><Save size={14} /> Save & Connect</button>
+                    <button onClick={saveConnection} className="w-full flex items-center justify-center gap-2 py-2 bg-leaf-600 text-white rounded hover:bg-leaf-700 text-xs font-bold"><Save size={14} /> Update Connection</button>
                 </div>
             </div>
             <div>
@@ -122,9 +145,6 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, preferen
                         <button onClick={() => onUpdate({ ...preferences, grouping_strategy: 'attribute' })} className={`p-2 text-[10px] rounded-md transition-all ${preferences.grouping_strategy === 'attribute' ? 'bg-white shadow-sm font-bold text-slate-700 border border-slate-200' : 'text-slate-500'}`}>Legacy (Strings)</button>
                         <button onClick={() => onUpdate({ ...preferences, grouping_strategy: 'path' })} className={`p-2 text-[10px] rounded-md transition-all ${preferences.grouping_strategy === 'path' ? 'bg-white shadow-sm font-bold text-leaf-700 border border-leaf-200' : 'text-slate-500'}`}>Authority (IDs)</button>
                     </div>
-                    <p className="text-[10px] text-slate-400 italic leading-tight px-1">
-                        Lineage grouping uses hierarchy_path IDs to prevent duplicate headers caused by inconsistent metadata.
-                    </p>
                 </div>
             </div>
             <div>
