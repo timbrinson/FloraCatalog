@@ -2,11 +2,6 @@
 
 This document tracks planned features and technical improvements to ensure continuity across development sessions.
 ## To Work on Now
-- [ ] **Fix Order for GH and SH:** Move GH before Genus. Move SH before Species.
-- [ ] **Fix Legend:** It disappeared. The button is there but it doesn't do anything.
-- [ ] **Fix Bolding/Dimming:** Some conditions get double dimming and should just be one level of dimming. Virtual rows should have the (none) in the column for their rank be bold and the color for their rank.
-- [ ] **Fix leading X Rule:** Need to modify a display rule where we treat genus starting X as a hybrid. For example we display "Xanthisma" as "× anthisma".
-- [ ] **Save Settings:** For the Settings that have state and the grid columns selected and the Statuses selected, have ability to persist them to the DB so it remembers their setting at the next session. Also have ability to clear what was saved so it goes back to the system defaults. This could initially be a global setting for all users. Future note: In the future each user should have ability to save their own settings or to use the global settings.
 
 ## High Priority
 - [ ] **Implement Ingestion Engine:** Rewrite the Add Plant functionality by following the Ingestion Engine design to implement the 5-stage validation pipeline and continuing to adhere to other decisions.
@@ -32,7 +27,7 @@ This document tracks planned features and technical improvements to ensure conti
 ## Low Priority
 - [ ] **Personalized Collection:** There is a need for a user to identify the subset of plants they care about (personalized collection of data) so they don't have to weed through the full set of plants every time. 
 - [ ] **Garden Collection:** There is a need for a user to track their own collection of plants that tie back to recorded plant info. 
-- [ ] **Index Expansion:** Add indices to all filterable columns in `app_taxa` to prevent 57014 Database Timeouts during complex grid filtering.
+- [ ] **Index Expansion:** Add indexes to all filterable columns in `app_taxa` to prevent 57014 Database Timeouts during complex grid filtering.
 - [ ] **3-Tier Architecture Transition:** Move database logic to a dedicated server/API layer to support scaling beyond free-tier and browser limitations.
 - [ ] **Infrastructure Maintenance:** Address the need for a paid Supabase plan as the database exceeds logical storage limits (~1.9GB currently).
 - [ ] **Lifeform Multiselect Filter:** Create a multiselect filter for the lifeform_description column (which uses the Raunkiær terminology). Previous exact-match implementation (v2.18.2) proved insufficient for complex Raunkiær strings. Future implementation requires case-insensitive substring search or GIN-index support. Nice to have would be an extension to allow logical AND. Another nice to have extension would handle filtering based on logical subtypes and descritptive terms.
@@ -76,4 +71,9 @@ This document tracks planned features and technical improvements to ensure conti
 - [x] **Implement Grid Display Spec:** Fix the hierarchical display of plants in tree mode by following the Grid Display Spec design.
 - [x] **Load "virtual-root" Parents (Hydration):** When a virtual-root is created for parents because the user filtered on a child and the parent does exist in the DB (but not in the local results pool), trigger a fetch to replace the virtual-root with the real parent record. This is Stage 2 of the "Replace Virtuals" rule.
 - [x] **Fixed Fragmentation:** Resolved the "Double Family" bug where cultivars like 'Back in Black' would split into a separate `(none)` tree. (Verified v2.27.1).
-- [ ] **Virtual Row for Generic  Cultivars:** Add a virtual group under Genus to hold generic cultivars. Use something like "---" or "(none)", etc. in the Species column. Not sure if they should sort before or after the other Species. Maybe do a similar thing for the Cultivars of Species, adding a fake group named "---" or "(none)" in the Infraspecies column?
+- [x] **Virtual Row for Generic  Cultivars:** Add a virtual group under Genus to hold generic cultivars. Use something like "---" or "(none)", etc. in the Species column. Not sure if they should sort before or after the other Species. Maybe do a similar thing for the Cultivars of Species, adding a fake group named "---" or "(none)" in the Infraspecies column?
+- [x] **Fix Order for GH and SH:** Move GH before Genus. Move SH before Species.
+- [x] **Fix Legend:** It disappeared. The button is there but it doesn't do anything.
+- [x] **Fix Bolding/Dimming:** Some conditions get double dimming and should just be one level of dimming. Virtual rows should have the (none) in the column for their rank be bold and the color for their rank.
+- [x] **Fix leading X Rule:** Need to modify a display rule where we treat genus starting X as a hybrid. For example we display "Xanthisma" as "× anthisma".
+- [x] **Save Settings:** For the Settings that have state and the grid columns selected and the Statuses selected, have ability to persist them to the DB so it remembers their setting at the next session. Also have ability to clear what was saved so it goes back to the system defaults. This could initially be a global setting for all users. Future note: In the future each user should have ability to save their own settings or to use the global settings.

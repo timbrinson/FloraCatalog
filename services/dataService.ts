@@ -9,6 +9,7 @@ import { Taxon, Synonym, Link, DataSource } from '../types';
 const DB_TABLE = 'app_taxa';
 const DETAILS_TABLE = 'app_taxon_details';
 const SOURCES_TABLE = 'app_data_sources';
+const SETTINGS_TABLE = 'app_settings_global';
 
 // --- MAPPERS ---
 
@@ -163,7 +164,6 @@ export const dataService = {
     Object.entries(filters).forEach(([key, value]) => {
         if (value === undefined || value === null || value === '') return;
         
-        // ADR-004: key IS already snake_case
         const dbKey = key;
         
         if (typeof value === 'string') {
@@ -250,7 +250,6 @@ export const dataService = {
 
       if (error || !data || data.length === 0) return null;
       
-      // Artificial Hybrid is considered an Accepted form of designation
       const bestMatch = data.find(t => t.taxon_status === 'Accepted' || t.taxon_status === 'Artificial Hybrid') || data[0];
       const mapped = mapFromDB(bestMatch);
 
@@ -340,5 +339,28 @@ export const dataService = {
           .delete()
           .neq('taxon_id', '00000000-0000-0000-0000-000000000000');
       if (error) throw error;
+  },
+
+  // --- SETTINGS PERSISTENCE ---
+
+  async getGlobalSettings(): Promise<any> {
+      if (getIsOffline()) return null;
+      const { data, error } = await getSupabase()
+          .from(SETTINGS_TABLE)
+          .select('settings')
+          .eq('id', 'default_config')
+          .maybeSingle();
+      
+      if (error) return null;
+      return data?.settings;
+  },
+
+  async saveGlobalSettings(settings: any): Promise<void> {
+      if (getIsOffline()) return;
+      const { error } = await getSupabase()
+          .from(SETTINGS_TABLE)
+          .upsert({ id: 'default_config', settings, updated_at: new Date().toISOString() });
+      
+      if (error) console.error("Failed to save global settings:", error);
   }
 };

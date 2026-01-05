@@ -1,25 +1,27 @@
 # Specification: Data Grid Display Engine
 
 ## 1. Visual Weight Matrix
-To maintain high density and readability, the grid applies visual weights based on the **Row Rank**. Only the column matching the row's specific rank is **Bold**. All parent columns are **Dimmed**.
+To maintain high density and readability, the grid applies visual weights based on the **Row Rank**.
 
-| Row Rank | Family Col | Genus Col | Species Col | Infraspecies Col | Cultivar Col |
-| :--- | :--- | :--- | :--- | :--- | :--- |
-| **Family** | **Bold** | (none) | (none) | (none) | (none) |
-| **Genus** | Dimmed | **Bold** | (none) | (none) | (none) |
-| **Species** | Dimmed | Dimmed | **Bold** | (none) | (none) |
-| **Infraspecies** | Dimmed | Dimmed | Dimmed | **Bold** | (none) |
-| **Cultivar** | Dimmed | Dimmed | Dimmed | Dimmed | **Bold** |
+### Data Columns (Family, Genus, Species, etc.)
+- **Matching Rank**: The column matching the row's specific rank is **Bold**. 
+- **Virtual Rows**: If the row is a virtual "Holder" row (e.g., a Species Virtual Root), the `(none)` placeholder in that rank's column is **Bold** and uses the **Rank's Theme Color** (e.g., Orange for Genus, Amber for Species).
+- **Parent/Other Ranks**: These are displayed with standard text color (`text-slate-600`). Dimming (opacity/graying) is no longer applied to data columns to prevent "double dimming" and preserve readability.
 
-**Special Case: Holder Rows / Virtual Roots**
-For "Holder Rows" (where a level is skipped, e.g., a Generic Cultivar), the identifying column for that rank displays the placeholder **(none)**.
-- **Bold Placeholder:** If the row *represents* that rank (e.g., a Species Virtual Root row), the `(none)` is styled as `italic font-normal text-slate-400 opacity-60`.
-- **Dimmed Placeholder:** If the row is a child of a holder (e.g., a Cultivar row showing its parentage), the `(none)` is styled as `font-normal text-slate-300 opacity-40`.
+### Plant Name Column
+- **Active Row**: The name of the active taxon is rendered with full visual weight.
+- **Lineage**: Parent segments of the name are **Dimmed** (opacity 40-60%) to emphasize the specific designation of the current row.
+
+| Row Rank | Data Col (Matching) | Data Col (Parent) | Plant Name Col |
+| :--- | :--- | :--- | :--- |
+| **Active Rank** | **Bold + Rank Color (Virtual)** | Standard | Full Weight |
+| **Parent Rank** | Standard | Standard | **Dimmed** |
 
 **Visual Constants:**
-- **Bold:** `font-bold text-slate-900`
-- **Dimmed:** `font-normal text-slate-400`
-- **Virtual Row Background:** Uses the standard background color assigned to that Rank in the active theme.
+- **Bold (Real Record):** `font-bold text-slate-900`
+- **Bold (Virtual Placeholder):** `font-bold text-[RankColor]-700`
+- **Standard:** `font-normal text-slate-600`
+- **Dimmed (Plant Name):** `text-slate-400`
 
 ---
 

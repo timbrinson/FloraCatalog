@@ -13,6 +13,7 @@ DROP TABLE IF EXISTS app_taxa CASCADE;
 DROP TABLE IF EXISTS app_attribute_definitions CASCADE;
 DROP TABLE IF EXISTS app_data_sources CASCADE;
 DROP TABLE IF EXISTS wcvp_import CASCADE;
+DROP TABLE IF EXISTS app_settings_global CASCADE;
 
 -- =============================================================================
 -- WCVP Import Schema (Staging Table)
@@ -70,10 +71,14 @@ CREATE TABLE app_data_sources (
     CONSTRAINT app_data_sources_name_version_key UNIQUE (name, version)
 );
 
--- NOTE: If you manually insert Source ID 1 (WCVP), you MUST reset the sequence:
--- SELECT setval('app_data_sources_id_seq', (SELECT MAX(id) FROM app_data_sources));
+-- 2. GLOBAL SETTINGS (UI State Persistence)
+CREATE TABLE app_settings_global (
+    id text PRIMARY KEY,
+    settings jsonb NOT NULL,
+    updated_at timestamptz DEFAULT NOW()
+);
 
--- 2. ATTRIBUTE REGISTRY
+-- 3. ATTRIBUTE REGISTRY
 CREATE TABLE app_attribute_definitions (
     key_name text PRIMARY KEY,
     category text NOT NULL,
@@ -86,7 +91,7 @@ CREATE TABLE app_attribute_definitions (
     display_order int DEFAULT 0
 );
 
--- 3. TAXA (Core Table)
+-- 4. TAXA (Core Table)
 CREATE TABLE app_taxa (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     parent_id uuid REFERENCES app_taxa(id),
@@ -139,7 +144,7 @@ CREATE TABLE app_taxa (
     descendant_count int DEFAULT 0
 );
 
--- 4. GOLDEN RECORD (Details)
+-- 5. GOLDEN RECORD (Details)
 CREATE TABLE app_taxon_details (
     taxon_id uuid PRIMARY KEY REFERENCES app_taxa(id) ON DELETE CASCADE,
     description_text text,
@@ -159,7 +164,7 @@ CREATE TABLE app_taxon_details (
     reference_links jsonb DEFAULT '[]'
 );
 
--- 5. SOURCE ARCHIVE
+-- 6. SOURCE ARCHIVE
 CREATE TABLE app_taxon_source_records (
     id bigserial PRIMARY KEY,
     taxon_id uuid NOT NULL REFERENCES app_taxa(id) ON DELETE CASCADE,
@@ -169,7 +174,7 @@ CREATE TABLE app_taxon_source_records (
     import_batch_id text 
 );
 
--- 6. AUDIT LOG
+-- 7. AUDIT LOG
 CREATE TABLE app_audit_log (
     id bigserial PRIMARY KEY,
     entity_id uuid NOT NULL,
@@ -217,6 +222,9 @@ CREATE INDEX IF NOT EXISTS idx_app_taxa_basionym_wcvp ON app_taxa(basionym_plant
 CREATE INDEX IF NOT EXISTS idx_app_taxa_source ON app_taxa(source_id);
 CREATE INDEX IF NOT EXISTS idx_app_taxa_source_nulls ON app_taxa (source_id) WHERE source_id IS NULL;
 
+-- Initial default settings row
+INSERT INTO app_settings_global (id, settings) VALUES ('default_config', '{}') ON CONFLICT DO NOTHING;
+
 -- permissions
 ALTER TABLE wcvp_import DISABLE ROW LEVEL SECURITY;
 ALTER TABLE app_data_sources DISABLE ROW LEVEL SECURITY;
@@ -225,5 +233,6 @@ ALTER TABLE app_taxa DISABLE ROW LEVEL SECURITY;
 ALTER TABLE app_taxon_details DISABLE ROW LEVEL SECURITY;
 ALTER TABLE app_taxon_source_records DISABLE ROW LEVEL SECURITY;
 ALTER TABLE app_audit_log DISABLE ROW LEVEL SECURITY;
+ALTER TABLE app_settings_global DISABLE ROW LEVEL SECURITY;
 
 NOTIFY pgrst, 'reload schema';

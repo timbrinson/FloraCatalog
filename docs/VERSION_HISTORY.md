@@ -1,8 +1,26 @@
 # Version History
 
+## v2.27.4 - UI Consistency Refinement
+**Date:** July 04, 2025
+**Status:** Current Release
+
+### UX & Visual Design
+- **Rank Color Consistency:** Standardized Rank-based highlight colors across data rows and virtual rows using 500-weight theme colors. This lightens the Genus and Cultivar ranks to reduce visual harshness.
+- **Placeholder Legibility:** Significantly improved visibility of `(none)` placeholders in parent columns by matching the `text-slate-400` and `80% opacity` style of the virtual Plant Name column.
+- **Badge Styling:** Updated Rank badge text to 500 weight to improve readability and visual hierarchy balance.
+
+## v2.27.3 - UI State Persistence
+**Date:** July 04, 2025
+**Status:** (Historical)
+
+### Features & Persistence
+- **Global Settings Persistence:** Implemented the `app_settings_global` table to store column visibility, ordering, widths, and user preferences across sessions.
+- **Column Reordering:** Optimized nomenclature grouping by placing Hybrid indicators (GH/SH) before Genus and Species designations.
+- **Legend Restoration:** Restored and enhanced the taxonomic rank color legend.
+
 ## v2.27.2 - Governance & Protocol Cleanup
 **Date:** July 03, 2025
-**Status:** Current Release
+**Status:** (Historical)
 
 ### Project Governance
 - **Evolution Cleanup Rule:** Codified Section 13 in `AI_DEVELOPMENT_PROTOCOL.md`. The system now proactively reminds the human architect to clean up extraneous code and sync documentation after complex evolution cycles.

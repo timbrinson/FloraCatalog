@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Settings, Layout, Zap, Palette, Database, Save, Search as SearchIcon, Cpu, AlertTriangle, RefreshCw, Loader2, Trash2, Bug, Network } from 'lucide-react';
+import { X, Settings, Layout, Zap, Palette, Database, Save, Search as SearchIcon, Cpu, AlertTriangle, RefreshCw, Loader2, Trash2, Bug, Network, RotateCcw } from 'lucide-react';
 import { UserPreferences, ColorTheme } from '../types';
 import { reloadClient, MANUAL_URL, MANUAL_KEY } from '../services/supabaseClient';
 import { dataService } from '../services/dataService';
@@ -90,6 +90,13 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, preferen
       }
   };
 
+  const resetToSystemDefaults = async () => {
+      if (confirm("This will clear all saved column layouts, filters, and preferences. Continue?")) {
+          await dataService.saveGlobalSettings({});
+          window.location.reload();
+      }
+  };
+
   return (
     <div className="fixed inset-0 bg-black/50 z-[60] flex items-center justify-center p-4 animate-in fade-in duration-200">
       <div className="bg-white rounded-xl shadow-2xl w-full max-w-md p-6 relative max-h-[90vh] overflow-y-auto">
@@ -97,7 +104,10 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, preferen
         <div className="flex items-center gap-2 mb-6"><Settings className="text-slate-700" size={24} /><h3 className="text-xl font-bold text-slate-800">Settings</h3></div>
         <div className="space-y-8">
             <div>
-                <h4 className="text-sm font-bold text-slate-700 uppercase tracking-wide mb-3 flex items-center gap-2"><Database size={14}/> Database Connection</h4>
+                <div className="flex justify-between items-center mb-3">
+                    <h4 className="text-sm font-bold text-slate-700 uppercase tracking-wide flex items-center gap-2"><Database size={14}/> Database Connection</h4>
+                    <button onClick={resetToSystemDefaults} className="flex items-center gap-1 text-[10px] font-bold text-red-600 uppercase hover:underline"><RotateCcw size={10}/> Reset Defaults</button>
+                </div>
                 <div className="bg-slate-50 p-4 rounded-lg border border-slate-200 space-y-3">
                     <div><label className="block text-xs font-bold text-slate-600 mb-1">Project URL</label><input type="text" className="w-full text-xs p-2 border border-slate-300 rounded outline-none font-mono" value={dbUrl} onChange={(e) => setDbUrl(e.target.value)} /></div>
                     <div><label className="block text-xs font-bold text-slate-600 mb-1">Anon Key</label><input type="password" className="w-full text-xs p-2 border border-slate-300 rounded outline-none font-mono" value={dbKey} onChange={(e) => setDbKey(e.target.value)} /></div>

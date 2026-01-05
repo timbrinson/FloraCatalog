@@ -11,7 +11,7 @@ export const assembleScientificName = (p: Partial<Taxon>): string => {
     const isGenusHybrid = p.genus_hybrid === '×' || p.genus_hybrid === 'x' || p.genus_hybrid === 'true';
     const gh = isGenusHybrid ? '× ' : '';
     // Strip existing symbols before applying standard ones
-    const cleanGenus = String(p.genus).trim().replace(/^[×x+]\s?/i, '');
+    const cleanGenus = String(p.genus).trim().replace(/^[×+]\s?/i, '');
     if (cleanGenus) {
         parts.push(`${gh}${cleanGenus.charAt(0).toUpperCase()}${cleanGenus.slice(1).toLowerCase()}`);
     }
@@ -20,7 +20,7 @@ export const assembleScientificName = (p: Partial<Taxon>): string => {
   if (p.species && p.species !== 'null') {
     const isSpeciesHybrid = p.species_hybrid === '×' || p.species_hybrid === 'x' || p.species_hybrid === 'true';
     const sh = isSpeciesHybrid ? '× ' : '';
-    const cleanSpecies = String(p.species).trim().replace(/^[×x+]\s?/i, '');
+    const cleanSpecies = String(p.species).trim().replace(/^[×+]\s?/i, '');
     if (cleanSpecies) {
         parts.push(`${sh}${cleanSpecies.toLowerCase()}`);
     }
@@ -48,7 +48,7 @@ export const assembleScientificName = (p: Partial<Taxon>): string => {
 export const formatScientificName = (taxon: Taxon, prefs: UserPreferences = { hybrid_spacing: 'space', auto_enrichment: false, color_theme: 'option2a', search_mode: 'prefix', grouping_strategy: 'attribute' }): string => {
   let name = taxon.name || ''; 
   
-  const cleanName = name.replace(/^[×x]\s?/i, '');
+  const cleanName = name.replace(/^[×]\s?/i, '');
   
   const isGenusHybrid = taxon.genus_hybrid === '×' || taxon.genus_hybrid === 'x';
   const isSpeciesHybrid = taxon.species_hybrid === '×' || taxon.species_hybrid === 'x';
@@ -69,11 +69,12 @@ export const formatFullScientificName = (taxon: Taxon, prefs: UserPreferences): 
 
     let formatted = fullName;
     
-    if (/^[×x]\s?/i.test(formatted)) {
-        formatted = formatted.replace(/^[×x]\s?/i, `%%HYBRID_START%%`);
+    // We only preserve explicit multiplication signs now
+    if (/^[×]\s?/i.test(formatted)) {
+        formatted = formatted.replace(/^[×]\s?/i, `%%HYBRID_START%%`);
     }
 
-    formatted = formatted.replace(/\s[×x]\s/g, ' %%HYBRID_MID%% ');
+    formatted = formatted.replace(/\s[×]\s/g, ' %%HYBRID_MID%% ');
     
     if (formatted.includes('×') && !formatted.includes('%%HYBRID')) {
          formatted = formatted.replace(/×/g, ' %%HYBRID_MID%% ');

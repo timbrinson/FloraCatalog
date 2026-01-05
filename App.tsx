@@ -21,7 +21,6 @@ export default function App() {
   // Data State
   const [taxa, setTaxa] = useState<Taxon[]>([]);
   const [ancestors, setAncestors] = useState<Taxon[]>([]);
-  // Fix: Corrected malformed useState hook syntax for offset
   const [offset, setOffset] = useState<number>(0);
   const [hasMore, setHasMore] = useState(true);
   const [totalRecords, setTotalRecords] = useState(0);
@@ -61,6 +60,37 @@ export default function App() {
     });
   }, [gridFilters]);
 
+  /**
+   * INITIAL LOAD: Fetch Global Settings from DB
+   */
+  useEffect(() => {
+    const init = async () => {
+      if (!getIsOffline()) {
+        const saved = await dataService.getGlobalSettings();
+        if (saved) {
+          if (saved.preferences) setPreferences(saved.preferences);
+          if (saved.filters) setGridFilters(saved.filters);
+        }
+      }
+    };
+    init();
+  }, []);
+
+  /**
+   * PERSISTENCE: Save settings to DB on change (debounced)
+   */
+  useEffect(() => {
+    if (isInitialized && !getIsOffline()) {
+      const timer = setTimeout(() => {
+        dataService.saveGlobalSettings({
+          preferences,
+          filters: gridFilters
+        });
+      }, 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [preferences, gridFilters, isInitialized]);
+
   const fetchBatch = async (currentOffset: number, isNewSearch: boolean) => {
       const currentOfflineStatus = getIsOffline();
       setIsOffline(currentOfflineStatus);
@@ -75,9 +105,6 @@ export default function App() {
           setOffset(0);
           setTotalRecords(0);
           setErrorDetails(null);
-          
-          // CRITICAL: We no longer clear ancestors here. 
-          // We wait until the new data arrives to swap them ATOMICALLY.
       } else {
           setIsFetchingMore(true);
       }
@@ -99,8 +126,6 @@ export default function App() {
           if (thisQueryId !== activeQueryIdRef.current) return;
 
           if (isNewSearch) { 
-              // ATOMIC SWAP: Discard old results and old ancestors in the same cycle.
-              // This prevents "Orphan Frames" where children lose their parents for a single render.
               setTaxa(data); 
               setAncestors([]); 
               if (count !== -1) setTotalRecords(count);
@@ -227,9 +252,6 @@ export default function App() {
 
   const handleAddSuccess = () => { setShowAddModal(false); fetchBatch(0, true); };
   const handleMaintenanceComplete = () => { setTaxa([]); setOffset(0); fetchBatch(0, true); };
-
-  useEffect(() => { const s = localStorage.getItem('flora_prefs_rev2'); if (s) try { setPreferences(JSON.parse(s)); } catch(e) {} }, []); 
-  useEffect(() => localStorage.setItem('flora_prefs_rev2', JSON.stringify(preferences)), [preferences]);
 
   const isHardError = (isOffline || (loadingState === LoadingState.ERROR && !isInitialized));
   const isActuallyEmpty = taxa.length === 0 && !isFiltering && loadingState === LoadingState.SUCCESS && totalRecords === 0 && isInitialized;

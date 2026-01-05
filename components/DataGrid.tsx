@@ -2,6 +2,9 @@
 import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { Taxon, UserPreferences, ColorTheme } from '../types';
 import { formatFullScientificName } from '../utils/formatters';
+import { dataService } from '../services/dataService';
+// Import getIsOffline to fix "Cannot find name 'getIsOffline'" errors.
+import { getIsOffline } from '../services/supabaseClient';
 import DetailsPanel from './DetailsPanel';
 import { 
   ArrowUpDown as ArrowUpDownIcon, Settings as SettingsIcon, Check as CheckIcon, 
@@ -12,11 +15,11 @@ import {
   ChevronUp as ChevronUpIcon, Loader2 as Loader2Icon, 
   Search as SearchIcon, List as ListIcon, Square as SquareIcon, 
   CheckSquare as CheckSquareIcon, ArrowRightToLine, AlignCenter,
-  AlertCircle, Bug as BugIcon
+  AlertCircle, Bug as BugIcon, X
 } from 'lucide-react';
 
 
-// Implementation of Grid Display Spec v2.27.1
+// Implementation of Grid Display Spec v2.28.1
 const RANK_LEVELS: Record<string, number> = {
     'family': 1,
     'genus': 2,
@@ -42,7 +45,8 @@ const THEMES: Record<ColorTheme, ThemeMap> = {
     'option2b': { 'family': 'red', 'genus': 'sky', 'species': 'orange', 'subspecies': 'amber', 'variety': 'amber', 'form': 'amber', 'infraspecies': 'amber', 'cultivar': 'green', 'grex': 'green' }
 };
 
-const getTextClass = (color: string) => color === 'slate' ? 'text-slate-600' : `text-${color}-700`;
+// Refined: Use 500 weight for rank badges to lighten text across all ranks as requested.
+const getTextClass = (color: string) => color === 'slate' ? 'text-slate-600' : `text-${color}-500`;
 
 const MultiSelectFilter = ({ options, selected, onChange, label }: { options: string[], selected: string[], onChange: (val: string[]) => void, label: string }) => {
     const [isOpen, setIsOpen] = useState(false);
@@ -142,10 +146,10 @@ const COLUMN_GROUPS: ColumnGroup[] = [
         id: 'nomenclature',
         label: 'Nomenclature',
         columns: [
-            { id: 'genus', label: 'Genus', tooltip: 'Genus Designation', defaultWidth: 120, filterType: 'text', defaultOn: true },
             { id: 'genus_hybrid', label: 'GH', tooltip: 'Genus Hybrid Indicator', defaultWidth: 40, filterType: 'multi-select', filterOptions: ['+', '×', 'NULL'], disableSorting: true, hideHeaderIcons: true, headerAlign: 'center', lockWidth: true, defaultOn: true },
-            { id: 'species', label: 'Species', tooltip: 'Species Designation', defaultWidth: 120, filterType: 'text', defaultOn: true },
+            { id: 'genus', label: 'Genus', tooltip: 'Genus Designation', defaultWidth: 120, filterType: 'text', defaultOn: true },
             { id: 'species_hybrid', label: 'SH', tooltip: 'Species Hybrid Indicator', defaultWidth: 40, filterType: 'multi-select', filterOptions: ['+', '×', 'NULL'], disableSorting: true, hideHeaderIcons: true, headerAlign: 'center', lockWidth: true, defaultOn: true },
+            { id: 'species', label: 'Species', tooltip: 'Species Designation', defaultWidth: 120, filterType: 'text', defaultOn: true },
             { 
                 id: 'infraspecific_rank', 
                 label: 'I Rank', 
@@ -283,6 +287,44 @@ const DataGrid: React.FC<DataGridProps> = ({
   const legendRef = useRef<HTMLDivElement>(null);
   const colPickerRef = useRef<HTMLDivElement>(null);
 
+  /**
+   * DB PERSISTENCE: Save layout changes to DB
+   */
+  useEffect(() => {
+    // FIX: Use getIsOffline from services/supabaseClient
+    if (!getIsOffline()) {
+        const timer = setTimeout(() => {
+            dataService.getGlobalSettings().then(existing => {
+                dataService.saveGlobalSettings({
+                    ...existing,
+                    visibleColumns: Array.from(visibleColumns),
+                    columnOrder,
+                    colWidths
+                });
+            });
+        }, 2000);
+        return () => clearTimeout(timer);
+    }
+  }, [visibleColumns, columnOrder, colWidths]);
+
+  /**
+   * INITIAL LOAD: Fetch layout from DB
+   */
+  useEffect(() => {
+    const fetchLayout = async () => {
+        // FIX: Use getIsOffline from services/supabaseClient
+        if (!getIsOffline()) {
+            const saved = await dataService.getGlobalSettings();
+            if (saved) {
+                if (saved.visibleColumns) setVisibleColumns(new Set(saved.visibleColumns));
+                if (saved.columnOrder) setColumnOrder(saved.columnOrder);
+                if (saved.colWidths) setColWidths(saved.colWidths);
+            }
+        }
+    };
+    fetchLayout();
+  }, []);
+
   useEffect(() => {
       const newLocalFilters: Record<string, string> = {};
       Object.keys(filters).forEach(key => {
@@ -334,9 +376,6 @@ const DataGrid: React.FC<DataGridProps> = ({
     taxa.forEach(t => registry.set(t.id, { ...t, origin_type: 'result' }));
     
     const pool = Array.from(registry.values());
-    // NOTE: Object-level mutation healing loop removed in v2.27.2 
-    // because walkLineage logic now handles inheritance dynamically.
-
     return { allTaxaPool: pool, authorityRegistry: registry };
   }, [taxa, ancestors]);
 
@@ -402,15 +441,6 @@ const DataGrid: React.FC<DataGridProps> = ({
                   const auth = authorityRegistry.get(curr.parent_id);
                   if (auth?.family) return auth.family;
                   curr = auth;
-              }
-              // Secondary fallback: Extract Genus ID from path and check its authority
-              if (row.hierarchy_path) {
-                  const segs = row.hierarchy_path.split('.');
-                  if (segs.length > 1) {
-                      const genusId = segs[1].replace(/_/g, '-');
-                      const genusAuth = authorityRegistry.get(genusId);
-                      if (genusAuth?.family) return genusAuth.family;
-                  }
               }
               return '(none)';
           }
@@ -529,9 +559,9 @@ const DataGrid: React.FC<DataGridProps> = ({
       subset.forEach(row => { 
           let val = '(none)';
           if (parentRecord && field === (parentRecord.taxon_rank || '').toLowerCase()) {
-              val = String(parentRecord.taxon_name || '').replace(/^[×x]\s?/i, '').trim();
+              val = String(parentRecord.taxon_name || '').trim();
           } else {
-              val = String(row[field as keyof Taxon] || '').replace(/^[×x]\s?/i, '').trim() || '(none)';
+              val = String(row[field as keyof Taxon] || '').trim() || '(none)';
           }
           if (!groups[val]) groups[val] = []; 
           groups[val].push(row); 
@@ -543,7 +573,7 @@ const DataGrid: React.FC<DataGridProps> = ({
           const isHolder = key === '(none)';
 
           const headerTaxon = allTaxaPool.find(t => {
-             const rowVal = String(getRowValue(t, field)).replace(/^[×x]\s?/i, '').trim();
+             const rowVal = String(getRowValue(t, field)).trim();
              if (rowVal !== key) return false;
              const rank = (t.taxon_rank as string || '').toLowerCase();
              if (field === 'family') return rank === 'family';
@@ -609,7 +639,7 @@ const DataGrid: React.FC<DataGridProps> = ({
           const field = groupBy[depth];
           const groups: Record<string, Taxon[]> = {};
           subset.forEach(row => {
-              const val = String(getRowValue(row, field) || '').replace(/^[×x]\s?/i, '').trim() || '(none)';
+              const val = String(getRowValue(row, field) || '').trim() || '(none)';
               if (!groups[val]) groups[val] = [];
               groups[val].push(row);
           });
@@ -709,7 +739,34 @@ const DataGrid: React.FC<DataGridProps> = ({
          </div>
          <div className="flex items-center gap-2">
              <button onClick={toggleDebugMode} className={`flex items-center gap-1.5 px-3 py-1.5 border border-slate-300 rounded text-xs hover:bg-slate-50 shadow-sm transition-colors ${preferences.debug_mode ? 'bg-amber-100 text-amber-700 border-amber-400' : 'bg-white text-slate-600'}`} title="Diagnostic Mode (See IDs & Paths)"><BugIcon size={14} /></button>
-             <button onClick={() => setShowLegend(!showLegend)} className={`flex items-center gap-1.5 px-3 py-1.5 border border-slate-300 rounded text-xs hover:bg-slate-50 shadow-sm ${showLegend ? 'bg-slate-100 text-leaf-600' : 'bg-white text-slate-600'}`}><InfoIcon size={14} /> Legend</button>
+             <div className="relative" ref={legendRef}>
+                <button onClick={() => setShowLegend(!showLegend)} className={`flex items-center gap-1.5 px-3 py-1.5 border border-slate-300 rounded text-xs hover:bg-slate-50 shadow-sm ${showLegend ? 'bg-slate-100 text-leaf-600' : 'bg-white text-slate-600'}`}><InfoIcon size={14} /> Legend</button>
+                {showLegend && (
+                    <div className="absolute right-0 top-full mt-2 w-64 bg-white border border-slate-200 rounded-lg shadow-2xl z-50 p-4 origin-top-right animate-in fade-in zoom-in-95 duration-150">
+                        <div className="flex justify-between items-center mb-3">
+                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Taxonomic Colors</span>
+                            <button onClick={() => setShowLegend(false)} className="text-slate-400 hover:text-slate-600"><X size={14}/></button>
+                        </div>
+                        <div className="grid grid-cols-1 gap-2">
+                            {Object.entries(RANK_LEVELS).filter(([r]) => r !== 'unranked').sort((a,b) => a[1] - b[1]).map(([rank]) => {
+                                const color = activeColorMap[rank] || 'slate';
+                                return (
+                                    <div key={rank} className="flex flex-col gap-1 border-b border-slate-50 pb-2 last:border-0">
+                                        <div className="flex items-center gap-2">
+                                            <div className={`w-3 h-3 rounded-sm bg-${color}-500 shadow-sm`}></div>
+                                            <span className="text-xs font-bold text-slate-700 capitalize">{rank}</span>
+                                        </div>
+                                        <div className="flex gap-2 ml-5">
+                                            <div className={`flex-1 px-1.5 py-0.5 rounded text-[10px] bg-${color}-50 border border-${color}-200 text-${color}-500 font-medium`}>Standard</div>
+                                            <div className={`flex-1 px-1.5 py-0.5 rounded text-[10px] bg-${color}-50 border border-${color}-200 text-${color}-500 font-medium saturate-50 opacity-80`}>Hybrid</div>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
+                )}
+             </div>
              <button onClick={fitToScreen} className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-300 rounded text-xs text-slate-600 hover:bg-slate-50 shadow-sm"><MonitorIcon size={14} /> Fit Screen</button>
              <button onClick={autoFitContent} className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-300 rounded text-xs text-slate-600 hover:bg-slate-50 shadow-sm"><MaximizeIcon size={14} /> Auto Fit</button>
              <div className="relative" ref={colPickerRef}>
@@ -840,7 +897,6 @@ const DataGrid: React.FC<DataGridProps> = ({
                                if ((col.id === 'genus_hybrid' || col.id === 'species_hybrid') && (val === 'x' || val === 'X' || val === '×')) displayVal = '×';
 
                                let isBold = false;
-                               let isDimmed = false;
                                let placeholderStyle = "";
                                
                                const isIndicatorCol = ['genus_hybrid', 'species_hybrid', 'infraspecific_rank'].includes(col.id);
@@ -848,19 +904,22 @@ const DataGrid: React.FC<DataGridProps> = ({
                                if (colLevel && !isIndicatorCol) {
                                   if (colLevel === rowLevel) {
                                      isBold = true;
-                                     if (val === '(none)') placeholderStyle = "italic font-normal text-slate-400 opacity-60";
+                                     if (val === '(none)') {
+                                         // Refined: Use Rank Color 500 for virtual designations to be less dark.
+                                         placeholderStyle = `italic font-bold text-${baseColor}-500`;
+                                     }
                                   } else if (colLevel < rowLevel) {
-                                     isDimmed = true;
                                      if (val === '(none)' || !val) {
                                         displayVal = '(none)';
-                                        placeholderStyle = "font-normal text-slate-300 opacity-40";
+                                        // Refined: Matching Plant Name style with higher opacity for legibility.
+                                        placeholderStyle = "font-normal text-slate-400 opacity-80 italic";
                                      }
                                   }
                                }
 
                                if (col.id === 'taxon_rank') displayVal = <span className={`px-2 py-0.5 text-[10px] rounded border font-bold bg-${baseColor}-100 ${getTextClass(baseColor)} border-${baseColor}-200 normal-case`}>{displayVal}</span>;
                                else if (col.id === 'taxon_name') {
-                                 const content = tr.is_holder ? <span className="italic opacity-60">(none)</span> : formatFullScientificName(tr, preferences);
+                                 const content = tr.is_holder ? <span className="italic opacity-80 text-slate-400">(none)</span> : formatFullScientificName(tr, preferences);
                                  displayVal = (
                                     <div style={{ paddingLeft: `${depthIndent}px` }} className="flex items-center">
                                         {content}
@@ -869,9 +928,10 @@ const DataGrid: React.FC<DataGridProps> = ({
                                }
                                else if (col.id === 'taxon_status') { let b = 'bg-slate-100 text-slate-500'; if (val === 'Accepted' || val === 'Registered' || val === 'Artificial Hybrid') b = 'bg-green-50 text-green-700 border-green-200 border'; displayVal = <span className={`px-2 py-0.5 text-[10px] rounded font-bold ${b} normal-case`}>{displayVal || '-'}</span>; }
 
+                               // Refined: Matching actual data names to rank color 500 weight for consistency.
                                const baseTextClass = isBold 
-                                 ? (baseColor === 'slate' ? "font-bold text-slate-900" : `font-bold text-${baseColor}-900`)
-                                 : (isDimmed ? "font-normal text-slate-400" : "text-slate-600");
+                                 ? (baseColor === 'slate' ? "font-bold text-slate-900" : `font-bold text-${baseColor}-500`)
+                                 : "font-normal text-slate-600";
 
                                return (
                                  <td key={col.id} className={`p-2 border-r border-slate-50 truncate overflow-hidden max-w-0 ${col.headerAlign === 'center' ? 'text-center' : ''}`} title={String(val || '')}>
