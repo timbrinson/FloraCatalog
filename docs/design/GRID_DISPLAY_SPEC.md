@@ -71,6 +71,7 @@ The depth of the tree is dynamic based on column visibility.
 1. **Filter Persistence:** Text inputs must be debounced and maintain focus during infinite scroll updates.
 2. **Scroll Anchoring:** Adding new rows at the bottom of the list must not "jump" the user's current scroll position.
 3. **Casing Sovereignty:** Values from the DB (`Accepted`, `subsp.`, `temperate`) must be displayed with `normal-case` to preserve scientific literal accuracy.
+4. **Layout Reconciliation:** The grid component must synchronize its internal layout state with incoming configuration from the database on every prop update, ensuring UI persistence across sessions (ADR-007).
 
 ---
 

@@ -232,7 +232,6 @@ interface DataGridProps {
     filters: Record<string, any>;
     onFilterChange: (key: string, value: any) => void;
     error?: string | null;
-    // Layout overrides passed from parent persistence (Sovereign DB settings)
     visibleColumns?: Set<string>;
     columnOrder?: string[];
     colWidths?: Record<string, number>;
@@ -250,7 +249,6 @@ const DataGrid: React.FC<DataGridProps> = ({
     colWidths: propColWidths,
     onLayoutUpdate
 }) => {
-  // UNCONTROLLED Layout State: Strictly priority to props from DB. 
   const [visibleColumns, setVisibleColumns] = useState<Set<string>>(() => {
       if (propVisibleColumns !== undefined) return propVisibleColumns;
       return new Set(ALL_COLUMNS.filter(c => c.defaultOn).map(c => c.id));
@@ -266,31 +264,11 @@ const DataGrid: React.FC<DataGridProps> = ({
       return Object.fromEntries(ALL_COLUMNS.map(c => [c.id, c.defaultWidth]));
   });
 
-  // --- RECONCILIATION LOGIC ---
-  // If propVisibleColumns changes from undefined to a value, it means the DB load just finished.
-  // We MUST sync the internal state to this new truth.
-  useEffect(() => {
-    if (propVisibleColumns !== undefined) {
-        console.log("🔄 [DataGrid.Sync] Applying visibleColumns from Late Props:", Array.from(propVisibleColumns));
-        setVisibleColumns(propVisibleColumns);
-    }
-  }, [propVisibleColumns]);
+  // Layout Reconciliation (ADR-007)
+  useEffect(() => { if (propVisibleColumns !== undefined) setVisibleColumns(propVisibleColumns); }, [propVisibleColumns]);
+  useEffect(() => { if (propColumnOrder !== undefined) setColumnOrder(propColumnOrder); }, [propColumnOrder]);
+  useEffect(() => { if (propColWidths !== undefined) setColWidths(propColWidths); }, [propColWidths]);
 
-  useEffect(() => {
-    if (propColumnOrder !== undefined) {
-        console.log("🔄 [DataGrid.Sync] Applying columnOrder from Late Props:", propColumnOrder);
-        setColumnOrder(propColumnOrder);
-    }
-  }, [propColumnOrder]);
-
-  useEffect(() => {
-    if (propColWidths !== undefined) {
-        console.log("🔄 [DataGrid.Sync] Applying colWidths from Late Props.");
-        setColWidths(propColWidths);
-    }
-  }, [propColWidths]);
-
-  // Notify parent of layout changes for its manual save logic
   useEffect(() => {
       onLayoutUpdate?.({
           visibleColumns: Array.from(visibleColumns),
@@ -761,7 +739,6 @@ const DataGrid: React.FC<DataGridProps> = ({
               {gridRows.map((row, idx) => {
                   const tr = row as TreeRow; const isExpanded = expandedRows.has(tr.id); 
                   let rankKey = String(tr.taxon_rank).toLowerCase();
-                  // Consolidate ranks for styling/legend per backlog
                   if (['subspecies', 'variety', 'form', 'infraspecies'].includes(rankKey)) rankKey = 'subspecies';
                   else if (['subvariety', 'subform', 'unranked', 'agamosp.'].includes(rankKey)) rankKey = 'unranked';
                   
@@ -830,7 +807,6 @@ const DataGrid: React.FC<DataGridProps> = ({
                                  );
                                }
                                else if (col.id === 'taxon_status') { 
-                                 // "Rethink Status Selector Colors" task: Avoid rank colors, use specific contrasts per specification.
                                  let b = 'bg-slate-100 text-slate-500 border-slate-200 border'; 
                                  if (val === 'Accepted' || val === 'Registered' || val === 'Artificial Hybrid') {
                                      b = 'bg-white text-black border-slate-200 border'; 

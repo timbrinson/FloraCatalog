@@ -10,6 +10,12 @@ import SettingsModal from './components/SettingsModal';
 import ActivityPanel from './components/ActivityPanel';
 import AddPlantModal from './components/AddPlantModal';
 
+interface AppLayoutConfig {
+    visibleColumns?: Set<string>;
+    columnOrder?: string[];
+    colWidths?: Record<string, number>;
+}
+
 export default function App() {
   const [loadingState, setLoadingState] = useState<LoadingState>(LoadingState.IDLE);
   const [isInitialized, setIsInitialized] = useState(false);
@@ -53,11 +59,11 @@ export default function App() {
     isOpen: boolean; title: string; message: string; confirmLabel?: string; isDestructive?: boolean; onConfirm: () => void;
   }>({ isOpen: false, title: '', message: '', onConfirm: () => {} });
 
-  const [initialLayout, setInitialLayout] = useState<{
-      visibleColumns?: Set<string>;
-      columnOrder?: string[];
-      colWidths?: Record<string, number>;
-  }>({});
+  /**
+   * initialLayout: Starts as NULL. 
+   * CRITICAL: DataGrid is NOT rendered while this is NULL to prevent flickering.
+   */
+  const [initialLayout, setInitialLayout] = useState<AppLayoutConfig | null>(null);
   
   const latestLayoutRef = useRef<{
       visibleColumns: string[];
@@ -68,76 +74,94 @@ export default function App() {
   const [gridKey, setGridKey] = useState(0);
 
   /**
-   * loadGlobalSettings: Fetch configuration from database
+   * loadGlobalSettings: Fetch configuration from database.
    */
-  const loadGlobalSettings = async () => {
-    console.log("🔍 [App.LoadSettings] Querying Database for global settings...");
+  const loadGlobalSettings = async (): Promise<AppLayoutConfig> => {
     try {
         const saved = await dataService.getGlobalSettings();
+        settingsLoadedRef.current = true; 
+
         if (saved && Object.keys(saved).length > 0) {
-            console.log("🔍 [App.LoadSettings] Database settings FOUND:", saved);
             if (saved.preferences) setPreferences(saved.preferences);
             if (saved.filters) setGridFilters(saved.filters);
             
-            const layoutUpdate = {
+            return {
                 visibleColumns: Array.isArray(saved.visibleColumns) ? new Set<string>(saved.visibleColumns) : undefined,
                 columnOrder: Array.isArray(saved.columnOrder) ? saved.columnOrder : undefined,
                 colWidths: (saved.colWidths && typeof saved.colWidths === 'object') ? saved.colWidths : undefined
             };
-            setInitialLayout(layoutUpdate);
-            settingsLoadedRef.current = true;
-            return true;
-        } else {
-            console.log("🔍 [App.LoadSettings] Database settings EMPTY or UNAVAILABLE.");
-            return false;
         }
+        return {}; 
     } catch (e) {
-        console.error("❌ [App.LoadSettings] Error during fetch:", e);
-        return false;
+        return {};
     }
   };
 
   /**
-   * INITIAL STARTUP: Orchestrates the first settings load but avoids hanging
+   * INITIAL STARTUP: Orchestrates the first settings load.
    */
   useEffect(() => {
     const init = async () => {
-      console.log("🔍 [App.init] Starting startup sequence...");
+      const hasCreds = !!(localStorage.getItem('supabase_url') && localStorage.getItem('supabase_anon_key'));
       
-      // Attempt 1: Immediate
-      const success = await loadGlobalSettings();
-      
-      // If failed, the interval watcher below will keep trying once online.
-      // But we set initialized to TRUE here to let the app mount and show settings/empty states.
-      if (!success) {
-          console.warn("🔍 [App.init] Initial settings fetch yielded no results. Connection might be pending.");
+      if (hasCreds) {
+          for (let i = 0; i < 5; i++) {
+              if (!getIsOffline()) break;
+              await new Promise(r => setTimeout(r, 200));
+          }
       }
-      
-      setIsInitialized(true);
+
+      const currentOffline = getIsOffline();
+      setIsOffline(currentOffline);
+
+      if (!currentOffline) {
+          const fallback = setTimeout(() => {
+              if (initialLayout === null) {
+                  setInitialLayout({});
+                  setIsInitialized(true);
+              }
+          }, 3000);
+
+          try {
+              const config = await loadGlobalSettings();
+              clearTimeout(fallback);
+              setInitialLayout(config);
+              setIsInitialized(true);
+          } catch (e) {
+              setInitialLayout({});
+              setIsInitialized(true);
+          }
+      } else {
+          setInitialLayout({});
+          setIsInitialized(true);
+      }
     };
     init();
   }, []);
 
   /**
-   * CONNECTION WATCHER: Automatically retries settings load when coming online
+   * CONNECTION WATCHER: Late-synchronization for online transitions
    */
   useEffect(() => {
     const interval = setInterval(() => {
         const currentOffline = getIsOffline();
         
-        // If we were offline and now we're online, or if settings haven't loaded yet...
-        if ((isOffline && !currentOffline) || (!settingsLoadedRef.current && !currentOffline)) {
-            console.log(`🌐 [App.Watcher] Client ready (Offline: ${currentOffline}). Attempting settings sync...`);
+        if (!currentOffline && !settingsLoadedRef.current && isInitialized) {
+            loadGlobalSettings().then(config => {
+                if (config && Object.keys(config).length > 0) {
+                    setInitialLayout(config);
+                    setGridKey(prev => prev + 1); 
+                }
+            });
+        } 
+        
+        if (isOffline !== currentOffline) {
             setIsOffline(currentOffline);
-            if (!currentOffline) {
-                loadGlobalSettings();
-            }
-        } else if (isOffline !== currentOffline) {
-            setIsOffline(currentOffline);
+            if (currentOffline && !isInitialized) setIsInitialized(true);
         }
     }, 1500);
     return () => clearInterval(interval);
-  }, [isOffline]);
+  }, [isOffline, isInitialized]);
 
   const isFiltering = useMemo(() => {
     return Object.entries(gridFilters).some(([key, value]) => {
@@ -158,24 +182,19 @@ export default function App() {
             columnOrder: latestLayoutRef.current.columnOrder,
             colWidths: latestLayoutRef.current.colWidths
         });
-        alert("Layout and settings saved to database.");
+        alert("Layout saved.");
     } catch (e: any) {
-        alert(`Failed to save: ${e.message}`);
+        alert(`Failed: ${e.message}`);
     }
   };
 
   const handleReloadLayout = async () => {
-    console.log("🔄 [App.Reload] User selected Reload Settings action.");
-    if (getIsOffline()) {
-        alert("App is offline. Cannot reload from database.");
-        return;
-    }
-    const success = await loadGlobalSettings();
-    if (success) {
+    if (getIsOffline()) return;
+    const config = await loadGlobalSettings();
+    if (settingsLoadedRef.current) {
+        setInitialLayout(config);
         setGridKey(prev => prev + 1);
-        alert("Settings reloaded from database.");
-    } else {
-        alert("No saved settings found in database.");
+        alert("Settings reloaded.");
     }
   };
 
@@ -287,8 +306,8 @@ export default function App() {
   }, [taxa]);
 
   useEffect(() => { 
-    if (isInitialized) fetchBatch(0, true); 
-  }, [gridFilters, sortConfig, preferences.search_mode, isInitialized]);
+    if (isInitialized && initialLayout !== null) fetchBatch(0, true); 
+  }, [gridFilters, sortConfig, preferences.search_mode, isInitialized, initialLayout]);
 
   const handleFilterChange = (key: string, value: any) => setGridFilters(prev => ({ ...prev, [key]: value }));
   const handleSettingsClose = () => { setShowSettingsModal(false); if (!getIsOffline()) fetchBatch(0, true); };
@@ -300,7 +319,7 @@ export default function App() {
           setTaxa(prev => prev.map(t => t.id === id ? { ...t, ...updates } : t));
           setAncestors(prev => prev.map(t => t.id === id ? { ...t, ...updates } : t));
       } catch (e: any) {
-          alert(`Failed to update: ${e.message}`);
+          alert(`Failed: ${e.message}`);
       }
   };
 
@@ -350,7 +369,7 @@ export default function App() {
       </header>
 
       <main className="flex-1 overflow-hidden p-4 relative">
-        {(!isInitialized) ? (
+        {(!isInitialized || initialLayout === null) ? (
           <div className="h-full flex items-center justify-center"><Loader2 className="animate-spin text-leaf-600" size={48} /></div>
         ) : isHardError || isActuallyEmpty ? (
           <EmptyState isOffline={isOffline} loadingState={loadingState} errorDetails={errorDetails} onOpenSettings={() => setShowSettingsModal(true)} onRetry={() => fetchBatch(0, true)} />
