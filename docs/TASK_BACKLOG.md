@@ -1,8 +1,15 @@
 # Project Roadmap & Task Back backlog
 
 This document tracks planned features and technical improvements to ensure continuity across development sessions.
-## To Work on Now
-
+## Work on Now
+- [ ] **Index Cleanup and Refinement:** Update manual and automated DB installation scripts where needed Output any new scripts that need to be ran manually. Indicate any inndices that need to be removed manually.
+  1. Need an index on infraspecies_rank. Filtering on this usually timesout.
+  2. Need an index on infraspecies. 
+  3. "idx_app_taxa_name_sort" and "idx_app_taxa_name_exact" are two identical indices on taxon_name. Which to keep?
+  4. "idx_app_taxa_source" and "idx_app_taxa_source_id" are two identical indices on source_id. Which to keep?
+  5. There are two other indices on source_id that are similar. Can we keep just one? These are:
+    - CREATE INDEX idx_app_taxa_source_id_filter ON public.app_taxa USING btree (source_id) WHERE ((source_id IS NULL) OR (source_id <> 1))
+    - CREATE INDEX idx_app_taxa_source_nulls ON public.app_taxa USING btree (source_id) WHERE (source_id IS NULL)
 
 ## High Priority
 - [ ] **Implement Ingestion Engine:** Rewrite the Add Plant functionality by following the Ingestion Engine design to implement the 5-stage validation pipeline and continuing to adhere to other decisions.
@@ -17,7 +24,7 @@ This document tracks planned features and technical improvements to ensure conti
 
 ## Medium Priority
 - [ ] **Fix Expand/Collapse Levels:** This functionality was developed for the older string based hierarchy and does not work with Authority (IDs) for hierarchy, other than Family level.
-- [ ] **Sorting on Family:** With the new grid tree using Authority (IDs) and Family colums/rows turned on, it is not sorting by genus and adding the family abve it. Can we make it sort on Family and group all the Genus under the one instance of a particular family? Should an index be created on the family column?
+- [ ] **Sorting on Family:** With the new grid tree using Authority (IDs) and Family colums/rows turned on, it is not sorting by genus and adding the family abve it. Can we make it sort on Family and group all the Genus under the one instance of a particular family?
 - [ ] **Create Records for Family:** We have done a lot of work to accomodate Family level when it exists as an attribute and not a record or WCVP rank. Should we create records for all Family values used in WCVP? We would add teh Family Rank as an extension (like was done for Cultivar). We would need a special Status as well like 'Generated' or Extrapulated', that is an extension of teh WCVP vales (like was done for Registered and Provisional). 
 - [ ] **Clean Up Zombie Scripts:** As we developed the manual and then automated installation scripts there were a lot of changes in order to get them to work. It is not clear which are still valid and which should be archoived or deleted. It would be good to maintain both path's for installation. The manual path is good for training someone to understand the steps. The automated one is best for productivity. We need to organize the long list of scripts by seting up functional and/or logical folders.
 - [ ] **DataGrid & Model Consistency Audit:** Perform a line-by-line audit of DataGrid.tsx and the dataService.ts mappers to identify "Hidden Regressions." Specifically: (1) Ensure all cell renderers have type-safety checks to prevent rendering objects/arrays in spans, (2) Verify that every property used in the UI matches the Data Mapping document exactly (e.g., resolving the childCount vs descendantCount naming conflict), and (3) Ensure all ReactNode casting satisfies the compiler without using any.

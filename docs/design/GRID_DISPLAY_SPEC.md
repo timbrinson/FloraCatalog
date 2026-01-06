@@ -26,6 +26,14 @@ To maintain high density and readability, the grid applies visual weights based 
 - **Standard:** `font-normal text-slate-600`
 - **Metadata Text:** `text-slate-500 font-normal`
 
+### 1.1 Hybrid Modulation
+To maintain taxonomic grouping while distinguishing hybrids (records with `×` indicators), the system applies subtle visual attenuation rather than a distinct color hue.
+
+- **Base Color Preservation:** Hybrids use the same base Tailwind color as their rank (e.g., Emerald for Genus).
+- **Saturation Reduction (`saturate-50`):** Reduces color intensity by 50%, making the row appear "muted" compared to authoritative standard records.
+- **Transparency (`opacity-80`):** Softens the overall presence of the row, allowing the eye to prioritize pure species baseline data while still clearly identifying the hybrid.
+- **Legend Representation:** The Legend UI displays both versions side-by-side to ensure the user understands the vibrancy contrast.
+
 ---
 
 ## 2. Virtual Root Management
@@ -47,7 +55,7 @@ When filtering results in a child (e.g., Cultivar), the parent records might not
 To prevent duplicate hierarchy headers caused by inconsistent metadata, the grid groups rows based on **Literal-ID Hybrid** bucketing:
 
 1. **The Authority Registry:** During the tree-walk, the engine builds a map of every unique ID in the pool to its most complete metadata record.
-2. **Family Bucketing (Literal):** Rows are grouped by their `family` string literal. If a record has a null family, it recursively climbs its `parent_id` chain to inherit the family name from its physical ancestor in the registry.
+2. **Family Bucketing (Literal):** Rows are grouped by their `family` string literal. If a record has a null family, it recursively climbs its `parent_id` chain to find an ancestor (Authority) that possesses the family string.
 3. **Genus & Below Bucketing (ID):** Rows are grouped by the UUID segments in their `hierarchy_path`. All rows sharing Ancestor ID `X` at a specific level are forced into Bucket `X`.
 4. **Label Resolution:** When rendering a bucket header, the name is resolved by looking up the bucket's identity (string or UUID) in the Authority Registry.
 

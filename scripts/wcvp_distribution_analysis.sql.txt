@@ -1,0 +1,53 @@
+-- =============================================================================
+-- WCVP DATA DISTRIBUTION & HEALTH ANALYSIS
+-- =============================================================================
+
+-- 1. ACCEPTED PLANTS BY RANK
+-- Useful for verifying the volume of data across different taxonomic levels.
+SELECT 
+    taxon_rank, 
+    COUNT(*) as accepted_count
+FROM app_taxa
+WHERE taxon_status = 'Accepted'
+GROUP BY taxon_rank
+ORDER BY accepted_count DESC;
+
+-- 2. ACCEPTED PLANTS BY INFRASPECIES RANK
+-- Useful for verifying the volume of data across different infrspecies taxonomic levels.
+SELECT 
+    infraspecific_rank, 
+    COUNT(*) as accepted_count
+FROM app_taxa
+WHERE taxon_status = 'Accepted'
+GROUP BY infraspecific_rank
+ORDER BY accepted_count DESC;
+
+-- 3. OVERALL STATUS BREAKDOWN
+-- Shows the distribution of Accepted, Synonym, Unplaced, etc.
+SELECT 
+    taxon_status, 
+    COUNT(*) as record_count,
+    ROUND(COUNT(*) * 100.0 / (SELECT COUNT(*) FROM app_taxa), 2) as percentage
+FROM app_taxa
+GROUP BY taxon_status
+ORDER BY record_count DESC;
+
+-- 4. HIERARCHY GAP ANALYSIS
+-- Identifies records that have a parent_plant_name_id in the source 
+-- but were not successfully linked to a physical parent_id.
+SELECT 
+    taxon_rank,
+    COUNT(*) as unlinked_records
+FROM app_taxa
+WHERE parent_plant_name_id IS NOT NULL 
+  AND parent_id IS NULL
+GROUP BY taxon_rank
+ORDER BY unlinked_records DESC;
+
+-- 5. PATH COMPLETION CHECK
+-- Checks how many records have their Ltree path fully calculated.
+SELECT 
+    COUNT(*) as total_records,
+    COUNT(hierarchy_path) as paths_built,
+    ROUND(COUNT(hierarchy_path) * 100.0 / COUNT(*), 2) as percent_complete
+FROM app_taxa;
