@@ -1,11 +1,22 @@
 export type ColorTheme = 'option1a' | 'option1b' | 'option2a' | 'option2b';
 
+export interface PalletLevel {
+  base_color: string;
+  cell_bg_weight: number;
+  text_weight: number;
+  badge_bg_weight: number;
+  badge_border_weight: number;
+}
+
+export type RankPallet = Record<'family' | 'genus' | 'species' | 'infraspecies' | 'cultivar', PalletLevel>;
+
 export interface UserPreferences {
   hybrid_spacing: 'space' | 'nospace';
   auto_enrichment: boolean;
   auto_fit_max_width?: number;
   fit_screen_max_ratio?: number;
   color_theme: ColorTheme;
+  grid_pallet?: RankPallet;
   search_mode: 'prefix' | 'fuzzy'; 
   debug_mode?: boolean;
   grouping_strategy: 'attribute' | 'path';

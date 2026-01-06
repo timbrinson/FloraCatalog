@@ -1,6 +1,6 @@
 // DO NOT add any new files, classes, or namespaces.
 import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
-import { Taxon, UserPreferences, ColorTheme } from '../types';
+import { Taxon, UserPreferences, ColorTheme, RankPallet, PalletLevel } from '../types';
 import { formatFullScientificName } from '../utils/formatters';
 import { dataService } from '../services/dataService';
 import { getIsOffline } from '../services/supabaseClient';
@@ -36,25 +36,22 @@ const COL_RANK_LEVELS: Record<string, number> = {
     'cultivar': 5
 };
 
-type ThemeMap = Record<string, string>;
-const THEMES: Record<ColorTheme, ThemeMap> = {
-    'option1a': { 'family': 'red', 'genus': 'orange', 'species': 'amber', 'subspecies': 'green', 'variety': 'green', 'form': 'green', 'infraspecies': 'green', 'cultivar': 'blue', 'grex': 'sky' },
-    'option1b': { 'family': 'red', 'genus': 'sky', 'species': 'green', 'subspecies': 'amber', 'variety': 'amber', 'form': 'amber', 'infraspecies': 'amber', 'cultivar': 'orange', 'grex': 'orange' },
-    'option2a': { 'family': 'red', 'genus': 'green', 'species': 'amber', 'subspecies': 'orange', 'variety': 'orange', 'form': 'orange', 'infraspecies': 'orange', 'cultivar': 'sky', 'grex': 'sky' },
-    'option2b': { 'family': 'red', 'genus': 'sky', 'species': 'orange', 'subspecies': 'amber', 'variety': 'amber', 'form': 'amber', 'infraspecies': 'amber', 'cultivar': 'green', 'grex': 'green' }
+const DEFAULT_PALLET: RankPallet = {
+  family: { base_color: 'rose', cell_bg_weight: 50, text_weight: 600, badge_bg_weight: 100, badge_border_weight: 200 },
+  genus: { base_color: 'emerald', cell_bg_weight: 50, text_weight: 600, badge_bg_weight: 100, badge_border_weight: 200 },
+  species: { base_color: 'amber', cell_bg_weight: 50, text_weight: 600, badge_bg_weight: 100, badge_border_weight: 200 },
+  infraspecies: { base_color: 'orange', cell_bg_weight: 50, text_weight: 600, badge_bg_weight: 100, badge_border_weight: 200 },
+  cultivar: { base_color: 'sky', cell_bg_weight: 50, text_weight: 600, badge_bg_weight: 100, badge_border_weight: 200 }
 };
 
-// Simplified Legend Configuration per Backlog
-const LEGEND_GROUPS = [
-    { label: 'Family', ranks: ['family'] },
-    { label: 'Genus', ranks: ['genus'] },
-    { label: 'Species', ranks: ['species'] },
-    { label: 'Infraspecies', ranks: ['subspecies', 'variety', 'form', 'infraspecies'] },
-    { label: 'Cultivar', ranks: ['cultivar'] },
-    { label: 'Other', ranks: ['subvariety', 'subform', 'unranked', 'agamosp.'] }
+// Simplified Legend Configuration per Backlog (v2.29.1)
+const LEGEND_GROUPS: { label: string; key: keyof RankPallet }[] = [
+    { label: 'Family', key: 'family' },
+    { label: 'Genus', key: 'genus' },
+    { label: 'Species', key: 'species' },
+    { label: 'Infraspecies', key: 'infraspecies' },
+    { label: 'Cultivar', key: 'cultivar' }
 ];
-
-const getTextClass = (color: string) => color === 'slate' ? 'text-slate-600' : `text-${color}-500`;
 
 const MultiSelectFilter = ({ options, selected, onChange, label }: { options: string[], selected: string[], onChange: (val: string[]) => void, label: string }) => {
     const [isOpen, setIsOpen] = useState(false);
@@ -194,6 +191,29 @@ const COLUMN_GROUPS: ColumnGroup[] = [
         ]
     },
     {
+        id: 'standard_identifiers',
+        label: 'Standard Identifiers',
+        columns: [
+            { id: 'wcvp_id', label: 'WCVP ID', tooltip: 'WCVP Plant Name ID', defaultWidth: 120, filterType: 'text', defaultOn: false },
+            { id: 'ipni_id', label: 'IPNI ID', tooltip: 'IPNI ID', defaultWidth: 100, filterType: 'text', defaultOn: false },
+            { id: 'powo_id', label: 'POWO ID', tooltip: 'POWO ID', defaultWidth: 100, filterType: 'text', defaultOn: false },
+        ]
+    },
+    {
+        id: 'publication',
+        label: 'Publication',
+        columns: [
+            { id: 'taxon_authors', label: 'Authorship', tooltip: 'Taxon Authors', defaultWidth: 200, filterType: 'text', defaultOn: false },
+            { id: 'primary_author', label: 'Prim. Author', tooltip: 'Primary Author', defaultWidth: 150, filterType: 'text', defaultOn: false },
+            { id: 'publication_author', label: 'Pub. Author', tooltip: 'Publication Author', defaultWidth: 150, filterType: 'text', defaultOn: false },
+            { id: 'place_of_publication', label: 'Pub. Place', tooltip: 'Place Of Publication', defaultWidth: 200, filterType: 'text', defaultOn: false },
+            { id: 'volume_and_page', label: 'Vol/Page', tooltip: 'Volume And Page', defaultWidth: 100, filterType: 'text', defaultOn: false },
+            { id: 'first_published', label: 'First Published', tooltip: 'First Published Date', defaultWidth: 100, filterType: 'text', defaultOn: false },
+            { id: 'nomenclatural_remarks', label: 'Nom. Remarks', tooltip: 'Nomenclatural Remarks', defaultWidth: 200, filterType: 'text', defaultOn: false },
+            { id: 'reviewed', label: 'Reviewed', tooltip: 'Reviewed Status', defaultWidth: 100, filterType: 'multi-select', filterOptions: ['Yes', 'No', 'NULL'], defaultOn: false },
+        ]
+    },
+    {
         id: 'related',
         label: 'Related Plants',
         columns: [
@@ -324,7 +344,8 @@ const DataGrid: React.FC<DataGridProps> = ({
 
   const activeColumns = useMemo(() => columnOrder.filter(id => visibleColumns.has(id)).map(id => ALL_COLUMNS.find(c => c.id === id)).filter((c): c is ColumnConfig => !!c), [columnOrder, visibleColumns]);
   const totalTableWidth = useMemo(() => activeColumns.reduce((sum, col) => sum + (colWidths[col.id] || col.defaultWidth), 0), [activeColumns, colWidths]);
-  const activeColorMap = useMemo(() => THEMES[preferences.color_theme] || THEMES['option1a'], [preferences.color_theme]);
+  
+  const activePallet = useMemo(() => preferences.grid_pallet || DEFAULT_PALLET, [preferences.grid_pallet]);
 
   const { allTaxaPool, authorityRegistry } = useMemo(() => {
     const registry = new Map<string, TreeRow>();
@@ -629,17 +650,20 @@ const DataGrid: React.FC<DataGridProps> = ({
                         </div>
                         <div className="grid grid-cols-1 gap-2">
                             {LEGEND_GROUPS.map((group) => {
-                                const baseRank = group.ranks[0];
-                                const color = activeColorMap[baseRank] || 'slate';
+                                const p = activePallet[group.key];
+                                const color = p?.base_color || 'slate';
+                                const badgeWeight = p?.badge_bg_weight || 100;
+                                const textWeight = p?.text_weight || 600;
+                                
                                 return (
                                     <div key={group.label} className="flex flex-col gap-1 border-b border-slate-50 pb-2 last:border-0">
                                         <div className="flex items-center gap-2">
-                                            <div className={`w-3 h-3 rounded-sm bg-${color}-500 shadow-sm`}></div>
+                                            <div className={`w-3 h-3 rounded-sm bg-${color}-${textWeight} shadow-sm`}></div>
                                             <span className="text-xs font-bold text-slate-700 capitalize">{group.label}</span>
                                         </div>
                                         <div className="flex gap-2 ml-5">
-                                            <div className={`flex-1 px-1.5 py-0.5 rounded text-[10px] bg-${color}-50 border border-${color}-200 text-${color}-500 font-medium`}>Standard</div>
-                                            <div className={`flex-1 px-1.5 py-0.5 rounded text-[10px] bg-${color}-50 border border-${color}-200 text-${color}-500 font-medium saturate-50 opacity-80`}>Hybrid</div>
+                                            <div className={`flex-1 px-1.5 py-0.5 rounded text-[10px] bg-${color}-${badgeWeight} border border-${color}-${p?.badge_border_weight || 200} text-${color}-${textWeight} font-medium`}>Standard</div>
+                                            <div className={`flex-1 px-1.5 py-0.5 rounded text-[10px] bg-${color}-${badgeWeight} border border-${color}-${p?.badge_border_weight || 200} text-${color}-${textWeight} font-medium saturate-50 opacity-80`}>Hybrid</div>
                                         </div>
                                     </div>
                                 );
@@ -653,18 +677,18 @@ const DataGrid: React.FC<DataGridProps> = ({
              <div className="relative" ref={colPickerRef}>
                  <button onClick={() => setShowColPicker(!showColPicker)} className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-300 rounded text-xs text-slate-600 hover:bg-slate-50 shadow-sm"><SettingsIcon size={14} /> Columns</button>
                  {showColPicker && (
-                    <div className="absolute right-0 top-full mt-2 w-72 bg-white border border-slate-200 rounded-lg shadow-2xl z-50 p-3 max-h-[70vh] overflow-y-auto origin-top-right animate-in fade-in zoom-in-95 duration-150">
+                    <div className="absolute right-0 top-full mt-2 w-[520px] bg-white border border-slate-200 rounded-lg shadow-2xl z-50 p-4 max-h-[85vh] overflow-y-auto origin-top-right animate-in fade-in zoom-in-95 duration-150">
                         <div className="flex justify-between items-center mb-4 px-1"><div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Configure Grid</div><div className="flex gap-2"><button onClick={() => setVisibleColumns(new Set())} className="text-[10px] text-blue-600 hover:underline">Hide All</button><button onClick={() => setVisibleColumns(new Set(ALL_COLUMNS.map(c=>c.id)))} className="text-[10px] text-blue-600 hover:underline">Show All</button></div></div>
-                        <div className="space-y-4">
+                        <div className="columns-2 gap-x-8 gap-y-0">
                             {COLUMN_GROUPS.map(group => (
-                                <div key={group.id} className="space-y-1">
-                                    <div className="flex items-center justify-between group/grp px-1 mb-1">
+                                <div key={group.id} className="mb-6 break-inside-avoid">
+                                    <div className="flex items-center justify-between group/grp px-1 mb-1.5">
                                         <div className="flex items-center gap-2 cursor-pointer" onClick={() => toggleColumnGroup(group.id)}>
                                             <div className={`text-leaf-600`}>{group.columns.every(c => visibleColumns.has(c.id)) ? <CheckSquareIcon size={14} /> : group.columns.some(c => visibleColumns.has(c.id)) ? <SquareIcon size={14} className="opacity-50" /> : <SquareIcon size={14} className="text-slate-300" />}</div>
                                             <span className="text-[10px] font-extrabold uppercase text-slate-500 tracking-wide">{group.label}</span>
                                         </div>
                                     </div>
-                                    <div className="grid grid-cols-1 gap-0.5 ml-5">
+                                    <div className="flex flex-col gap-0.5 ml-5">
                                         {group.columns.map(col => (
                                             <div key={col.id} onClick={() => toggleColumn(col.id)} className="flex items-center gap-2 px-2 py-1 hover:bg-slate-50 cursor-pointer rounded transition-colors group/col" title={col.tooltip}><div className={`w-3 h-3 rounded flex items-center justify-center border flex-shrink-0 ${visibleColumns.has(col.id) ? 'bg-leaf-500 border-leaf-500' : 'border-slate-300'}`}>{visibleColumns.has(col.id) && <CheckIcon size={10} className="text-white"/>}</div><span className="text-xs text-slate-600 group-hover/col:text-slate-900 truncate">{col.label}</span></div>
                                         ))}
@@ -738,11 +762,15 @@ const DataGrid: React.FC<DataGridProps> = ({
            <tbody key={tableVersionKey} className="divide-y divide-slate-100">
               {gridRows.map((row, idx) => {
                   const tr = row as TreeRow; const isExpanded = expandedRows.has(tr.id); 
-                  let rankKey = String(tr.taxon_rank).toLowerCase();
-                  if (['subspecies', 'variety', 'form', 'infraspecies'].includes(rankKey)) rankKey = 'subspecies';
-                  else if (['subvariety', 'subform', 'unranked', 'agamosp.'].includes(rankKey)) rankKey = 'unranked';
+                  let rankKey = String(tr.taxon_rank).toLowerCase() as keyof RankPallet;
+                  if (['subspecies', 'variety', 'form', 'infraspecies'].includes(rankKey)) rankKey = 'infraspecies';
+                  else if (!['family', 'genus', 'species', 'cultivar'].includes(rankKey)) { 
+                    rankKey = 'species'; // Default fallback for unknown ranks
+                  }
                   
-                  const baseColor = activeColorMap[rankKey] || 'slate'; const isHybrid = tr.genus_hybrid === '×' || tr.genus_hybrid === 'x' || tr.species_hybrid === '×' || tr.species_hybrid === 'x';
+                  const p = activePallet[rankKey];
+                  const color = p?.base_color || 'slate'; 
+                  const isHybrid = tr.genus_hybrid === '×' || tr.genus_hybrid === 'x' || tr.species_hybrid === '×' || tr.species_hybrid === 'x';
                   const rowLevel = RANK_LEVELS[rankKey] || 99;
 
                   let debugClass = "";
@@ -753,10 +781,11 @@ const DataGrid: React.FC<DataGridProps> = ({
                   }
 
                   const rowKey = `${tr.origin_type || 'row'}-${tr.tree_path || tr.id}-${idx}`;
+                  const rowBg = isExpanded ? 'bg-blue-50/50' : `bg-${color}-${p?.cell_bg_weight || 50} ${isHybrid ? 'saturate-50' : ''}`;
 
                   return (
                      <React.Fragment key={rowKey}>
-                        <tr className={`hover:bg-blue-50/50 transition-colors ${isExpanded ? 'bg-blue-50/50' : (baseColor === 'slate' ? (isHybrid ? 'bg-slate-50 saturate-50' : '') : `bg-${baseColor}-50 ${isHybrid ? 'saturate-50' : ''}`)} ${tr.is_tree_header ? 'cursor-pointer group/header border-b-2 border-slate-200 font-medium' : ''} ${debugClass}`} onClick={tr.is_tree_header ? () => toggleGroup(tr.tree_path || '') : undefined}>
+                        <tr className={`hover:bg-blue-50/50 transition-colors ${rowBg} ${tr.is_tree_header ? 'cursor-pointer group/header border-b-2 border-slate-200 font-medium' : ''} ${debugClass}`} onClick={tr.is_tree_header ? () => toggleGroup(tr.tree_path || '') : undefined}>
                            {activeColumns.map(col => {
                                const colLevel = COL_RANK_LEVELS[col.id];
                                const val = getRowValue(tr, col.id);
@@ -764,12 +793,6 @@ const DataGrid: React.FC<DataGridProps> = ({
                                
                                if (col.id === 'tree_control') return <td key={col.id} className={`p-2 relative ${tr.is_tree_header ? '' : 'border-slate-50'}`} style={{ paddingLeft: `${depthIndent}px` }}>
                                    {tr.is_tree_header && <span className={`transform transition-transform inline-block ${tr.tree_expanded ? 'rotate-90' : ''}`}><ChevronRightIcon size={14} /></span>}
-                                   {preferences.debug_mode && (
-                                       <div className="absolute top-0 right-0 p-0.5 text-[8px] font-mono leading-none flex flex-col items-end pointer-events-none opacity-40">
-                                          <span>{tr.origin_type?.charAt(0).toUpperCase()}</span>
-                                          <span>D:{tr.depth}</span>
-                                       </div>
-                                   )}
                                </td>;
                                if (col.id === 'descendant_count') return <td key={col.id} className="p-2 text-xs text-center text-slate-400 font-mono">{tr.is_tree_header ? (tr as any).child_count : (tr.descendant_count || '')}</td>;
                                if (col.id === 'actions') return <td key={col.id} className="p-2 border-r border-slate-200 text-center"><div className="flex items-center justify-center gap-1"><button onClick={(e) => { e.stopPropagation(); setExpandedRows(prev => { const n = new Set(prev); n.has(tr.id) ? n.delete(tr.id) : n.add(tr.id); return n; }); }} className={`p-1.5 rounded shadow-sm ${isExpanded ? 'bg-slate-800 text-white' : 'bg-white border border-slate-200 text-slate-500 hover:text-slate-800'}`}>{isExpanded ? <ChevronUpIcon size={14}/> : <ChevronDownIcon size={14}/>}</button>{['genus', 'species', 'subspecies', 'variety', 'form'].includes(rankKey) && <button onClick={(e) => { e.stopPropagation(); onAction?.('enrich', tr); }} title="Analyze & Find Details" className="p-1.5 bg-indigo-50 border border-indigo-200 rounded text-indigo-600 hover:bg-indigo-100 shadow-sm"><PickaxeIcon size={14} /></button>}<button onClick={(e) => { e.stopPropagation(); onAction?.('enrich', tr); }} title="Enrich Data Layer" className="p-1.5 bg-amber-50 border border-amber-200 rounded text-amber-600 hover:bg-amber-100 shadow-sm"><Wand2Icon size={14} /></button></div></td>;
@@ -787,7 +810,7 @@ const DataGrid: React.FC<DataGridProps> = ({
                                   if (colLevel === rowLevel) {
                                      isBold = true;
                                      if (val === '(none)') {
-                                         placeholderStyle = `italic font-bold text-${baseColor}-500`;
+                                         placeholderStyle = `italic font-bold text-${color}-${p?.text_weight || 600}`;
                                      }
                                   } else if (colLevel < rowLevel) {
                                      if (val === '(none)' || !val) {
@@ -797,7 +820,7 @@ const DataGrid: React.FC<DataGridProps> = ({
                                   }
                                }
 
-                               if (col.id === 'taxon_rank') displayVal = <span className={`px-2 py-0.5 text-[10px] rounded border font-bold bg-${baseColor}-100 ${getTextClass(baseColor)} border-${baseColor}-200 normal-case`}>{displayVal}</span>;
+                               if (col.id === 'taxon_rank') displayVal = <span className={`px-2 py-0.5 text-[10px] rounded border font-normal bg-${color}-${p?.badge_bg_weight || 100} text-${color}-${p?.text_weight || 600} border-${color}-${p?.badge_border_weight || 200} normal-case`}>{displayVal}</span>;
                                else if (col.id === 'taxon_name') {
                                  const content = tr.is_holder ? <span className="italic opacity-80 text-slate-400">(none)</span> : formatFullScientificName(tr, preferences);
                                  displayVal = (
@@ -807,17 +830,11 @@ const DataGrid: React.FC<DataGridProps> = ({
                                  );
                                }
                                else if (col.id === 'taxon_status') { 
-                                 let b = 'bg-slate-100 text-slate-500 border-slate-200 border'; 
-                                 if (val === 'Accepted' || val === 'Registered' || val === 'Artificial Hybrid') {
-                                     b = 'bg-white text-black border-slate-200 border'; 
-                                 } else if (val === 'Provisional') {
-                                     b = 'bg-white text-slate-700 border-slate-200 border';
-                                 }
-                                 displayVal = <span className={`px-2 py-0.5 text-[10px] rounded font-bold ${b} normal-case shadow-sm`}>{displayVal || '-'}</span>; 
+                                 displayVal = <span className="text-[11px] text-slate-500 font-normal normal-case">{displayVal || '-'}</span>; 
                                }
 
                                const baseTextClass = isBold 
-                                 ? (baseColor === 'slate' ? "font-bold text-slate-900" : `font-bold text-${baseColor}-500`)
+                                 ? `font-bold text-${color}-${p?.text_weight || 900}`
                                  : "font-normal text-slate-600";
 
                                const isSystemCol = ['tree_control', 'descendant_count'].includes(col.id);

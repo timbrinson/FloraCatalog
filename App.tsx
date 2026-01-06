@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Loader2, Leaf, Activity, Settings, Plus } from 'lucide-react';
-import { Taxon, LoadingState, UserPreferences, ActivityItem, ActivityStatus } from './types';
+import { Taxon, LoadingState, UserPreferences, ActivityItem, ActivityStatus, RankPallet } from './types';
 import { dataService } from './services/dataService';
 import { getIsOffline, reloadClient } from './services/supabaseClient';
 import EmptyState from './components/EmptyState';
@@ -15,6 +15,14 @@ interface AppLayoutConfig {
     columnOrder?: string[];
     colWidths?: Record<string, number>;
 }
+
+const DEFAULT_PALLET: RankPallet = {
+  family: { base_color: 'rose', cell_bg_weight: 50, text_weight: 600, badge_bg_weight: 100, badge_border_weight: 200 },
+  genus: { base_color: 'emerald', cell_bg_weight: 50, text_weight: 600, badge_bg_weight: 100, badge_border_weight: 200 },
+  species: { base_color: 'amber', cell_bg_weight: 50, text_weight: 600, badge_bg_weight: 100, badge_border_weight: 200 },
+  infraspecies: { base_color: 'orange', cell_bg_weight: 50, text_weight: 600, badge_bg_weight: 100, badge_border_weight: 200 },
+  cultivar: { base_color: 'sky', cell_bg_weight: 50, text_weight: 600, badge_bg_weight: 100, badge_border_weight: 200 }
+};
 
 export default function App() {
   const [loadingState, setLoadingState] = useState<LoadingState>(LoadingState.IDLE);
@@ -48,6 +56,7 @@ export default function App() {
       auto_fit_max_width: 400,
       fit_screen_max_ratio: 4.0,
       color_theme: 'option2a',
+      grid_pallet: DEFAULT_PALLET,
       search_mode: 'prefix',
       debug_mode: false,
       grouping_strategy: 'path'
@@ -82,7 +91,14 @@ export default function App() {
         settingsLoadedRef.current = true; 
 
         if (saved && Object.keys(saved).length > 0) {
-            if (saved.preferences) setPreferences(saved.preferences);
+            if (saved.preferences) {
+                // Merge preferences with defaults to handle new schema fields (like grid_pallet)
+                setPreferences(prev => ({
+                    ...prev,
+                    ...saved.preferences,
+                    grid_pallet: saved.preferences.grid_pallet || DEFAULT_PALLET
+                }));
+            }
             if (saved.filters) setGridFilters(saved.filters);
             
             return {

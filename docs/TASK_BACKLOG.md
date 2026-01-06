@@ -3,8 +3,8 @@
 This document tracks planned features and technical improvements to ensure continuity across development sessions.
 ## To Work on Now
 
+
 ## High Priority
-- [ ] **Pallet for Grid Colors:** Update the configurability of the grid colors. Replace the 4 options 1a, 1b, 2a, and 2b with ability to customize the colors. The customization has selections for each of the five grid levels (family, genus, species, infraspecies, cultivar) with the base Tailwind CSS v3 color, weight for cell wash/background, weight for text, weight for badge wash/background and weight for badge border.
 - [ ] **Implement Ingestion Engine:** Rewrite the Add Plant functionality by following the Ingestion Engine design to implement the 5-stage validation pipeline and continuing to adhere to other decisions.
 - [ ] **Fix Finding Plant Details:** [Human Note: The Tooltips are working and do help. The icons are not obvious but maybe others would not either. Actions gets stuck with activity "Initializing AI curator..." and never finishes. The same wording is used in the Activity Panel for both so you can't tell them apart.] The Icon Button for searching for plant details doesn't function. Also the Icon is not obvious what it does. I'm not sure which of the two Icons to select but neither works. The Icon button needs a tool tip saying what it does.
 - [ ] **Fix Missing Controls for Adding Plants:** [Human Note: Bulk Upload was removed as the AI rewrote the Add Plant interface after the file was corrupted where it simplified things due to many issues found when adding plants. Needs implemented again after the Ingestion Engine is implemented and ading a single plant is working smoothly.] [AI Note: Implemented AddPlantModal with AI-assisted taxonomic parsing via Gemini 3 Pro. Restored Bulk Upload capability with .txt/.csv file parsing. Integrated all "Add" operations with the Activity Panel for asynchronous tracking and background processing. Cleaned up legacy files: PlantCard.tsx, ProcessMonitor.tsx, and defaultData.ts.]
@@ -78,7 +78,11 @@ This document tracks planned features and technical improvements to ensure conti
 - [x] **Fix Legend:** It disappeared. (Restored in v2.28.1).
 - [x] **Fix Bolding/Dimming:** Some conditions get double dimming.
 - [x] **Fix leading X Rule:** treat genus starting X as a hybrid.
-- [ ] **Simplify Legend Colors:** Remove the specific infraspecies ranks (Subspecies, Variety, Form) and just have Infraspecies to represent any of them. Replace Subvariety and Subform with just 'Other'.
-- [ ] **Rethink Status Selector Colors:** The green for Accepted and Artificial Hybrid looks too much like the green for Genus. Everything else is currently just black (or dark gray) on light gray. We should stay away from using any colors related to the rank and grid background. Let's use black on white for Accepted, Articial Hybrid and Registered. Use dark gray on white for Provisional. Use dark gray on light gray for all others.
-- [ ] **UI to Save Config State:** Provide a UI for the user to explicitly save the config state as opposed to saving it automatically everytime something is changed. Also provide a way to refresh the state from the settings that have been saved.
-- [ ] **Remove Column Borders:** A couple columns have a border on the right side. Remove it fromm the tree column and the Count column.
+- [x] **Simplify Legend Colors:** Remove the specific infraspecies ranks (Subspecies, Variety, Form) and just have Infraspecies to represent any of them. Replace Subvariety and Subform with just 'Other'.
+- [x] **Rethink Status Selector Colors:** The green for Accepted and Artificial Hybrid looks too much like the green for Genus. Everything else is currently just black (or dark gray) on light gray. We should stay away from using any colors related to the rank and grid background. Let's use black on white for Accepted, Articial Hybrid and Registered. Use dark gray on white for Provisional. Use dark gray on light gray for all others.
+- [x] **UI to Save Config State:** Provide a UI for the user to explicitly save the config state as opposed to saving it automatically everytime something is changed. Also provide a way to refresh the state from the settings that have been saved.
+- [x] **Remove Column Borders:** A couple columns have a border on the right side. Remove it fromm the tree column and the Count column.
+- [x] **Pallet for Grid Colors:** Update the configurability of the grid colors. Replace the 4 options 1a, 1b, 2a, and 2b with ability to customize the colors. The customization has selections for each of the five grid levels (family, genus, species, infraspecies, cultivar) with the base Tailwind CSS v3 color, weight for cell wash/background, weight for text, weight for badge wash/background and weight for badge border. Place these toward the bottom of the Seetings panel, above Maintenance.
+- [x] **Status Values as Text:** The status values in the grid are badges which draws too much attention to them. Change them to just text (regular font).
+- [x] **Rank Values Not Bold:** The rank values in the grid are badges with bold text. Change them to regular font but keep them as badges.
+
