@@ -55,7 +55,6 @@ export default function App() {
       auto_enrichment: false,
       auto_fit_max_width: 400,
       fit_screen_max_ratio: 4.0,
-      color_theme: 'option2a',
       grid_pallet: DEFAULT_PALLET,
       search_mode: 'prefix',
       debug_mode: false,

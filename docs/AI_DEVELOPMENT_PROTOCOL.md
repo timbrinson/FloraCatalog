@@ -76,3 +76,13 @@ For all application tiers, **Database Literals are the sovereign naming standard
 1.  **Identify Extraneous Code:** Scan the affected components for variables, console logs, or logic branches that were part of a "trial" but are no longer used by the final solution.
 2.  **Documentation Sync:** Compare the final technical implementation with existing `docs/` (ADRs, Specs, Data Mapping). Identify any descriptions that are now inaccurate.
 3.  **Proactive Suggestion:** Before closing the task, the AI must ask: *"We have reached a stable state. Should I perform a Cleanup Pass to remove trial code and synchronize documentation with the current implementation?"*
+
+## 14. Documentation Checksumming (ADR-009)
+Whenever a documentation file (especially `TASK_BACKLOG.md`) is modified, the AI must provide a "Verbatim Verification" statement in the planning phase:
+*"I have verified via a mental diff that no items were removed from ANY section, and all human notes have been preserved character-for-character. Item counts per section are: [List Counts]."*
+
+## 15. Markdown Formatting Standards (ADR-009)
+To distinguish between user intent and AI-generated context within a shared document:
+1.  **Human Note:** Use a bold nested bullet: `* **Human Note:** [text]`
+2.  **AI Context/Summary:** Use a blockquote: `> **AI Context:** [text]`
+3.  **Task Status:** AI is prohibited from modifying the status of a task `[ ]` to `[x]` or moving it to Archive without explicit Human Architect approval.

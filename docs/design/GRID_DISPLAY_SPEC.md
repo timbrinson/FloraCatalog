@@ -8,20 +8,23 @@ To maintain high density and readability, the grid applies visual weights based 
 - **Virtual Rows**: If the row is a virtual "Holder" row (e.g., a Species Virtual Root), the `(none)` placeholder in that rank's column is **Bold** and uses the **Rank's Theme Color** (e.g., Orange for Genus, Amber for Species).
 - **Parent/Other Ranks**: These are displayed with standard text color (`text-slate-600`). Dimming (opacity/graying) is no longer applied to data columns to prevent "double dimming" and preserve readability.
 
+### Taxonomy Metadata (Status & Rank)
+- **Status Value**: Rendered as simple, regular-weight text (`text-slate-500 font-normal`). This minimizes visual noise across large lists.
+- **Rank Value**: Rendered as a badge using the rank's base color, but utilizing **normal font weight** (`font-normal`) to reduce the "punch" of the metadata relative to the scientific name.
+
 ### Plant Name Column
 - **Active Row**: The name of the active taxon is rendered with full visual weight.
 - **Lineage**: Parent segments of the name are **Dimmed** (opacity 40-60%) to emphasize the specific designation of the current row.
 
-| Row Rank | Data Col (Matching) | Data Col (Parent) | Plant Name Col |
+| Row Component | Data Col (Matching) | Taxonomy Status | Taxonomy Rank |
 | :--- | :--- | :--- | :--- |
-| **Active Rank** | **Bold + Rank Color (Virtual)** | Standard | Full Weight |
-| **Parent Rank** | Standard | Standard | **Dimmed** |
+| **Styling** | **Bold** | Plain Text | Normal Weight Badge |
+| **Rationale** | Highlights Position | Minimizes Noise | Scannable but light |
 
 **Visual Constants:**
 - **Bold (Real Record):** `font-bold text-slate-900`
-- **Bold (Virtual Placeholder):** `font-bold text-[RankColor]-700`
 - **Standard:** `font-normal text-slate-600`
-- **Dimmed (Plant Name):** `text-slate-400`
+- **Metadata Text:** `text-slate-500 font-normal`
 
 ---
 

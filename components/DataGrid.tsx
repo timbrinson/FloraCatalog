@@ -1,6 +1,6 @@
 // DO NOT add any new files, classes, or namespaces.
 import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
-import { Taxon, UserPreferences, ColorTheme, RankPallet, PalletLevel } from '../types';
+import { Taxon, UserPreferences, RankPallet, PalletLevel } from '../types';
 import { formatFullScientificName } from '../utils/formatters';
 import { dataService } from '../services/dataService';
 import { getIsOffline } from '../services/supabaseClient';
@@ -276,6 +276,7 @@ const DataGrid: React.FC<DataGridProps> = ({
   
   const [columnOrder, setColumnOrder] = useState<string[]>(() => {
       if (propColumnOrder !== undefined) return propColumnOrder;
+      // Fix: ALL_COLUMNS.map(c => [c.id]) was returning string[][], should be string[]
       return ALL_COLUMNS.map(c => c.id);
   });
   

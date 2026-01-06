@@ -1,5 +1,3 @@
-export type ColorTheme = 'option1a' | 'option1b' | 'option2a' | 'option2b';
-
 export interface PalletLevel {
   base_color: string;
   cell_bg_weight: number;
@@ -15,7 +13,6 @@ export interface UserPreferences {
   auto_enrichment: boolean;
   auto_fit_max_width?: number;
   fit_screen_max_ratio?: number;
-  color_theme: ColorTheme;
   grid_pallet?: RankPallet;
   search_mode: 'prefix' | 'fuzzy'; 
   debug_mode?: boolean;

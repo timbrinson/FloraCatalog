@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { X, Settings, Layout, Zap, Palette, Database, Save, Search as SearchIcon, Cpu, AlertTriangle, RefreshCw, Loader2, Trash2, Bug, Network, RotateCcw, Download, Droplets, Type, Square, Grid2X2 } from 'lucide-react';
-import { UserPreferences, ColorTheme, RankPallet, PalletLevel } from '../types';
+import { UserPreferences, RankPallet, PalletLevel } from '../types';
 import { reloadClient, MANUAL_URL, MANUAL_KEY } from '../services/supabaseClient';
 import { dataService } from '../services/dataService';
 import ConfirmDialog from './ConfirmDialog';
@@ -184,9 +184,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, preferen
                 <div className="bg-slate-50 p-4 rounded-lg border border-slate-200 space-y-3">
                     <label className="block text-[10px] font-extrabold text-slate-400 uppercase tracking-wider mb-1">Grouping Strategy (ADR-006)</label>
                     <div className="grid grid-cols-2 gap-2 p-1 bg-slate-100 rounded-lg">
-                        {/* Fixed typo: preferences.group_strategy to preferences.grouping_strategy */}
                         <button onClick={() => onUpdate({ ...preferences, grouping_strategy: 'attribute' })} className={`p-2 text-[10px] rounded-md transition-all ${preferences.grouping_strategy === 'attribute' ? 'bg-white shadow-sm font-bold text-slate-700 border border-slate-200' : 'text-slate-500'}`}>Legacy (Strings)</button>
-                        {/* Fixed typo: text-slate-50 to text-slate-500 */}
                         <button onClick={() => onUpdate({ ...preferences, grouping_strategy: 'path' })} className={`p-2 text-[10px] rounded-md transition-all ${preferences.grouping_strategy === 'path' ? 'bg-white shadow-sm font-bold text-leaf-700 border border-leaf-200' : 'text-slate-500'}`}>Authority (IDs)</button>
                     </div>
                 </div>

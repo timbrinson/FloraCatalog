@@ -6,9 +6,14 @@ This document tracks planned features and technical improvements to ensure conti
 
 ## High Priority
 - [ ] **Implement Ingestion Engine:** Rewrite the Add Plant functionality by following the Ingestion Engine design to implement the 5-stage validation pipeline and continuing to adhere to other decisions.
-- [ ] **Fix Finding Plant Details:** [Human Note: The Tooltips are working and do help. The icons are not obvious but maybe others would not either. Actions gets stuck with activity "Initializing AI curator..." and never finishes. The same wording is used in the Activity Panel for both so you can't tell them apart.] The Icon Button for searching for plant details doesn't function. Also the Icon is not obvious what it does. I'm not sure which of the two Icons to select but neither works. The Icon button needs a tool tip saying what it does.
-- [ ] **Fix Missing Controls for Adding Plants:** [Human Note: Bulk Upload was removed as the AI rewrote the Add Plant interface after the file was corrupted where it simplified things due to many issues found when adding plants. Needs implemented again after the Ingestion Engine is implemented and ading a single plant is working smoothly.] [AI Note: Implemented AddPlantModal with AI-assisted taxonomic parsing via Gemini 3 Pro. Restored Bulk Upload capability with .txt/.csv file parsing. Integrated all "Add" operations with the Activity Panel for asynchronous tracking and background processing. Cleaned up legacy files: PlantCard.tsx, ProcessMonitor.tsx, and defaultData.ts.]
-- [ ] **Traceability & Lineage Framework:** [Human Note: Source Attribution was removed as the AI rewrote the Add Plant interface after the file was corrupted where it simplified things due to many issues found when adding plants. Needs implemented again after the Ingestion Engine is implemented.] [AI Note: Implemented mandatory Source Attribution in AddPlantModal. Integrated app_data_sources registry to track "Who, What, When, and How." Manual additions now capture App Version (v2.18.0), process context, and timestamp. Locked down WCVP source from manual attribution selection. Added case-insensitive matching for lineage detection. Resolved statement timeouts in Purge utility by switching to ID-chained deletion.]
+- [ ] **Fix Finding Plant Details:** The Icon Button for searching for plant details doesn't function. Also the Icon is not obvious what it does. I'm not sure which of the two Icons to select but neither works. The Icon button needs a tool tip saying what it does.
+    * **Human Note:** The Tooltips are working and do help. The icons are not obvious but maybe others would not either. Actions gets stuck with activity "Initializing AI curator..." and never finishes. The same wording is used in the Activity Panel for both so you can't tell them apart.
+- [ ] **Fix Missing Controls for Adding Plants:**
+    * **Human Note:** Bulk Upload was removed as the AI rewrote the Add Plant interface after the file was corrupted where it simplified things due to many issues found when adding plants. Needs implemented again after the Ingestion Engine is implemented and ading a single plant is working smoothly.
+    > **AI Context:** Implemented AddPlantModal with AI-assisted taxonomic parsing via Gemini 3 Pro. Restored Bulk Upload capability with .txt/.csv file parsing. Integrated all "Add" operations with the Activity Panel for asynchronous tracking and background processing. Cleaned up legacy files: PlantCard.tsx, ProcessMonitor.tsx, and defaultData.ts.
+- [ ] **Traceability & Lineage Framework:**
+    * **Human Note:** Source Attribution was removed as the AI rewrote the Add Plant interface after the file was corrupted where it simplified things due to many issues found when adding plants. Needs implemented again after the Ingestion Engine is implemented.
+    > **AI Context:** Implemented mandatory Source Attribution in AddPlantModal. Integrated app_data_sources registry to track "Who, What, When, and How." Manual additions now capture App Version (v2.18.0), process context, and timestamp. Locked down WCVP source from manual attribution selection. Added case-insensitive matching for lineage detection. Resolved statement timeouts in Purge utility by switching to ID-chained deletion.
 
 ## Medium Priority
 - [ ] **Fix Expand/Collapse Levels:** This functionality was developed for the older string based hierarchy and does not work with Authority (IDs) for hierarchy, other than Family level.
@@ -56,19 +61,25 @@ This document tracks planned features and technical improvements to ensure conti
 
 
 ## Archive
-- [x] (Done) **Stop Grid Flash** [AI Note: Partially resolved in v2.29.0 via a "Render Blocking" lifecycle guard. The application now remains in a loading state until saved settings are retrieved or a timeout occurs. Minor frame flicker persists during data-stream ingestion, but the "System Default" transition is mitigated.]
-- [x] (Done) **Save Settings:** Implemented cloud persistence for grid layout, filters, and theme preferences. Users can manually Save and Reload configuration via the Persistence panel in Settings (v2.28.0).
-- [x] (Done) **Fix Core Filter Dropdowns:** Standardized ranks, status and infraspecific ranks used in grid filter. Options and UI elements now match database capitalization exactly.
-- [x] (Done) **Fix Climate Filter:** Restored specific small-case literals to match DB data.
-- [x] (Done) **Lifeform Filter as Text:** Change the Lifeform filter back to just text instead of a multi-select.
-- [x] (Done) **Unselect All Columns:** (Fixed - Pending User Verification) [AI Note: Added "Hide All" button next to "Show All" in the Column Picker menu in DataGrid.tsx.]
-- [x] (Done) **Fix Genus Column for Family:** (Fixed - Pending User Verification) [AI Note: Updated getRowValue in DataGrid.tsx to return an empty string for the 'genus' column when taxonRank is 'Family'.]
-- [x] (Done) **Optimize Filtering:** Review the rules used for dynamic filtering in dataService.ts. [AI Note: Implemented Hybrid Search Engine toggle and Intelligent Auto-Casing.]
-- [x] (Done) **Fix 57014 Errors:** [AI Note: Implemented UX mitigations to handle "Database timeout (57014)" errors via Commit-on-Enter logic.]
-- [x] (Done) **Files to Delete:** User manually verified and deleted legacy files: PlantCard.tsx, ProcessMonitor.tsx, and defaultData.ts.
-- [x] (Done) **Intelligent Hierarchy Binding:** Added findTaxonByName to dataService.
-- [x] (Done) **Traceability & Lineage Framework:** Implemented mandatory Source Attribution in AddPlantModal.
-- [x] (Done) **How To Reset Cultivars:** (Fixed - Pending User Verification) [AI Note: Implemented split maintenance utility in SettingsModal.]
+- [x] **Stop Grid Flash** 
+    > **AI Context:** Partially resolved in v2.29.0 via a "Render Blocking" lifecycle guard. The application now remains in a loading state until saved settings are retrieved or a timeout occurs. Minor frame flicker persists during data-stream ingestion, but the "System Default" transition is mitigated.
+- [x] **Save Settings:** Implemented cloud persistence for grid layout, filters, and theme preferences. Users can manually Save and Reload configuration via the Persistence panel in Settings (v2.28.0).
+- [x] **Fix Core Filter Dropdowns:** Standardized ranks, status and infraspecific ranks used in grid filter. Options and UI elements now match database capitalization exactly.
+- [x] **Fix Climate Filter:** Restored specific small-case literals to match DB data.
+- [x] **Lifeform Filter as Text:** Change the Lifeform filter back to just text instead of a multi-select.
+- [x] **Unselect All Columns:** (Fixed - Pending User Verification) 
+    > **AI Context:** Added "Hide All" button next to "Show All" in the Column Picker menu in DataGrid.tsx.
+- [x] **Fix Genus Column for Family:** (Fixed - Pending User Verification) 
+    > **AI Context:** Updated getRowValue in DataGrid.tsx to return an empty string for the 'genus' column when taxonRank is 'Family'.
+- [x] **Optimize Filtering:** Review the rules used for dynamic filtering in dataService.ts. 
+    > **AI Context:** Implemented Hybrid Search Engine toggle and Intelligent Auto-Casing.
+- [x] **Fix 57014 Errors:** 
+    > **AI Context:** Implemented UX mitigations to handle "Database timeout (57014)" errors via Commit-on-Enter logic.
+- [x] **Files to Delete:** User manually verified and deleted legacy files: PlantCard.tsx, ProcessMonitor.tsx, and defaultData.ts.
+- [x] **Intelligent Hierarchy Binding:** Added findTaxonByName to dataService.
+- [x] **Traceability & Lineage Framework:** Implemented mandatory Source Attribution in AddPlantModal.
+- [x] **How To Reset Cultivars:** (Fixed - Pending User Verification) 
+    > **AI Context:** Implemented split maintenance utility in SettingsModal.
 - [x] (To be replaced with new Ingestion Engine Design) **Redesigned "Add Plant" Process to Follow Hybrid Intelligence Framework.**
 - [x] **Implement Grid Display Spec:** Fix the hierarchical display of plants in tree mode by following the Grid Display Spec design.
 - [x] **Load "virtual-root" Parents (Hydration):** Trigger a fetch to replace the virtual-root with the real parent record.
@@ -85,4 +96,3 @@ This document tracks planned features and technical improvements to ensure conti
 - [x] **Pallet for Grid Colors:** Update the configurability of the grid colors. Replace the 4 options 1a, 1b, 2a, and 2b with ability to customize the colors. The customization has selections for each of the five grid levels (family, genus, species, infraspecies, cultivar) with the base Tailwind CSS v3 color, weight for cell wash/background, weight for text, weight for badge wash/background and weight for badge border. Place these toward the bottom of the Seetings panel, above Maintenance.
 - [x] **Status Values as Text:** The status values in the grid are badges which draws too much attention to them. Change them to just text (regular font).
 - [x] **Rank Values Not Bold:** The rank values in the grid are badges with bold text. Change them to regular font but keep them as badges.
-
