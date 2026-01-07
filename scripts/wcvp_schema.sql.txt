@@ -105,9 +105,9 @@ CREATE TABLE app_taxa (
     basionym_plant_name_id text,
     homotypic_synonym text,
 
-    taxon_rank text,
+    taxon_rank text COLLATE "C",
     taxon_name text NOT NULL COLLATE "C",
-    taxon_status text,
+    taxon_status text COLLATE "C",
     family text COLLATE "C",
     common_name text,
     
@@ -116,7 +116,7 @@ CREATE TABLE app_taxa (
     species text COLLATE "C",
     species_hybrid text, 
     infraspecies text COLLATE "C",
-    infraspecific_rank text,
+    infraspecific_rank text COLLATE "C",
     cultivar text COLLATE "C",
     
     hybrid_formula text,
@@ -189,38 +189,33 @@ CREATE TABLE app_audit_log (
 );
 
 -- =============================================================================
--- OPTIMIZED INDICES (Standardized)
+-- OPTIMIZED INDICES (Standardized Baseline)
 -- =============================================================================
 
--- 1. Search & Sort
+-- 1. Search & Sort (Essential for Grid Startup)
 CREATE INDEX IF NOT EXISTS idx_app_taxa_taxon_name_trgm ON app_taxa USING GIN (taxon_name gin_trgm_ops);
-CREATE INDEX IF NOT EXISTS idx_app_taxa_name_sort ON app_taxa (taxon_name COLLATE "C");
-CREATE INDEX IF NOT EXISTS idx_app_taxa_name_exact ON app_taxa (taxon_name);
+CREATE INDEX IF NOT EXISTS idx_app_taxa_name_sort ON app_taxa (taxon_name);
 
 -- 2. Hierarchy & Grouping
 CREATE INDEX IF NOT EXISTS idx_app_taxa_parent ON app_taxa(parent_id);
 CREATE INDEX IF NOT EXISTS idx_app_taxa_path_gist ON app_taxa USING GIST (hierarchy_path);
 CREATE INDEX IF NOT EXISTS idx_app_taxa_genus_species ON app_taxa (genus, species);
-CREATE INDEX IF NOT EXISTS idx_app_taxa_species_alone ON app_taxa (species);
 
--- 3. Common Filter Columns
+-- 3. Filter Columns (Prevents Timeouts on 1.4M rows)
 CREATE INDEX IF NOT EXISTS idx_app_taxa_family ON app_taxa(family);
 CREATE INDEX IF NOT EXISTS idx_app_taxa_rank ON app_taxa(taxon_rank);
 CREATE INDEX IF NOT EXISTS idx_app_taxa_status ON app_taxa(taxon_status);
+CREATE INDEX IF NOT EXISTS idx_app_taxa_infraspecific_rank ON app_taxa(infraspecific_rank);
+CREATE INDEX IF NOT EXISTS idx_app_taxa_infraspecies ON app_taxa(infraspecies);
 CREATE INDEX IF NOT EXISTS idx_app_taxa_cultivar ON app_taxa(cultivar);
-CREATE INDEX IF NOT EXISTS idx_app_taxa_gh ON app_taxa(genus_hybrid);
-CREATE INDEX IF NOT EXISTS idx_app_taxa_sh ON app_taxa(species_hybrid);
 
 -- 4. Identifiers (WCVP / IPNI / POWO)
-CREATE INDEX IF NOT EXISTS idx_app_taxa_ipni ON app_taxa(ipni_id);
-CREATE INDEX IF NOT EXISTS idx_app_taxa_powo ON app_taxa(powo_id);
-CREATE INDEX IF NOT EXISTS idx_app_taxa_accepted_wcvp ON app_taxa(accepted_plant_name_id);
+CREATE INDEX IF NOT EXISTS idx_app_taxa_wcvp ON app_taxa(wcvp_id);
 CREATE INDEX IF NOT EXISTS idx_app_taxa_parent_wcvp ON app_taxa(parent_plant_name_id);
-CREATE INDEX IF NOT EXISTS idx_app_taxa_basionym_wcvp ON app_taxa(basionym_plant_name_id);
 
 -- 5. Maintenance / Purge Support
-CREATE INDEX IF NOT EXISTS idx_app_taxa_source ON app_taxa(source_id);
-CREATE INDEX IF NOT EXISTS idx_app_taxa_source_nulls ON app_taxa (source_id) WHERE source_id IS NULL;
+CREATE INDEX IF NOT EXISTS idx_app_taxa_source_id ON app_taxa(source_id);
+CREATE INDEX IF NOT EXISTS idx_app_taxa_source_id_filter ON app_taxa (source_id) WHERE source_id IS NULL OR source_id <> 1;
 
 -- Initial default settings row
 INSERT INTO app_settings_global (id, settings) VALUES ('default_config', '{}') ON CONFLICT DO NOTHING;

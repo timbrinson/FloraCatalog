@@ -1,9 +1,8 @@
 /**
- * AUTOMATED DATABASE BUILDER (CLI) v2.27.1
+ * AUTOMATED DATABASE BUILDER (CLI) v2.30.1
  * 
  * Orchestrates the transformation of raw WCVP data into the FloraCatalog database.
  * Optimized for free-tier environments using granular segmented iterative hierarchy.
- * v2.26.0: Added "False Root Recovery" logic to Step 7 for cross-segment gap closure.
  */
 
 import pg from 'pg';
@@ -73,7 +72,6 @@ const SEGMENTS = [
 
 /**
  * buildPopulateQuery: Comprehensive column list for high-fidelity transfer.
- * Includes NOT EXISTS to allow safe resumes.
  */
 const buildPopulateQuery = (start, end) => `
     INSERT INTO app_taxa (
@@ -139,9 +137,6 @@ const getPythonCommand = () => {
     catch (e) { return 'python'; }
 };
 
-/**
- * selectSegments: Filters segments based on user input for targeted recovery.
- */
 const selectSegments = async () => {
     console.log("\nAvailable Ranges: A, D, H, M, S, T, W, or 'All'");
     log("Recommendation: If recovering T-Z, run Step 6-8 for 'All' to close gaps.");
@@ -216,12 +211,15 @@ async function stepPopulate(client, segments) {
 }
 
 async function stepIndexes(client) {
-    log("Building Structural Indexes...");
+    log("Building Essential Build Indexes (Standardized)...");
+    // These are the bare minimum needed for efficient Parent linking and Hierarchy walks.
     await client.query(`
-        CREATE INDEX IF NOT EXISTS idx_app_taxa_wcvp_id ON app_taxa(wcvp_id);
+        CREATE INDEX IF NOT EXISTS idx_app_taxa_wcvp ON app_taxa(wcvp_id);
         CREATE INDEX IF NOT EXISTS idx_app_taxa_parent_plant_name_id ON app_taxa(parent_plant_name_id);
-        CREATE INDEX IF NOT EXISTS idx_app_taxa_parent_id ON app_taxa(parent_id);
+        CREATE INDEX IF NOT EXISTS idx_app_taxa_parent ON app_taxa(parent_id);
+        CREATE INDEX IF NOT EXISTS idx_app_taxa_name_sort ON app_taxa (taxon_name COLLATE "C");
     `);
+    log("Essential indexes verified.");
 }
 
 async function stepLink(client, segments) {
@@ -245,9 +243,6 @@ async function stepHierarchy(client, segments) {
     log("Calculating Hierarchy Paths (Ltree - Segmented Iterative)...");
     await client.query("SET statement_timeout = 0;");
     
-    // --- GAP RECOVERY LOGIC ---
-    // If we previously ran A-S, some records were roots but now have parents in T-Z.
-    // We must reset these "False Roots" (paths with length 2 that now have a parent).
     log("Resetting False Roots (Recovery Logic)...");
     await client.query(`
         UPDATE app_taxa 
@@ -311,16 +306,20 @@ async function stepCounts(client, segments) {
 }
 
 async function stepOptimize(client) {
-    log(`Applying Performance Tuning...`);
-    if (!fs.existsSync(FILE_OPTIMIZE)) return;
+    log(`Applying Performance Tuning (Full Grid Optimization)...`);
+    if (!fs.existsSync(FILE_OPTIMIZE)) {
+        warn(`Could not find ${FILE_OPTIMIZE}. Skipping.`);
+        return;
+    }
     const sql = fs.readFileSync(FILE_OPTIMIZE, 'utf-8');
     await client.query(sql);
+    log("Performance indexes created.");
 }
 
 // --- MAIN LOOP ---
 
 async function main() {
-    console.log("\n🌿 FLORA CATALOG - DATABASE AUTOMATION v2.27.1 🌿\n");
+    console.log("\n🌿 FLORA CATALOG - DATABASE AUTOMATION v2.30.1 🌿\n");
     process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
     let dbUrl = process.env.DATABASE_URL;
     let finalConfig;
@@ -354,11 +353,11 @@ async function main() {
             { id: '2', name: "Build Schema (Reset)", fn: () => stepBuildSchema(client) },
             { id: '3', name: "Import CSV (Stream)", fn: () => stepImportStream(client) },
             { id: '4', name: "Populate App Taxa (Segmented)", fn: (segs) => stepPopulate(client, segs) },
-            { id: '5', name: "Build Indexes", fn: () => stepIndexes(client) },
+            { id: '5', name: "Build Build-Indexes", fn: () => stepIndexes(client) },
             { id: '6', name: "Link Parents (Segmented)", fn: (segs) => stepLink(client, segs) },
             { id: '7', name: "Build Hierarchy (Segmented Iterative)", fn: (segs) => stepHierarchy(client, segs) },
             { id: '8', name: "Calc Counts (Segmented)", fn: (segs) => stepCounts(client, segs) },
-            { id: '9', name: "Optimize", fn: () => stepOptimize(client) }
+            { id: '9', name: "Final Performance Tuning", fn: () => stepOptimize(client) }
         ];
 
         console.log("\n--- MENU ---");
@@ -368,7 +367,6 @@ async function main() {
         
         if (startIndex === -1) { err("Invalid selection"); process.exit(1); }
 
-        // Targeted Segments for Steps 4, 6, 7, 8
         let targetSegments = SEGMENTS;
         const segmentedSteps = ['4', '6', '7', '8'];
         if (segmentedSteps.includes(choice)) {

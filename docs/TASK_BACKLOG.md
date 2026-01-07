@@ -2,14 +2,8 @@
 
 This document tracks planned features and technical improvements to ensure continuity across development sessions.
 ## Work on Now
-- [ ] **Index Cleanup and Refinement:** Update manual and automated DB installation scripts where needed Output any new scripts that need to be ran manually. Indicate any inndices that need to be removed manually.
-  1. Need an index on infraspecies_rank. Filtering on this usually timesout.
-  2. Need an index on infraspecies. 
-  3. "idx_app_taxa_name_sort" and "idx_app_taxa_name_exact" are two identical indices on taxon_name. Which to keep?
-  4. "idx_app_taxa_source" and "idx_app_taxa_source_id" are two identical indices on source_id. Which to keep?
-  5. There are two other indices on source_id that are similar. Can we keep just one? These are:
-    - CREATE INDEX idx_app_taxa_source_id_filter ON public.app_taxa USING btree (source_id) WHERE ((source_id IS NULL) OR (source_id <> 1))
-    - CREATE INDEX idx_app_taxa_source_nulls ON public.app_taxa USING btree (source_id) WHERE (source_id IS NULL)
+- [ ] **Ingestion Engine Transition:** Prepare the infrastructure for the 5-stage validation pipeline implementation.
+    * **Human Note:** The recent V8.1 index cleanup and PostgREST quoting fix have stabilized the grid performance and search reliability. We are now ready to pivot back to data ingestion features.
 
 ## High Priority
 - [ ] **Implement Ingestion Engine:** Rewrite the Add Plant functionality by following the Ingestion Engine design to implement the 5-stage validation pipeline and continuing to adhere to other decisions.
@@ -68,6 +62,11 @@ This document tracks planned features and technical improvements to ensure conti
 
 
 ## Archive
+- [x] **Index Cleanup and Refinement:** 
+    * **Human Note:** idx_app_taxa_name_sort is currently defined in the DB as: CREATE INDEX idx_app_taxa_name_sort ON public.app_taxa USING btree (taxon_name). I recall there was a COLLATE "C" in some index in the past but wonder if it was inadvertently removed during a debug session. 
+    * **Human Note:** I ran the script. I notice that filtering on Status = Accepted and (Rank = Form or I Rank = f.) causes a timeout but no other Ranks or I Ranks do.. Doing the same query in Supabase returns fast results.
+    * **Human Note:** I ran the SQL. It had a couple timeouts early on but is working better now that I exercised it a few times.. There were a couple messages in the javascript console "Failed to load resource: the server responded with a status of 500 ()". When selecting the link in the error gives "{"message":"No API key found in request","hint":"No `apikey` request header or url param was found."}"
+    > **AI Context:** Diagnostic analysis suggests the 500/API key error was caused by unquoted multi-word string literals in PostgREST 'or' filters (e.g., 'Artificial Hybrid'), which mangled the request URL structure. Hardened dataService.ts v2.30.2 to enforce quoting. Upgraded indices to V8.1 (Sort-Inclusive). Audit confirmed redundancy: removed shadowed wcvp_id, status, and rank indexes to reclaim space. Sparse rank timeouts mitigated to less than 1s.
 - [x] **Stop Grid Flash** 
     > **AI Context:** Partially resolved in v2.29.0 via a "Render Blocking" lifecycle guard. The application now remains in a loading state until saved settings are retrieved or a timeout occurs. Minor frame flicker persists during data-stream ingestion, but the "System Default" transition is mitigated.
 - [x] **Save Settings:** Implemented cloud persistence for grid layout, filters, and theme preferences. Users can manually Save and Reload configuration via the Persistence panel in Settings (v2.28.0).

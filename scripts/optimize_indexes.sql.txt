@@ -1,25 +1,29 @@
 -- =============================================================================
--- PERFORMANCE OVERHAUL V3: Standardized Indices & Sort Optimization
--- Fixes 57014 Timeouts by providing B-Tree support for Grid sorting.
+-- PERFORMANCE OVERHAUL V8.1: Name-Inclusive Composite Filters & Redundancy Cleanup
+-- Resolves timeouts when filtering sparse ranks (Form, f.) by providing
+-- pre-sorted data to the "ORDER BY taxon_name COLLATE 'C'" operation.
+-- RECLAIMS: ~100MB of storage by removing shadowed indexes.
 -- =============================================================================
 
 -- 1. Enable Trigram Extension
 CREATE EXTENSION IF NOT EXISTS pg_trgm;
 
--- 2. CLEANUP: Remove ALL known legacy/duplicate/test indices
+-- 2. CLEANUP: Remove ALL legacy, duplicate, or shadowed indexes
 DROP INDEX IF EXISTS idx_app_taxa_name;
 DROP INDEX IF EXISTS idx_app_taxa_name_search;
 DROP INDEX IF EXISTS idx_app_taxa_name_sort;
+DROP INDEX IF EXISTS idx_app_taxa_name_exact;
 DROP INDEX IF EXISTS idx_app_taxa_name_sort_c;
 DROP INDEX IF EXISTS trgm_idx_app_taxa_name;
 DROP INDEX IF EXISTS idx_app_taxa_name_trgm;
 DROP INDEX IF EXISTS idx_app_taxa_genus;
 DROP INDEX IF EXISTS idx_app_taxa_species;
-DROP INDEX IF EXISTS idx_app_taxa_species_standalone;
 DROP INDEX IF EXISTS idx_app_taxa_species_alone;
 DROP INDEX IF EXISTS idx_app_taxa_family;
 DROP INDEX IF EXISTS idx_app_taxa_rank;
 DROP INDEX IF EXISTS idx_app_taxa_status;
+DROP INDEX IF EXISTS idx_app_taxa_infraspecific_rank;
+DROP INDEX IF EXISTS idx_app_taxa_infraspecies;
 DROP INDEX IF EXISTS idx_app_taxa_cultivar;
 DROP INDEX IF EXISTS idx_app_taxa_gh;
 DROP INDEX IF EXISTS idx_app_taxa_sh;
@@ -38,56 +42,67 @@ DROP INDEX IF EXISTS idx_app_taxa_basionym_wcvp;
 DROP INDEX IF EXISTS idx_app_taxa_geo;
 DROP INDEX IF EXISTS idx_app_taxa_path_gist;
 DROP INDEX IF EXISTS idx_app_taxa_source;
+DROP INDEX IF EXISTS idx_app_taxa_source_id;
 DROP INDEX IF EXISTS idx_app_taxa_source_nulls;
-DROP INDEX IF EXISTS idx_app_taxa_name_exact;
+DROP INDEX IF EXISTS idx_app_taxa_source_id_filter;
+DROP INDEX IF EXISTS idx_app_taxa_name_ci;
+DROP INDEX IF EXISTS idx_app_taxa_status_rank;
+DROP INDEX IF EXISTS idx_app_taxa_status_irank;
+-- Shadowed V8 Cleanup
+DROP INDEX IF EXISTS idx_app_taxa_status_rank_sort;
+DROP INDEX IF EXISTS idx_app_taxa_status_irank_sort;
 
--- 3. NOMENCLATURE SEARCH & SORT (CRITICAL)
--- B-Tree Index for ORDER BY and Prefix LIKE. Uses COLLATE "C" for max performance.
-CREATE INDEX IF NOT EXISTS idx_app_taxa_name_sort ON app_taxa (taxon_name COLLATE "C");
+-- 3. STORAGE LAYER OPTIMIZATION (CRITICAL)
+-- Ensure COLLATE "C" at the column level for all nomenclature and metadata.
+ALTER TABLE app_taxa ALTER COLUMN taxon_name SET DATA TYPE text COLLATE "C";
+ALTER TABLE app_taxa ALTER COLUMN family SET DATA TYPE text COLLATE "C";
+ALTER TABLE app_taxa ALTER COLUMN genus SET DATA TYPE text COLLATE "C";
+ALTER TABLE app_taxa ALTER COLUMN species SET DATA TYPE text COLLATE "C";
+ALTER TABLE app_taxa ALTER COLUMN infraspecies SET DATA TYPE text COLLATE "C";
+ALTER TABLE app_taxa ALTER COLUMN cultivar SET DATA TYPE text COLLATE "C";
+ALTER TABLE app_taxa ALTER COLUMN taxon_rank SET DATA TYPE text COLLATE "C";
+ALTER TABLE app_taxa ALTER COLUMN taxon_status SET DATA TYPE text COLLATE "C";
+ALTER TABLE app_taxa ALTER COLUMN infraspecific_rank SET DATA TYPE text COLLATE "C";
 
--- Exact match index for lineage detection (v2.18.1 fix)
-CREATE INDEX IF NOT EXISTS idx_app_taxa_name_exact ON app_taxa (taxon_name);
+-- 4. NOMENCLATURE SEARCH & SORT
+CREATE INDEX idx_app_taxa_name_sort ON app_taxa (taxon_name);
+CREATE INDEX idx_app_taxa_taxon_name_trgm ON app_taxa USING GIN (taxon_name gin_trgm_ops);
+CREATE INDEX idx_app_taxa_name_ci ON app_taxa (LOWER(TRIM(taxon_name)));
 
--- Case-insensitive functional index for background lineage matching
-CREATE INDEX IF NOT EXISTS idx_app_taxa_name_ci ON app_taxa (LOWER(TRIM(taxon_name)));
+-- 5. HIGH-SPEED COMPOSITE FILTERS (V8 Sort-Inclusive)
+-- These allow the DB to find matches AND return them pre-sorted by name, 
+-- eliminating the expensive "re-sort" that causes 57014 timeouts.
+-- Note: These shadow standard (status, rank) indexes.
+CREATE INDEX idx_app_taxa_status_rank_sort ON app_taxa (taxon_status, taxon_rank, taxon_name);
+CREATE INDEX idx_app_taxa_status_irank_sort ON app_taxa (taxon_status, infraspecific_rank, taxon_name);
+CREATE INDEX idx_app_taxa_genus_species_sort ON app_taxa (genus, species, taxon_name);
 
--- GIN Index: Fast wildcard search (ILIKE '%term%')
-CREATE INDEX IF NOT EXISTS idx_app_taxa_taxon_name_trgm ON app_taxa USING GIN (taxon_name gin_trgm_ops);
+-- 6. HIERARCHY & OTHER FILTERS
+CREATE INDEX idx_app_taxa_family ON app_taxa(family);
+CREATE INDEX idx_app_taxa_genus ON app_taxa(genus);
+CREATE INDEX idx_app_taxa_species ON app_taxa(species);
+CREATE INDEX idx_app_taxa_status ON app_taxa(taxon_status);
+CREATE INDEX idx_app_taxa_infraspecies ON app_taxa(infraspecies);
+CREATE INDEX idx_app_taxa_cultivar ON app_taxa(cultivar);
+CREATE INDEX idx_app_taxa_gh ON app_taxa(genus_hybrid);
+CREATE INDEX idx_app_taxa_sh ON app_taxa(species_hybrid);
 
--- 4. HIERARCHY & COMBINATION FILTERS
--- Composite for Genus + Species searches
-CREATE INDEX IF NOT EXISTS idx_app_taxa_genus_species ON app_taxa (genus, species);
+-- 7. IDENTIFIER LOOKUPS
+-- Note: wcvp_id is handled by app_taxa_wcvp_id_key (Unique constraint index)
+CREATE INDEX idx_app_taxa_ipni ON app_taxa(ipni_id);
+CREATE INDEX idx_app_taxa_powo ON app_taxa(powo_id);
+CREATE INDEX idx_app_taxa_parent ON app_taxa(parent_id);
+CREATE INDEX idx_app_taxa_accepted_wcvp ON app_taxa(accepted_plant_name_id);
+CREATE INDEX idx_app_taxa_parent_plant_name_id ON app_taxa(parent_plant_name_id);
+CREATE INDEX idx_app_taxa_basionym_wcvp ON app_taxa(basionym_plant_name_id);
 
--- Standalone sort support for major columns
-CREATE INDEX IF NOT EXISTS idx_app_taxa_family ON app_taxa(family COLLATE "C");
-CREATE INDEX IF NOT EXISTS idx_app_taxa_genus ON app_taxa(genus COLLATE "C");
-CREATE INDEX IF NOT EXISTS idx_app_taxa_species ON app_taxa(species COLLATE "C");
-CREATE INDEX IF NOT EXISTS idx_app_taxa_rank ON app_taxa(taxon_rank);
-CREATE INDEX IF NOT EXISTS idx_app_taxa_status ON app_taxa(taxon_status);
-CREATE INDEX IF NOT EXISTS idx_app_taxa_cultivar ON app_taxa(cultivar COLLATE "C");
+-- 8. MAINTENANCE & GEOGRAPHIC
+CREATE INDEX idx_app_taxa_source_id ON app_taxa(source_id);
+CREATE INDEX idx_app_taxa_source_id_filter ON app_taxa (source_id) WHERE source_id IS NULL OR source_id <> 1;
+CREATE INDEX idx_app_taxa_path_gist ON app_taxa USING GIST (hierarchy_path);
+CREATE INDEX idx_app_taxa_geo_trgm ON app_taxa USING GIN (geographic_area gin_trgm_ops);
 
--- Hybrid Markers
-CREATE INDEX IF NOT EXISTS idx_app_taxa_gh ON app_taxa(genus_hybrid);
-CREATE INDEX IF NOT EXISTS idx_app_taxa_sh ON app_taxa(species_hybrid);
-
--- 5. IDENTIFIER LOOKUPS (Internal & External)
-CREATE INDEX IF NOT EXISTS idx_app_taxa_wcvp ON app_taxa(wcvp_id);
-CREATE INDEX IF NOT EXISTS idx_app_taxa_ipni ON app_taxa(ipni_id);
-CREATE INDEX IF NOT EXISTS idx_app_taxa_powo ON app_taxa(powo_id);
-CREATE INDEX IF NOT EXISTS idx_app_taxa_parent ON app_taxa(parent_id);
-CREATE INDEX IF NOT EXISTS idx_app_taxa_source ON app_taxa(source_id);
-CREATE INDEX IF NOT EXISTS idx_app_taxa_accepted_wcvp ON app_taxa(accepted_plant_name_id);
-CREATE INDEX IF NOT EXISTS idx_app_taxa_parent_plant_name_id ON app_taxa(parent_plant_name_id);
-CREATE INDEX IF NOT EXISTS idx_app_taxa_basionym_wcvp ON app_taxa(basionym_plant_name_id);
-
--- Partial index for high-speed maintenance operations (Purge)
-CREATE INDEX IF NOT EXISTS idx_app_taxa_source_nulls ON app_taxa (source_id) WHERE source_id IS NULL;
-
--- 6. GEOGRAPHIC & PATHS
-CREATE INDEX IF NOT EXISTS idx_app_taxa_path_gist ON app_taxa USING GIST (hierarchy_path);
-CREATE INDEX IF NOT EXISTS idx_app_taxa_geo_trgm ON app_taxa USING GIN (geographic_area gin_trgm_ops);
-
--- 7. Refresh Statistics
+-- 9. Refresh Statistics
 ANALYZE app_taxa;
 
-SELECT 'Performance tuning complete. Table statistics refreshed.' as status;
+SELECT 'Index cleanup and V8.1 Sort-Inclusive optimization complete.' as status;

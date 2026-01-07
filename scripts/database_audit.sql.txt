@@ -1,0 +1,32 @@
+-- =============================================================================
+-- DATABASE STORAGE AUDIT
+-- Use these queries to monitor your Supabase logical storage usage.
+-- =============================================================================
+
+-- 1. TABLE SIZE SUMMARY (Table, Indexes, and Total)
+-- Shows exactly how much "Real Data" vs "Index Overhead" each app table uses.
+SELECT
+    relname AS table_name,
+    pg_size_pretty(pg_table_size(C.oid)) AS table_size,
+    pg_size_pretty(pg_indexes_size(C.oid)) AS index_size,
+    pg_size_pretty(pg_total_relation_size(C.oid)) AS total_size
+FROM pg_class C
+LEFT JOIN pg_namespace N ON (N.oid = C.relnamespace)
+WHERE nspname = 'public'
+  AND relkind = 'r'
+  AND relname LIKE 'app_%'
+ORDER BY pg_total_relation_size(C.oid) DESC;
+
+-- 2. DETAILED INDEX SIZE ANALYSIS (app_taxa)
+-- Identifies the specific footprint of every index on the core table.
+SELECT
+    indexname AS index_name,
+    pg_size_pretty(pg_relation_size(quote_ident(indexname)::regclass)) AS index_size
+FROM pg_indexes
+WHERE schemaname = 'public' 
+  AND tablename = 'app_taxa'
+ORDER BY pg_relation_size(quote_ident(indexname)::regclass) DESC;
+
+-- 3. TOTAL DATABASE FOOTPRINT
+-- Shows the total logical size of the current database.
+SELECT pg_size_pretty(pg_database_size(current_database())) as total_db_size;

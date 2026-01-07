@@ -200,12 +200,18 @@ export const dataService = {
             if (value.length > 0) {
                  const hasNull = value.includes('NULL');
                  const realValues = value.filter(v => v !== 'NULL');
+                 
+                 // Quoting values for PostgREST 'or' logic to handle spaces (e.g. "Artificial Hybrid")
+                 // This fixes 500 "No apikey found" errors caused by malformed request URLs.
+                 const quotedValues = realValues.map(v => `"${v}"`).join(',');
+
                  if (hasNull && realValues.length > 0) {
-                     query = query.or(`${dbKey}.in.(${realValues.join(',')}),${dbKey}.is.null`);
+                     query = query.or(`${dbKey}.in.(${quotedValues}),${dbKey}.is.null`);
                  } else if (hasNull) {
                      query = query.is(dbKey, null);
                  } else {
-                     query = query.in(dbKey, value);
+                     // Also quote values here to be safe for multi-word categories
+                     query = query.or(`${dbKey}.in.(${quotedValues})`);
                  }
             }
         }

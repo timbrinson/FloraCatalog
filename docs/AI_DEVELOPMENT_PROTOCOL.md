@@ -40,7 +40,7 @@ Whenever a new conversation starts or the session is reset, the AI MUST NOT emit
 ## 7. Behavioral Warnings & Anti-Patterns
 Past sessions have identified "Drift" patterns that must be avoided:
 - **Optimization Bias**: The AI often attempts to "improve" the schema or component structure without being asked. This causes data loss or UI regressions. **STOP.** Only change what is requested.
-- **Backlog Creep**: Do not start "helping" with the next item in the backlog just because you finished the current one. Finish the task, report success, and wait.
+- **Backlog Creep**: Do not start "helping" with the next item in the backlog because you finished the current one. Finish the task, report success, and wait.
 - **Strong Feedback Signal**: If the User provides strong or repetitive feedback regarding AI behavior, it is a signal that the AI has diverged from this protocol. The AI must pause, re-read this document, and explicitly re-ground itself.
 
 ## 8. Content Integrity & Preservation
@@ -81,8 +81,4 @@ For all application tiers, **Database Literals are the sovereign naming standard
 Whenever a documentation file (especially `TASK_BACKLOG.md`) is modified, the AI must provide a "Verbatim Verification" statement in the planning phase:
 *"I have verified via a mental diff that no items were removed from ANY section, and all human notes have been preserved character-for-character. Item counts per section are: [List Counts]."*
 
-## 15. Markdown Formatting Standards (ADR-009)
-To distinguish between user intent and AI-generated context within a shared document:
-1.  **Human Note:** Use a bold nested bullet: `* **Human Note:** [text]`
-2.  **AI Context/Summary:** Use a blockquote: `> **AI Context:** [text]`
-3.  **Task Status:** AI is prohibited from modifying the status of a task `[ ]` to `[x]` or moving it to Archive without explicit Human Architect approval.
+## 
