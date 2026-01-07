@@ -1,8 +1,17 @@
 # Version History
 
-## v2.30.3 - Storage Intelligence & Versioning
+## v2.30.5 - Baseline Stabilization & Cleanup
 **Date:** July 07, 2025
 **Status:** Current Release
+
+### Administrative & Cleanup
+- **Zombie Script Hygiene:** Removed legacy performance scripts documented as obsolete in v2.30.2.
+- **Backlog Management:** Archived the "Index Cleanup" task series following verified stability of the V8.1 Performance Baseline.
+- **Documentation Alignment:** Verified data mapping and filter strategy documents remain consistent with current V8.1 logic.
+
+## v2.30.3 - Storage Intelligence & Versioning
+**Date:** July 07, 2025
+**Status:** (Historical)
 
 ### Diagnostics & Maintenance
 - **Database Storage Audit:** Created `scripts/database_audit.sql.txt` containing advanced queries for table and index size analysis. This allows administrators to monitor the 500MB Supabase free-tier limit with precision.
