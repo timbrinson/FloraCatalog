@@ -26,6 +26,7 @@ This project maintains a robust documentation layer in the `docs/` directory to 
 - [**Data Mapping Table**](./docs/DATA_MAPPING.md): Field-level mapping between WCVP source data and the application database.
 - [**Filter Strategies**](./docs/FILTER_STRATEGIES.md): Definitive logic for search engines (B-Tree vs GIN) and botanical filter values.
 - [**Computational Strategy (ADR-005)**](./docs/decisions/ADR-005-Computational-Strategy.md): Deterministic Standards vs. AI Ambiguity.
+- [**Order-to-Family Mapping Strategy**](./docs/design/ORDER_FAMILY_MAPPING_SPEC.md): Technical analysis for extending the hierarchy to phylogeny.
 
 ### Guides & Operations
 - [**Setup Guide**](./docs/SETUP_GUIDE.md): Infrastructure configuration for Supabase and Gemini API.

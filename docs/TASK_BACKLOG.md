@@ -2,10 +2,18 @@
 
 This document tracks planned features and technical improvements to ensure continuity across development sessions.
 ## Work on Now
+- [ ] **Create Records for Family:** We have done a lot of work to accomodate Family level when it exists as an attribute and not a record or WCVP rank. Should we create records for all Family values used in WCVP? We would add teh Family Rank as an extension (like was done for Cultivar). We would need a special Status as well like 'Generated' or Extrapulated', that is an extension of teh WCVP vales (like was done for Registered and Provisional). 
 
 ## High Priority
-- [ ] **Ingestion Engine Transition:** Prepare the infrastructure for the 5-stage validation pipeline implementation.
-    * **Human Note:** The recent V8.1 index cleanup and PostgREST quoting fix have stabilized the grid performance and search reliability. We are now ready to pivot back to data ingestion features.
+- [ ] **Phylogenetic Extension (Order Level):** Extend the taxonomic hierarchy above the Family level by creating physical 'Order' records. This anchors the catalog to globally accepted phylogenetic standards: APG IV (Angiosperms), Christenhusz (Gymnosperms), and PPG I (Pteridophytes).
+    * **Human Note:** Follow the implementation strategy defined in docs/design/ORDER_FAMILY_MAPPING_SPEC.md, prioritizing the WFO Backbone (Path A) for bulk efficiency.
+    > **AI Context:** 
+    1. Create 'Order' records with Rank: 'Order', Status: 'Derived', and Source: 2 (FloraCatalog System).
+    2. Perform a SQL join to map existing 'Family' records to their parent 'Order' records via parent_id.
+    3. Re-run the iterative hierarchy build (Step 7 of the automation script) to shift the entire database tree down one level (e.g., root.order_uuid.family_uuid...).
+    4. Update the "Purge Non-WCVP" utility to ensure 'Derived' Order records are protected.
+- [ ] **Subtree Fetching:** We can perform a single query: WHERE hierarchy_path <@ 'root.family_id' to fetch every Genus, Species, and Cultivar in that family instantly. This is much faster than the current "fetch a batch and hope we have the parents" approach.
+- [ ] **Lineage Visuals:** We can show a true "Breadcrumb" in the Details Panel (e.g., Asparagaceae > Agave > parryi) by simply joining the names of the UUIDs in the path.
 - [ ] **Implement Ingestion Engine:** Rewrite the Add Plant functionality by following the Ingestion Engine design to implement the 5-stage validation pipeline and continuing to adhere to other decisions.
 - [ ] **Fix Finding Plant Details:** The Icon Button for searching for plant details doesn't function. Also the Icon is not obvious what it does. I'm not sure which of the two Icons to select but neither works. The Icon button needs a tool tip saying what it does.
     * **Human Note:** The Tooltips are working and do help. The icons are not obvious but maybe others would not either. Actions gets stuck with activity "Initializing AI curator..." and never finishes. The same wording is used in the Activity Panel for both so you can't tell them apart.
@@ -18,7 +26,6 @@ This document tracks planned features and technical improvements to ensure conti
 
 ## Medium Priority
 - [ ] **Sorting on Family:** With the new grid tree using Authority (IDs) and Family colums/rows turned on, it is not sorting by genus and adding the family abve it. Can we make it sort on Family and group all the Genus under the one instance of a particular family?
-- [ ] **Create Records for Family:** We have done a lot of work to accomodate Family level when it exists as an attribute and not a record or WCVP rank. Should we create records for all Family values used in WCVP? We would add teh Family Rank as an extension (like was done for Cultivar). We would need a special Status as well like 'Generated' or Extrapulated', that is an extension of teh WCVP vales (like was done for Registered and Provisional). 
 - [ ] **Clean Up Zombie Scripts:** As we developed the manual and then automated installation scripts there were a lot of changes in order to get them to work. It is not clear which are still valid and which should be archoived or deleted. It would be good to maintain both path's for installation. The manual path is good for training someone to understand the steps. The automated one is best for productivity. We need to organize the long list of scripts by seting up functional and/or logical folders.
 - [ ] **DataGrid & Model Consistency Audit:** Perform a line-by-line audit of DataGrid.tsx and the dataService.ts mappers to identify "Hidden Regressions." Specifically: (1) Ensure all cell renderers have type-safety checks to prevent rendering objects/arrays in spans, (2) Verify that every property used in the UI matches the Data Mapping document exactly (e.g., resolving the childCount vs descendantCount naming conflict), and (3) Ensure all ReactNode casting satisfies the compiler without using any.
 - [ ] **Cache Limits:** If we keep scrolling in the grid it will continue to load more and more plants. We should have a caching scheme that can expire earlier loaded plants at some point. If the user scrolls back to to the top it would recache those that expired so that from the user's perspective it is continuous.
