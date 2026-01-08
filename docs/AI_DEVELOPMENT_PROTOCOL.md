@@ -81,4 +81,8 @@ For all application tiers, **Database Literals are the sovereign naming standard
 Whenever a documentation file (especially `TASK_BACKLOG.md`) is modified, the AI must provide a "Verbatim Verification" statement in the planning phase:
 *"I have verified via a mental diff that no items were removed from ANY section, and all human notes have been preserved character-for-character. Item counts per section are: [List Counts]."*
 
-## 
+## 15. Mandatory Pre-Flight Compliance Check
+**MANDATORY:** Before emitting any `<changes>` block, the AI must perform a final internal audit against **Guardrail F**.
+- **Action:** In the natural language response, the AI MUST include a section titled "Pre-Flight Compliance" with the following line: 
+  - `Backlog Integrity: Confirmed` (verifying that no tasks were marked complete or moved to archive without explicit user command).
+- **Failure Consequence:** Any XML block provided without this confirmation is considered a protocol breach and must be disregarded by the human architect.

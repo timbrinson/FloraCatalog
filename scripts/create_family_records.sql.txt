@@ -1,0 +1,88 @@
+-- =============================================================================
+-- SYSTEM TASK: CREATE FAMILY RECORDS & HIERARCHY GRAFTING (BATCHED)
+-- Implementation of "Create Records for Family" Task
+-- Optimized to prevent "Upstream Timeout" errors in Supabase.
+-- =============================================================================
+
+-- PRE-FLIGHT: Attempt to increase timeout
+SET statement_timeout = 0;
+
+-- STEP 1: Ensure FloraCatalog System source exists (Source 2)
+INSERT INTO app_data_sources (id, name, version, citation_text, trust_level)
+VALUES (
+    2, 
+    'FloraCatalog System', 
+    'v2.31.1 (Derived)', 
+    'Internal system layer used to derive taxonomic backbone records (Families/Orders) from the "family" column of the authoritative WCVP v14 baseline.', 
+    5
+)
+ON CONFLICT (id) DO UPDATE SET
+    citation_text = EXCLUDED.citation_text;
+
+-- STEP 2: Create Physical Family Records
+INSERT INTO app_taxa (taxon_name, taxon_rank, taxon_status, family, source_id, verification_level)
+SELECT DISTINCT family, 'Family', 'Derived', family, 2, 'FloraCatalog v2.31.1 (Derived from WCVP v14 "family" attribute)'
+FROM app_taxa
+WHERE family IS NOT NULL
+  AND NOT EXISTS (SELECT 1 FROM app_taxa a WHERE a.family = app_taxa.family AND a.taxon_rank = 'Family')
+ON CONFLICT DO NOTHING;
+
+-- STEP 3: Hierarchy Grafting (Link Roots to Families)
+-- Split into batches by Taxon Name to prevent timeouts.
+
+-- 3a: Batch A - G
+UPDATE app_taxa child
+SET parent_id = parent.id
+FROM app_taxa parent
+WHERE child.parent_id IS NULL
+  AND child.family = parent.family
+  AND parent.taxon_rank = 'Family'
+  AND child.id != parent.id
+  AND child.taxon_name < 'H';
+
+SELECT 'Batch 3a (A-G) Grafted' as status;
+
+-- 3b: Batch H - O
+UPDATE app_taxa child
+SET parent_id = parent.id
+FROM app_taxa parent
+WHERE child.parent_id IS NULL
+  AND child.family = parent.family
+  AND parent.taxon_rank = 'Family'
+  AND child.id != parent.id
+  AND child.taxon_name >= 'H' AND child.taxon_name < 'P';
+
+SELECT 'Batch 3b (H-O) Grafted' as status;
+
+-- 3c: Batch P - S
+UPDATE app_taxa child
+SET parent_id = parent.id
+FROM app_taxa parent
+WHERE child.parent_id IS NULL
+  AND child.family = parent.family
+  AND parent.taxon_rank = 'Family'
+  AND child.id != parent.id
+  AND child.taxon_name >= 'P' AND child.taxon_name < 'T';
+
+SELECT 'Batch 3c (P-S) Grafted' as status;
+
+-- 3d: Batch T - Z & Hybrids
+UPDATE app_taxa child
+SET parent_id = parent.id
+FROM app_taxa parent
+WHERE child.parent_id IS NULL
+  AND child.family = parent.family
+  AND parent.taxon_rank = 'Family'
+  AND child.id != parent.id
+  AND child.taxon_name >= 'T';
+
+SELECT 'Batch 3d (T-Z) Grafted' as status;
+
+-- STEP 4: Reset Paths for Rebuild
+-- We nullify the hierarchy_path for all records to ensure a clean rebuild 
+-- via the automate_build.js Step 7 script.
+UPDATE app_taxa SET hierarchy_path = NULL;
+
+-- FINAL STATUS
+SELECT 'Family Backbone Refined. Records (Status: Derived): ' || count(*) as status 
+FROM app_taxa WHERE taxon_rank = 'Family' AND source_id = 2;

@@ -6,7 +6,7 @@ import { dataService } from '../services/dataService';
 import { Taxon, ActivityItem } from '../types';
 import { assembleScientificName } from '../utils/formatters';
 
-const APP_VERSION = 'v2.31.0';
+const APP_VERSION = 'v2.31.1';
 
 interface PipelineItem {
     taxon_rank: string;
@@ -144,7 +144,7 @@ const AddPlantModal: React.FC<AddPlantModalProps> = ({
         alternative_names: [],
         reference_links: [],
         created_at: Date.now(),
-        source_id: 2, 
+        source_id: 3, // Source ID 3 (Manual Addition)
         descendant_count: 0,
         verification_level: `FloraCatalog ${APP_VERSION}`
       };

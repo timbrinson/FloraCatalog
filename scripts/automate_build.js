@@ -1,8 +1,8 @@
 /**
- * AUTOMATED DATABASE BUILDER (CLI) v2.30.1
+ * AUTOMATED DATABASE BUILDER (CLI) v2.31.1
  * 
  * Orchestrates the transformation of raw WCVP data into the FloraCatalog database.
- * Optimized for free-tier environments using granular segmented iterative hierarchy.
+ * Optimized for free-tier environments using granular segmented iterative operations.
  */
 
 import pg from 'pg';
@@ -40,6 +40,7 @@ const DIR_TEMP = path.join(DIR_DATA, 'temp');
 const FILE_CLEAN_CSV = path.join(DIR_TEMP, 'wcvp_names_clean.csv');
 const FILE_SCHEMA = 'scripts/wcvp_schema.sql.txt';
 const FILE_OPTIMIZE = 'scripts/optimize_indexes.sql.txt';
+const APP_VERSION = 'v2.31.1';
 
 // Granular segments to prevent Supabase connection resets
 const SEGMENTS = [
@@ -210,6 +211,52 @@ async function stepPopulate(client, segments) {
     log("Population complete.");
 }
 
+async function stepBackbone(client, segments) {
+    log("Generating Family Backbone (Segmented Grafting)...");
+    await client.query("SET statement_timeout = 0;");
+
+    // Phase 1: Ensure FloraCatalog System source exists
+    await client.query(`
+        INSERT INTO app_data_sources (id, name, version, citation_text, trust_level)
+        VALUES (
+            2, 
+            'FloraCatalog System', 
+            '${APP_VERSION} (Derived)', 
+            'Internal system layer used to derive taxonomic backbone records from authoritative WCVP v14 attributes.', 
+            5
+        ) ON CONFLICT (id) DO NOTHING;
+    `);
+
+    // Phase 2: Create Physical Family Records (One-time creation from unique values)
+    log("Creating unique Family records...");
+    await client.query(`
+        INSERT INTO app_taxa (taxon_name, taxon_rank, taxon_status, family, source_id, verification_level)
+        SELECT DISTINCT family, 'Family', 'Derived', family, 2, 'FloraCatalog ${APP_VERSION} (Derived from WCVP v14 "family" attribute)'
+        FROM app_taxa
+        WHERE family IS NOT NULL
+          AND NOT EXISTS (SELECT 1 FROM app_taxa a WHERE a.family = app_taxa.family AND a.taxon_rank = 'Family')
+        ON CONFLICT DO NOTHING;
+    `);
+
+    // Phase 3: Segmented Grafting (Linking roots to Families)
+    // Logic: child.family = parent.family for stability
+    for (const seg of segments) {
+        log(`Grafting Segment: ${seg.label}...`);
+        const q = `
+            UPDATE app_taxa child
+            SET parent_id = parent.id
+            FROM app_taxa parent
+            WHERE child.parent_id IS NULL
+              AND child.family = parent.family
+              AND parent.taxon_rank = 'Family'
+              AND child.id != parent.id
+              AND child.taxon_name >= '${seg.start}' AND child.taxon_name < '${seg.end}';
+        `;
+        await client.query(q);
+    }
+    log("Backbone generation complete.");
+}
+
 async function stepIndexes(client) {
     log("Building Essential Build Indexes (Standardized)...");
     // These are the bare minimum needed for efficient Parent linking and Hierarchy walks.
@@ -218,6 +265,7 @@ async function stepIndexes(client) {
         CREATE INDEX IF NOT EXISTS idx_app_taxa_parent_plant_name_id ON app_taxa(parent_plant_name_id);
         CREATE INDEX IF NOT EXISTS idx_app_taxa_parent ON app_taxa(parent_id);
         CREATE INDEX IF NOT EXISTS idx_app_taxa_name_sort ON app_taxa (taxon_name COLLATE "C");
+        CREATE INDEX IF NOT EXISTS idx_app_taxa_family ON app_taxa(family);
     `);
     log("Essential indexes verified.");
 }
@@ -319,7 +367,7 @@ async function stepOptimize(client) {
 // --- MAIN LOOP ---
 
 async function main() {
-    console.log("\n🌿 FLORA CATALOG - DATABASE AUTOMATION v2.30.1 🌿\n");
+    console.log("\n🌿 FLORA CATALOG - DATABASE AUTOMATION v2.31.1 🌿\n");
     process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
     let dbUrl = process.env.DATABASE_URL;
     let finalConfig;
@@ -353,11 +401,12 @@ async function main() {
             { id: '2', name: "Build Schema (Reset)", fn: () => stepBuildSchema(client) },
             { id: '3', name: "Import CSV (Stream)", fn: () => stepImportStream(client) },
             { id: '4', name: "Populate App Taxa (Segmented)", fn: (segs) => stepPopulate(client, segs) },
-            { id: '5', name: "Build Build-Indexes", fn: () => stepIndexes(client) },
-            { id: '6', name: "Link Parents (Segmented)", fn: (segs) => stepLink(client, segs) },
-            { id: '7', name: "Build Hierarchy (Segmented Iterative)", fn: (segs) => stepHierarchy(client, segs) },
-            { id: '8', name: "Calc Counts (Segmented)", fn: (segs) => stepCounts(client, segs) },
-            { id: '9', name: "Final Performance Tuning", fn: () => stepOptimize(client) }
+            { id: '5', name: "Generate Family Backbone (Segmented)", fn: (segs) => stepBackbone(client, segs) },
+            { id: '6', name: "Build Build-Indexes", fn: () => stepIndexes(client) },
+            { id: '7', name: "Link Parents (Segmented)", fn: (segs) => stepLink(client, segs) },
+            { id: '8', name: "Build Hierarchy (Segmented Iterative)", fn: (segs) => stepHierarchy(client, segs) },
+            { id: '9', name: "Calc Counts (Segmented)", fn: (segs) => stepCounts(client, segs) },
+            { id: '10', name: "Final Performance Tuning", fn: () => stepOptimize(client) }
         ];
 
         console.log("\n--- MENU ---");
@@ -368,7 +417,7 @@ async function main() {
         if (startIndex === -1) { err("Invalid selection"); process.exit(1); }
 
         let targetSegments = SEGMENTS;
-        const segmentedSteps = ['4', '6', '7', '8'];
+        const segmentedSteps = ['4', '5', '7', '8', '9'];
         if (segmentedSteps.includes(choice)) {
             targetSegments = await selectSegments();
         }

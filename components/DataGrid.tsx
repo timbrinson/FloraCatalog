@@ -18,7 +18,7 @@ import {
 } from 'lucide-react';
 
 
-// Implementation of Grid Display Spec v2.31.0
+// Implementation of Grid Display Spec v2.31.1
 // Comprehensive rank mapping including primary, secondary, and obsolete ranks from WCVP baseline.
 const RANK_LEVELS: Record<string, number> = {
     'family': 1,
@@ -154,7 +154,7 @@ const COLUMN_GROUPS: ColumnGroup[] = [
                 tooltip: 'Taxonomic Status', 
                 defaultWidth: 110, 
                 filterType: 'multi-select', 
-                filterOptions: ['Accepted', 'Synonym', 'Unplaced', 'Registered', 'Provisional', 'Artificial Hybrid', 'Illegitimate', 'Invalid', 'Local Biotype', 'Misapplied', 'Orthographic', 'Provisionally Accepted', 'External to WCVP'], 
+                filterOptions: ['Accepted', 'Synonym', 'Unplaced', 'Registered', 'Provisional', 'Generated', 'Artificial Hybrid', 'Illegitimate', 'Invalid', 'Local Biotype', 'Misapplied', 'Orthographic', 'Provisionally Accepted', 'External to WCVP'], 
                 defaultOn: false 
             },
             { id: 'family', label: 'Family', tooltip: 'Family', defaultWidth: 120, filterType: 'text', defaultOn: false },

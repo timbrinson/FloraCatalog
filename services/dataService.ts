@@ -326,10 +326,13 @@ export const dataService = {
 
   async purgeNonWCVPTaxa(): Promise<void> {
       if (getIsOffline()) throw new Error("Cannot reset in offline mode");
+      // Refined Purge Strategy (ADR-003): 
+      // Protect official WCVP (1) and System Derived (2) records. 
+      // Purge only manual user additions or unknown entries (3+).
       const { error } = await getSupabase()
           .from(DB_TABLE)
           .delete()
-          .or('source_id.neq.1,source_id.is.null');
+          .not('source_id', 'in', '(1,2)');
       if (error) {
           if (error.message.includes('timeout')) {
               throw new Error("Statement timeout. Please use the SQL editor.");
