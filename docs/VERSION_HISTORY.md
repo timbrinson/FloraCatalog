@@ -1,8 +1,16 @@
 # Version History
 
-## v2.31.0 - Authority Standardization & Expansion Fix
+## v2.31.2 - Logic Sequence Correction
 **Date:** July 08, 2025
 **Status:** Current Release
+
+### Build Pipeline Hardening
+- **Sequence Refactor:** Re-ordered the `automate_build.js` pipeline to ensure specific scientific linking (Species → Genus) occurs **before** the generic Family grafting. This prevents a logic bug where species would incorrectly link directly to families, bypassing their genera.
+- **Index Priority:** Moved "Build-Indexes" to Step 5 (immediately after Population). This ensures that the primary linking (Step 6) and fallthrough grafting (Step 7) have full index support, mitigating "Upstream Timeout" errors during massive table joins.
+
+## v2.31.0 - Authority Standardization & Expansion Fix
+**Date:** July 08, 2025
+**Status:** (Historical)
 
 ### Architectural Consolidation
 - **Legacy Mode Removal:** Permanently deleted the "Legacy (String)" data engine. The application now operates exclusively on the **Authority-Based (ID) Hierarchy (ADR-006)**, ensuring consistent bucketing even when metadata is missing in child records.
