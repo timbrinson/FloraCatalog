@@ -18,7 +18,7 @@ import {
 } from 'lucide-react';
 
 
-// Implementation of Grid Display Spec v2.30.11
+// Implementation of Grid Display Spec v2.31.0
 // Comprehensive rank mapping including primary, secondary, and obsolete ranks from WCVP baseline.
 const RANK_LEVELS: Record<string, number> = {
     'family': 1,
@@ -392,6 +392,47 @@ const DataGrid: React.FC<DataGridProps> = ({
       }
   };
 
+  const isRankMatch = (rank: string, target: string) => {
+      const r = rank.toLowerCase();
+      const t = target.toLowerCase();
+      if (t === 'infraspecies') {
+          // Ensure comprehensive infraspecific matching per Spec v2.30.9
+          return (RANK_LEVELS[r] === 4);
+      }
+      return r === t;
+  };
+
+  const getTargetIdForRank = (row: Taxon, targetRank: string): string => {
+      if (targetRank === 'family') {
+          if (row.family) return row.family;
+          let curr: Taxon | undefined = row;
+          while (curr && curr.parent_id) {
+              const auth = authorityRegistry.get(curr.parent_id);
+              if (auth?.family) return auth.family;
+              curr = auth;
+          }
+          return '(none)';
+      }
+      if (row.hierarchy_path) {
+          const segments = row.hierarchy_path.split('.');
+          for (let i = 1; i < segments.length; i++) {
+              const id = segments[i].replace(/_/g, '-');
+              const auth = authorityRegistry.get(id);
+              if (auth && isRankMatch(auth.taxon_rank || '', targetRank)) return id;
+          }
+      }
+      if (isRankMatch(row.taxon_rank || '', targetRank)) return row.id;
+      let curr: Taxon | undefined = row;
+      while (curr && curr.parent_id) {
+          const parent: Taxon | undefined = authorityRegistry.get(curr.parent_id);
+          if (parent) {
+              if (isRankMatch(parent.taxon_rank || '', targetRank)) return parent.id;
+              curr = parent;
+          } else { break; }
+      }
+      return '(none)';
+  };
+
   const walkLineage = (subset: Taxon[], depth: number, parentPath: string, parentRecord?: Taxon): TreeRow[] => {
       const outputRows: TreeRow[] = [];
       const field = groupBy[depth];
@@ -402,45 +443,7 @@ const DataGrid: React.FC<DataGridProps> = ({
           });
           return outputRows;
       }
-      const isRankMatch = (rank: string, target: string) => {
-          const r = rank.toLowerCase();
-          const t = target.toLowerCase();
-          if (t === 'infraspecies') {
-              // Ensure comprehensive infraspecific matching per Spec v2.30.9
-              return (RANK_LEVELS[r] === 4);
-          }
-          return r === t;
-      };
-      const getTargetIdForRank = (row: Taxon, targetRank: string): string => {
-          if (targetRank === 'family') {
-              if (row.family) return row.family;
-              let curr: Taxon | undefined = row;
-              while (curr && curr.parent_id) {
-                  const auth = authorityRegistry.get(curr.parent_id);
-                  if (auth?.family) return auth.family;
-                  curr = auth;
-              }
-              return '(none)';
-          }
-          if (row.hierarchy_path) {
-              const segments = row.hierarchy_path.split('.');
-              for (let i = 1; i < segments.length; i++) {
-                  const id = segments[i].replace(/_/g, '-');
-                  const auth = authorityRegistry.get(id);
-                  if (auth && isRankMatch(auth.taxon_rank || '', targetRank)) return id;
-              }
-          }
-          if (isRankMatch(row.taxon_rank || '', targetRank)) return row.id;
-          let curr: Taxon | undefined = row;
-          while (curr && curr.parent_id) {
-              const parent: Taxon | undefined = authorityRegistry.get(curr.parent_id);
-              if (parent) {
-                  if (isRankMatch(parent.taxon_rank || '', targetRank)) return parent.id;
-                  curr = parent;
-              } else { break; }
-          }
-          return '(none)';
-      };
+      
       const groupMap = new Map<string, Taxon[]>();
       const groupOrder: string[] = [];
       subset.forEach(row => {
@@ -496,68 +499,12 @@ const DataGrid: React.FC<DataGridProps> = ({
       return outputRows;
   };
 
-  const walkAttributes = (subset: Taxon[], depth: number, parentPath: string, parentRecord?: Taxon): TreeRow[] => {
-      const outputRows: TreeRow[] = [];
-      const field = groupBy[depth];
-      if (!field || depth >= groupBy.length) {
-          subset.forEach(t => {
-              const tr = t as TreeRow;
-              outputRows.push({ ...tr, depth, tree_path: `${parentPath}/${t.id}`, origin_type: tr.origin_type || 'result' });
-          });
-          return outputRows;
-      }
-      const groups: Record<string, Taxon[]> = {};
-      subset.forEach(row => { 
-          let val = '(none)';
-          if (parentRecord && field === (parentRecord.taxon_rank || '').toLowerCase()) {
-              val = String(parentRecord.taxon_name || '').trim();
-          } else {
-              val = String(row[field as keyof Taxon] || '').trim() || '(none)';
-          }
-          if (!groups[val]) groups[val] = []; 
-          groups[val].push(row); 
-      });
-      Object.keys(groups).sort(genericFirstSort).forEach(key => {
-          const groupItems = groups[key];
-          const path = `${parentPath}/${key}`;
-          const isHolder = key === '(none)';
-          const headerTaxon = allTaxaPool.find(t => {
-             const rowVal = String(getRowValue(t, field)).trim();
-             if (rowVal !== key) return false;
-             const rank = (t.taxon_rank as string || '').toLowerCase();
-             if (field === 'family') return rank === 'family';
-             if (field === 'genus') return rank === 'genus';
-             if (field === 'species') return rank === 'species';
-             if (field === 'infraspecies') return (RANK_LEVELS[rank] === 4);
-             return rank === field.toLowerCase();
-          });
-          const itemsWithoutHeader = headerTaxon ? groupItems.filter(i => i.id !== headerTaxon.id) : groupItems;
-          const firstChild = groupItems[0];
-          const headerRow: TreeRow = headerTaxon ? { ...headerTaxon, origin_type: 'ancestor' } : {
-              id: `virtual:none:${parentRecord?.id || 'root'}:${field}:${key}`,
-              is_virtual: true, is_holder: isHolder, origin_type: 'virtual',
-              taxon_rank: (field === 'infraspecies' ? 'Infraspecies' : field.charAt(0).toUpperCase() + field.slice(1)) as any, 
-              name: key, taxon_name: key, taxon_status: '', // Spec v2.30.11: Virtual rows have blank status
-              family: field === 'family' ? key : (parentRecord?.family || firstChild?.family),
-              genus: field === 'genus' ? key : (depth >= 1 ? (parentRecord?.genus || firstChild?.genus) : undefined),
-              species: field === 'species' ? key : (depth >= 2 ? (parentRecord?.species || firstChild?.species) : undefined),
-              alternative_names: [], reference_links: [], created_at: 0
-          } as any;
-          headerRow.is_tree_header = true; headerRow.tree_expanded = !collapsedGroups.has(path);
-          (headerRow as any).child_count = headerTaxon ? (headerTaxon.descendant_count || 0) : groupItems.length;
-          headerRow.depth = depth; headerRow.tree_path = path;
-          outputRows.push(headerRow);
-          if (headerRow.tree_expanded) outputRows.push(...walkAttributes(itemsWithoutHeader, depth + 1, path, headerRow));
-      });
-      return outputRows;
-  };
-
   const gridRows = useMemo((): TreeRow[] => {
       if (!taxa || taxa.length === 0) return [];
       if (groupBy.length === 0) return taxa.map(t => ({ ...t, origin_type: 'result' } as TreeRow));
-      if (preferences.grouping_strategy === 'path') return walkLineage(taxa, 0, 'root');
-      else return walkAttributes(taxa, 0, 'root');
-  }, [taxa, allTaxaPool, authorityRegistry, groupBy, collapsedGroups, preferences.grouping_strategy, visibleColumns]);
+      // Spec v2.31.0: Exclusive Authority (IDs) grouping
+      return walkLineage(taxa, 0, 'root');
+  }, [taxa, allTaxaPool, authorityRegistry, groupBy, collapsedGroups, visibleColumns]);
 
   const toggleGroup = (path: string) => { const next = new Set(collapsedGroups); if (next.has(path)) next.delete(path); else next.add(path); setCollapsedGroups(next); };
   
@@ -565,21 +512,27 @@ const DataGrid: React.FC<DataGridProps> = ({
       if (!taxa) return;
       const newCollapsed = new Set<string>();
       const allPathsWithDepths: {path: string, depth: number}[] = [];
+      
+      // Spec v2.31.0: Refactored walk to use getTargetIdForRank, aligning with Authority Path logic.
       const walk = (subset: Taxon[], depth: number, parentPath: string) => {
           if (depth >= groupBy.length) return;
           const field = groupBy[depth];
           const groups: Record<string, Taxon[]> = {};
+          
           subset.forEach(row => {
-              const val = String(getRowValue(row, field) || '').trim() || '(none)';
-              if (!groups[val]) groups[val] = [];
-              groups[val].push(row);
+              // Standard ID-based segment identification
+              const segmentId = getTargetIdForRank(row, field);
+              if (!groups[segmentId]) groups[segmentId] = [];
+              groups[segmentId].push(row);
           });
-          Object.keys(groups).forEach(key => {
-              const path = `${parentPath}/${key}`;
+          
+          Object.keys(groups).forEach(segmentId => {
+              const path = `${parentPath}/${segmentId}`;
               allPathsWithDepths.push({ path, depth });
-              walk(groups[key], depth + 1, path);
+              walk(groups[segmentId], depth + 1, path);
           });
       };
+      
       walk(taxa, 0, 'root');
       allPathsWithDepths.forEach(item => { if (item.depth >= targetDepth) newCollapsed.add(item.path); });
       setCollapsedGroups(newCollapsed);
@@ -637,8 +590,8 @@ const DataGrid: React.FC<DataGridProps> = ({
   const toggleDebugMode = () => onPreferenceChange?.({ ...preferences, debug_mode: !preferences.debug_mode });
 
   const tableVersionKey = useMemo(() => {
-    return `${groupBy.join('-')}-${JSON.stringify(filters)}-${taxa.length}-${sortConfig.key}-${sortConfig.direction}-${preferences.debug_mode}-${preferences.grouping_strategy}`;
-  }, [groupBy, filters, taxa.length, sortConfig, preferences.debug_mode, preferences.grouping_strategy]);
+    return `${groupBy.join('-')}-${JSON.stringify(filters)}-${taxa.length}-${sortConfig.key}-${sortConfig.direction}-${preferences.debug_mode}`;
+  }, [groupBy, filters, taxa.length, sortConfig, preferences.debug_mode]);
 
   return (
     <div className="bg-white rounded-xl shadow border border-slate-200 overflow-hidden flex flex-col h-full relative">

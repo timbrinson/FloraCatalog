@@ -2,7 +2,6 @@
 
 This document tracks planned features and technical improvements to ensure continuity across development sessions.
 ## Work on Now
-- [ ] **Fix Expand/Collapse Levels:** This functionality was developed for the older string based hierarchy and does not work with Authority (IDs) for hierarchy, other than Family level.
 
 ## High Priority
 - [ ] **Ingestion Engine Transition:** Prepare the infrastructure for the 5-stage validation pipeline implementation.
@@ -62,6 +61,8 @@ This document tracks planned features and technical improvements to ensure conti
 
 
 ## Archive
+- [x] **Fix Expand/Collapse Levels:** This functionality was developed for the older string based hierarchy and does not work with Authority (IDs) for hierarchy, other than Family level.
+- [x] **Remove the Legacy (String) Mode:** It is no longer needed since Authority (IDs) has been implemented, is stable and working well.
 - [x] **Index Cleanup and Refinement:** Update manual and automated DB installation scripts where needed Output any new scripts that need to be ran manually. Indicate any inndices that need to be removed manually.
     * **Human Note:** idx_app_taxa_name_sort is currently defined in the DB as: CREATE INDEX idx_app_taxa_name_sort ON public.app_taxa USING btree (taxon_name). I recall there was a COLLATE "C" in some index in the past but wonder if it was inadvertently removed during a debug session. 
     * **Human Note:** I ran the script. I notice that filtering on Status = Accepted and (Rank = Form or I Rank = f.) causes a timeout but no other Ranks or I Ranks do.. Doing the same query in Supabase returns fast results.

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Settings, Layout, Zap, Palette, Database, Save, Search as SearchIcon, Cpu, AlertTriangle, RefreshCw, Loader2, Trash2, Bug, Network, RotateCcw, Download, Droplets, Type, Square, Grid2X2 } from 'lucide-react';
+import { X, Settings, Layout, Zap, Palette, Database, Save, Search as SearchIcon, Cpu, AlertTriangle, RefreshCw, Loader2, Trash2, Bug, RotateCcw, Download, Droplets, Type, Square, Grid2X2 } from 'lucide-react';
 import { UserPreferences, RankPallet, PalletLevel } from '../types';
 import { reloadClient, MANUAL_URL, MANUAL_KEY } from '../services/supabaseClient';
 import { dataService } from '../services/dataService';
@@ -177,16 +177,6 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, preferen
                     <div><label className="block text-xs font-bold text-slate-600 mb-1">Project URL</label><input type="text" className="w-full text-xs p-2 border border-slate-300 rounded outline-none font-mono" value={dbUrl} onChange={(e) => setDbUrl(e.target.value)} /></div>
                     <div><label className="block text-xs font-bold text-slate-600 mb-1">Anon Key</label><input type="password" className="w-full text-xs p-2 border border-slate-300 rounded outline-none font-mono" value={dbKey} onChange={(e) => setDbKey(e.target.value)} /></div>
                     <button onClick={saveConnection} className="w-full flex items-center justify-center gap-2 py-2 bg-leaf-600 text-white rounded hover:bg-leaf-700 text-xs font-bold"><Save size={14} /> Update Connection</button>
-                </div>
-            </div>
-            <div>
-                <h4 className="text-sm font-bold text-slate-700 uppercase tracking-wide mb-3 flex items-center gap-2"><Network size={14}/> Data Engine</h4>
-                <div className="bg-slate-50 p-4 rounded-lg border border-slate-200 space-y-3">
-                    <label className="block text-[10px] font-extrabold text-slate-400 uppercase tracking-wider mb-1">Grouping Strategy (ADR-006)</label>
-                    <div className="grid grid-cols-2 gap-2 p-1 bg-slate-100 rounded-lg">
-                        <button onClick={() => onUpdate({ ...preferences, grouping_strategy: 'attribute' })} className={`p-2 text-[10px] rounded-md transition-all ${preferences.grouping_strategy === 'attribute' ? 'bg-white shadow-sm font-bold text-slate-700 border border-slate-200' : 'text-slate-500'}`}>Legacy (Strings)</button>
-                        <button onClick={() => onUpdate({ ...preferences, grouping_strategy: 'path' })} className={`p-2 text-[10px] rounded-md transition-all ${preferences.grouping_strategy === 'path' ? 'bg-white shadow-sm font-bold text-leaf-700 border border-leaf-200' : 'text-slate-500'}`}>Authority (IDs)</button>
-                    </div>
                 </div>
             </div>
             <div>

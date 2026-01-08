@@ -57,8 +57,7 @@ export default function App() {
       fit_screen_max_ratio: 4.0,
       grid_pallet: DEFAULT_PALLET,
       search_mode: 'prefix',
-      debug_mode: false,
-      grouping_strategy: 'path'
+      debug_mode: false
   });
 
   const [activities, setActivities] = useState<ActivityItem[]>([]);

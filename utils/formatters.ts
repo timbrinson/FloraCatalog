@@ -44,7 +44,7 @@ export const assembleScientificName = (p: Partial<Taxon>): string => {
   return parts.join(' ').trim();
 };
 
-export const formatScientificName = (taxon: Taxon, prefs: UserPreferences = { hybrid_spacing: 'space', auto_enrichment: false, search_mode: 'prefix', grouping_strategy: 'attribute' }): string => {
+export const formatScientificName = (taxon: Taxon, prefs: UserPreferences = { hybrid_spacing: 'space', auto_enrichment: false, search_mode: 'prefix' }): string => {
   let name = taxon.name || ''; 
   
   const cleanName = name.replace(/^[×]\s?/i, '');

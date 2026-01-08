@@ -16,7 +16,6 @@ export interface UserPreferences {
   grid_pallet?: RankPallet;
   search_mode: 'prefix' | 'fuzzy'; 
   debug_mode?: boolean;
-  grouping_strategy: 'attribute' | 'path';
 }
 
 export enum LoadingState {
