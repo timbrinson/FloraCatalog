@@ -18,27 +18,28 @@ import {
 } from 'lucide-react';
 
 
-// Implementation of Grid Display Spec v2.30.9
+// Implementation of Grid Display Spec v2.30.11
 // Comprehensive rank mapping including primary, secondary, and obsolete ranks from WCVP baseline.
 const RANK_LEVELS: Record<string, number> = {
     'family': 1,
     'genus': 2,
     'species': 3,
     // Infraspecific Cluster (Level 4)
+    // Includes 'unranked' because these records typically sit below Species in the WCVP hierarchy.
     'subspecies': 4, 'subsp.': 4,
     'variety': 4, 'var.': 4,
     'subvariety': 4, 'subvar.': 4,
     'form': 4, 'f.': 4,
     'subform': 4, 'subf.': 4,
     'infraspecies': 4,
+    'unranked': 4,
     'agamosp.': 4, 'convariety': 4, 'convar.': 4, 'ecas.': 4, 'grex': 4, 
     'lusus': 4, 'microf.': 4, 'microgène': 4, 'micromorphe': 4, 
     'modif.': 4, 'monstr.': 4, 'mut.': 4, 'nid': 4, 'nothof.': 4, 
     'nothosubsp.': 4, 'nothovar.': 4, 'positio': 4, 'proles': 4, 
     'provar.': 4, 'psp.': 4, 'stirps': 4, 'subap.': 4, 'sublusus': 4, 
     'subproles': 4, 'subspecioid': 4, 'subsubsp.': 4, 'unterrasse': 4,
-    'cultivar': 5,
-    'unranked': 99
+    'cultivar': 5
 };
 
 const COL_RANK_LEVELS: Record<string, number> = {
@@ -477,7 +478,7 @@ const DataGrid: React.FC<DataGridProps> = ({
               taxon_rank: (field === 'infraspecies' ? 'Infraspecies' : field.charAt(0).toUpperCase() + field.slice(1)) as any,
               name: isHolder ? '(none)' : (isFamilyRank ? segmentId : (segmentId === '(unlinked)' ? '(unlinked)' : segmentId)),
               taxon_name: isHolder ? '(none)' : (isFamilyRank ? segmentId : (segmentId === '(unlinked)' ? '(unlinked)' : segmentId)),
-              taxon_status: 'Accepted',
+              taxon_status: '', // Spec v2.30.11: Virtual rows have blank status
               family: field === 'family' ? segmentId : (parentRecord?.family || firstChild?.family),
               genus: field === 'genus' ? segmentId : (depth >= 1 ? (parentRecord?.genus || firstChild?.genus) : undefined),
               species: field === 'species' ? segmentId : (depth >= 2 ? (parentRecord?.species || firstChild?.species) : undefined),
@@ -536,7 +537,7 @@ const DataGrid: React.FC<DataGridProps> = ({
               id: `virtual:none:${parentRecord?.id || 'root'}:${field}:${key}`,
               is_virtual: true, is_holder: isHolder, origin_type: 'virtual',
               taxon_rank: (field === 'infraspecies' ? 'Infraspecies' : field.charAt(0).toUpperCase() + field.slice(1)) as any, 
-              name: key, taxon_name: key, taxon_status: 'Accepted',
+              name: key, taxon_name: key, taxon_status: '', // Spec v2.30.11: Virtual rows have blank status
               family: field === 'family' ? key : (parentRecord?.family || firstChild?.family),
               genus: field === 'genus' ? key : (depth >= 1 ? (parentRecord?.genus || firstChild?.genus) : undefined),
               species: field === 'species' ? key : (depth >= 2 ? (parentRecord?.species || firstChild?.species) : undefined),
@@ -791,8 +792,8 @@ const DataGrid: React.FC<DataGridProps> = ({
                   const tr = row as TreeRow; const isExpanded = expandedRows.has(tr.id); 
                   let rankKey = String(tr.taxon_rank).toLowerCase() as keyof RankPallet;
                   
-                  // Rank Normalization (Spec v2.30.9)
-                  // Use the Level mapping to bucket rare ranks into the standard Infraspecies pallet.
+                  // Rank Normalization (Spec v2.30.11)
+                  // Use the Level mapping to bucket rare and unranked records into the standard Infraspecies pallet.
                   if (RANK_LEVELS[rankKey] === 4) rankKey = 'infraspecies';
                   else if (!['family', 'genus', 'species', 'cultivar'].includes(rankKey)) { 
                     rankKey = 'species'; // Default fallback
@@ -862,7 +863,8 @@ const DataGrid: React.FC<DataGridProps> = ({
                                  );
                                }
                                else if (col.id === 'taxon_status') { 
-                                 displayVal = <span className="text-[11px] text-slate-500 font-normal normal-case">{displayVal || '-'}</span>; 
+                                 // Spec v2.30.11: Blank status for virtual rows, fallback hyphen only for real records.
+                                 displayVal = <span className="text-[11px] text-slate-500 font-normal normal-case">{tr.is_virtual ? '' : (displayVal || '-')}</span>; 
                                }
 
                                const baseTextClass = isBold 
