@@ -2,7 +2,7 @@
 
 This document tracks planned features and technical improvements to ensure continuity across development sessions.
 ## Work on Now
-
+- [ ] **Fix Expand/Collapse Levels:** This functionality was developed for the older string based hierarchy and does not work with Authority (IDs) for hierarchy, other than Family level.
 
 ## High Priority
 - [ ] **Ingestion Engine Transition:** Prepare the infrastructure for the 5-stage validation pipeline implementation.
@@ -18,7 +18,6 @@ This document tracks planned features and technical improvements to ensure conti
     > **AI Context:** Implemented mandatory Source Attribution in AddPlantModal. Integrated app_data_sources registry to track "Who, What, When, and How." Manual additions now capture App Version (v2.18.0), process context, and timestamp. Locked down WCVP source from manual attribution selection. Added case-insensitive matching for lineage detection. Resolved statement timeouts in Purge utility by switching to ID-chained deletion.
 
 ## Medium Priority
-- [ ] **Fix Expand/Collapse Levels:** This functionality was developed for the older string based hierarchy and does not work with Authority (IDs) for hierarchy, other than Family level.
 - [ ] **Sorting on Family:** With the new grid tree using Authority (IDs) and Family colums/rows turned on, it is not sorting by genus and adding the family abve it. Can we make it sort on Family and group all the Genus under the one instance of a particular family?
 - [ ] **Create Records for Family:** We have done a lot of work to accomodate Family level when it exists as an attribute and not a record or WCVP rank. Should we create records for all Family values used in WCVP? We would add teh Family Rank as an extension (like was done for Cultivar). We would need a special Status as well like 'Generated' or Extrapulated', that is an extension of teh WCVP vales (like was done for Registered and Provisional). 
 - [ ] **Clean Up Zombie Scripts:** As we developed the manual and then automated installation scripts there were a lot of changes in order to get them to work. It is not clear which are still valid and which should be archoived or deleted. It would be good to maintain both path's for installation. The manual path is good for training someone to understand the steps. The automated one is best for productivity. We need to organize the long list of scripts by seting up functional and/or logical folders.

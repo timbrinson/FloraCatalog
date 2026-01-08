@@ -31,7 +31,7 @@ Whenever a new conversation starts or the session is reset, the AI MUST NOT emit
 ## 6. Permanent Guardrails
 - **Guardrail A (Backlog Status)**: The `TASK_BACKLOG.md` file is **read-only context**. The AI is strictly forbidden from implementing any task listed in the backlog unless the user explicitly names that specific task in the current prompt and provides a direct "Go."
 - **Guardrail B (Post-Error Grounding)**: After any "Internal Error," session timeout, or environment reset, the AI must perform the Section 1 Handover Protocol before proposing any changes.
-- **Guardrail C (Task Lifecycle Verification)**: Only the Human Architect can move tasks around. The AI may suggest a status update (e.g., "Fixed - Awaiting Verification"), but only the user can move them.
+- **Guardrail C (Task Lifecycle Verification)**: Only the Human Architect can move tasks around. The AI may suggest a status update (e.g., "Fixed - Awaiting Verification"), but the move to Archive requires user consent.
 - **Guardrail D (Preservation Over Brevity)**: Maintaining a complete historical record in roadmap documents is more important than keeping the XML response short.
 - **Guardrail E (The Zero-Action Rule)**: The AI is strictly prohibited from modifying *any* file—including documentation like `VISION_STATEMENT.md`—without explicit user approval of the specific plan in the current turn.
 - **Guardrail F (Explicit Sign-Off Rule)**: The AI is strictly forbidden from marking a `TASK_BACKLOG.md` item as `[x]` or moving it to the "Archive" based on its own assessment of completion. Even if the AI believes a task is finished, the document update only occurs after a direct command from the Human Architect (e.g., "Verified, mark as done").

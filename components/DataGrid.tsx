@@ -276,7 +276,6 @@ const DataGrid: React.FC<DataGridProps> = ({
   
   const [columnOrder, setColumnOrder] = useState<string[]>(() => {
       if (propColumnOrder !== undefined) return propColumnOrder;
-      // Fix: ALL_COLUMNS.map(c => [c.id]) was returning string[][], should be string[]
       return ALL_COLUMNS.map(c => c.id);
   });
   
@@ -392,7 +391,7 @@ const DataGrid: React.FC<DataGridProps> = ({
       const isRankMatch = (rank: string, target: string) => {
           const r = rank.toLowerCase();
           const t = target.toLowerCase();
-          if (t === 'infraspecies') return ['subspecies', 'variety', 'form', 'infraspecies'].includes(r);
+          if (t === 'infraspecies') return ['subspecies', 'variety', 'form', 'subvariety', 'subform', 'infraspecies'].includes(r);
           return r === t;
       };
       const getTargetIdForRank = (row: Taxon, targetRank: string): string => {
@@ -512,7 +511,7 @@ const DataGrid: React.FC<DataGridProps> = ({
              if (field === 'family') return rank === 'family';
              if (field === 'genus') return rank === 'genus';
              if (field === 'species') return rank === 'species';
-             if (field === 'infraspecies') return ['variety', 'subspecies', 'form'].includes(rank);
+             if (field === 'infraspecies') return ['variety', 'subspecies', 'form', 'subvariety', 'subform'].includes(rank);
              return rank === field.toLowerCase();
           });
           const itemsWithoutHeader = headerTaxon ? groupItems.filter(i => i.id !== headerTaxon.id) : groupItems;
@@ -628,7 +627,16 @@ const DataGrid: React.FC<DataGridProps> = ({
     <div className="bg-white rounded-xl shadow border border-slate-200 overflow-hidden flex flex-col h-full relative">
       <div className="p-2 border-b border-slate-200 bg-slate-50 flex justify-between items-center z-20 relative flex-shrink-0">
          <div className="text-xs text-slate-500 font-medium px-2 flex items-center gap-4 flex-1">
-             <span>{taxa?.length.toLocaleString() || '0'} of {totalRecords >= 0 ? totalRecords.toLocaleString() : 'many'} records loaded</span>
+             <div className="flex items-center gap-2">
+                <button onClick={() => setIsHierarchyMode(!isHierarchyMode)} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${isHierarchyMode ? 'bg-leaf-600 text-white shadow-sm' : 'bg-white border border-slate-200 text-slate-600'}`}>
+                  {isHierarchyMode ? <NetworkIcon size={14}/> : <ListIcon size={14}/>}
+                  {isHierarchyMode ? 'Hierarchy Mode' : 'Flat List'}
+                </button>
+                <div className="h-4 w-px bg-slate-200 mx-1"></div>
+                <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest whitespace-nowrap">
+                  {taxa?.length.toLocaleString() || '0'} of {totalRecords >= 0 ? totalRecords.toLocaleString() : 'many'} records
+                </div>
+             </div>
              {isLoadingMore && <span className="flex items-center gap-1 text-leaf-600"><Loader2Icon size={12} className="animate-spin"/> Loading...</span>}
              {error && (<div className="flex items-center gap-1.5 px-3 py-1 bg-red-50 text-red-600 rounded-full border border-red-100 animate-in fade-in duration-300 max-w-[300px] truncate" title={error}><AlertCircle size={14} className="flex-shrink-0" /><span className="font-bold truncate">{error}</span></div>)}
              {isHierarchyMode && (
@@ -708,10 +716,12 @@ const DataGrid: React.FC<DataGridProps> = ({
            <thead className="bg-slate-50 sticky top-0 z-10 text-xs font-bold text-slate-500 uppercase tracking-wide shadow-sm">
               <tr>
                   {activeColumns.map(col => (
-                      <th key={col.id} className={`border-b border-slate-200 last:border-r-0 bg-slate-50 select-none relative group ${['tree_control', 'descendant_count'].includes(col.id) ? '' : 'border-r border-slate-100'}`} style={{ width: colWidths[col.id], minWidth: 30 }} draggable={!col.disableDrag} onDragStart={(e) => handleDragStart(e, col.id)} onDragOver={handleDragOver} onDrop={(e) => handleDrop(e, col.id)} title={col.tooltip}>
+                      <th key={col.id} className={`border-b border-slate-200 bg-slate-50 select-none relative group ${['tree_control', 'descendant_count'].includes(col.id) ? '' : 'border-r border-slate-100'}`} style={{ width: colWidths[col.id], minWidth: 30 }} draggable={!col.disableDrag} onDragStart={(e) => handleDragStart(e, col.id)} onDragOver={handleDragOver} onDrop={(e) => handleDrop(e, col.id)} title={col.tooltip}>
                          <div className={`flex items-center gap-1 p-2 h-full w-full ${col.headerAlign === 'center' ? 'justify-center' : 'justify-between'}`}>
                              {col.id === 'tree_control' ? (
-                                <button onClick={(e) => { e.stopPropagation(); setIsHierarchyMode(!isHierarchyMode); }} className={`p-1 rounded hover:bg-slate-200 transition-colors ${isHierarchyMode ? 'text-indigo-600 bg-indigo-50 ring-1 ring-indigo-200 shadow-inner' : 'text-slate-400'}`} title={isHierarchyMode ? "Flat View" : "Tree View"}>{isHierarchyMode ? <NetworkIcon size={16} /> : <ListIcon size={16} />}</button>
+                                <div className="flex justify-center w-full">
+                                    <button onClick={(e) => { e.stopPropagation(); setIsHierarchyMode(!isHierarchyMode); }} className={`p-1 rounded hover:bg-slate-200 transition-colors ${isHierarchyMode ? 'text-leaf-600' : 'text-slate-400'}`} title={isHierarchyMode ? "Flat View" : "Tree View"}>{isHierarchyMode ? <NetworkIcon size={16} /> : <ListIcon size={16} />}</button>
+                                </div>
                              ) : (
                                  <>
                                      <div className="flex items-center gap-1 cursor-grab active:cursor-grabbing overflow-hidden" onClick={() => !col.disableSorting && handleSort(col.id)}>
@@ -764,7 +774,7 @@ const DataGrid: React.FC<DataGridProps> = ({
               {gridRows.map((row, idx) => {
                   const tr = row as TreeRow; const isExpanded = expandedRows.has(tr.id); 
                   let rankKey = String(tr.taxon_rank).toLowerCase() as keyof RankPallet;
-                  if (['subspecies', 'variety', 'form', 'infraspecies'].includes(rankKey)) rankKey = 'infraspecies';
+                  if (['subspecies', 'variety', 'form', 'subvariety', 'subform', 'infraspecies'].includes(rankKey)) rankKey = 'infraspecies';
                   else if (!['family', 'genus', 'species', 'cultivar'].includes(rankKey)) { 
                     rankKey = 'species'; // Default fallback for unknown ranks
                   }
@@ -793,10 +803,12 @@ const DataGrid: React.FC<DataGridProps> = ({
                                const depthIndent = (tr.depth || 0) * 20;
                                
                                if (col.id === 'tree_control') return <td key={col.id} className={`p-2 relative ${tr.is_tree_header ? '' : 'border-slate-50'}`} style={{ paddingLeft: `${depthIndent}px` }}>
-                                   {tr.is_tree_header && <span className={`transform transition-transform inline-block ${tr.tree_expanded ? 'rotate-90' : ''}`}><ChevronRightIcon size={14} /></span>}
+                                   <div className="flex justify-center w-full h-full min-h-[1.5rem]">
+                                        {tr.is_tree_header && <span className={`transform transition-transform inline-block ${tr.tree_expanded ? 'rotate-90' : ''}`}><ChevronRightIcon size={14} /></span>}
+                                   </div>
                                </td>;
                                if (col.id === 'descendant_count') return <td key={col.id} className="p-2 text-xs text-center text-slate-400 font-mono">{tr.is_tree_header ? (tr as any).child_count : (tr.descendant_count || '')}</td>;
-                               if (col.id === 'actions') return <td key={col.id} className="p-2 border-r border-slate-200 text-center"><div className="flex items-center justify-center gap-1"><button onClick={(e) => { e.stopPropagation(); setExpandedRows(prev => { const n = new Set(prev); n.has(tr.id) ? n.delete(tr.id) : n.add(tr.id); return n; }); }} className={`p-1.5 rounded shadow-sm ${isExpanded ? 'bg-slate-800 text-white' : 'bg-white border border-slate-200 text-slate-500 hover:text-slate-800'}`}>{isExpanded ? <ChevronUpIcon size={14}/> : <ChevronDownIcon size={14}/>}</button>{['genus', 'species', 'subspecies', 'variety', 'form'].includes(rankKey) && <button onClick={(e) => { e.stopPropagation(); onAction?.('enrich', tr); }} title="Analyze & Find Details" className="p-1.5 bg-indigo-50 border border-indigo-200 rounded text-indigo-600 hover:bg-indigo-100 shadow-sm"><PickaxeIcon size={14} /></button>}<button onClick={(e) => { e.stopPropagation(); onAction?.('enrich', tr); }} title="Enrich Data Layer" className="p-1.5 bg-amber-50 border border-amber-200 rounded text-amber-600 hover:bg-amber-100 shadow-sm"><Wand2Icon size={14} /></button></div></td>;
+                               if (col.id === 'actions') return <td key={col.id} className="p-2 border-r border-slate-200 text-center"><div className="flex items-center justify-center gap-1"><button onClick={(e) => { e.stopPropagation(); setExpandedRows(prev => { const n = new Set(prev); n.has(tr.id) ? n.delete(tr.id) : n.add(tr.id); return n; }); }} className={`p-1.5 rounded shadow-sm ${isExpanded ? 'bg-slate-800 text-white' : 'bg-white border border-slate-200 text-slate-500 hover:text-slate-800'}`}>{isExpanded ? <ChevronUpIcon size={14}/> : <ChevronDownIcon size={14}/>}</button>{['genus', 'species', 'subspecies', 'variety', 'form', 'subvariety', 'subform'].includes(rankKey) && <button onClick={(e) => { e.stopPropagation(); onAction?.('enrich', tr); }} title="Analyze & Find Details" className="p-1.5 bg-indigo-50 border border-indigo-200 rounded text-indigo-600 hover:bg-indigo-100 shadow-sm"><PickaxeIcon size={14} /></button>}<button onClick={(e) => { e.stopPropagation(); onAction?.('enrich', tr); }} title="Enrich Data Layer" className="p-1.5 bg-amber-50 border border-amber-200 rounded text-amber-600 hover:bg-amber-100 shadow-sm"><Wand2Icon size={14} /></button></div></td>;
 
                                let displayVal: React.ReactNode = '';
                                if (typeof val === 'string' || typeof val === 'number') { displayVal = val; } else if (typeof val === 'boolean') { displayVal = val ? 'Yes' : 'No'; }
