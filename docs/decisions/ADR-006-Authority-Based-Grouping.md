@@ -29,3 +29,4 @@ We utilize the **ID-Sovereignty Principle** for all tree-walk operations, with a
 - **Metadata Resilience:** Inconsistent fields in result sets no longer break the tree structure.
 - **Single Source of Truth:** A Genus will only ever appear once in the grid, regardless of metadata errors in its descendants.
 - **Literal Family Support:** Successfully handles the "Attribute-only" nature of Families in the WCVP dataset without requiring the creation of millions of ghost Family records.
+- **Authority-Aware Expansion Fix (v2.31.0):** The UI expansion logic (`expandTreeLevel`) has been refactored to align with the ID-based bucketing. By using `getTargetIdForRank` to generate expansion paths, the "1, 2, 3, 4" Level buttons now correctly identify the hierarchy depth using UUID segments rather than string labels, preventing key mismatches during recursive tree walks.

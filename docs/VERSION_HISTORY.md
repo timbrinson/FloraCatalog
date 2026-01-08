@@ -1,8 +1,20 @@
 # Version History
 
+## v2.31.0 - Authority Standardization & Expansion Fix
+**Date:** July 08, 2025
+**Status:** Current Release
+
+### Architectural Consolidation
+- **Legacy Mode Removal:** Permanently deleted the "Legacy (String)" data engine. The application now operates exclusively on the **Authority-Based (ID) Hierarchy (ADR-006)**, ensuring consistent bucketing even when metadata is missing in child records.
+- **Settings UI Cleanup:** Removed the "Data Engine" toggle and strategy configuration from the Settings panel to simplify the user experience and reduce technical debt.
+- **Authority-Aware Expansion:** Refactored the `expandTreeLevel` logic in `DataGrid.tsx` to utilize `getTargetIdForRank`. This ensures that the expansion "Path Keys" (using UUID segments) align character-for-character with the rendering engine's bucket IDs, restoring the functionality of the 1, 2, 3, and 4 level collapse buttons.
+
+### Bug Fixes
+- **Tree Key Alignment:** Resolved the "Key Mismatch" bug where Level buttons failed to collapse nodes because they were looking for string labels instead of Authority UUIDs.
+
 ## v2.30.5 - Baseline Stabilization & Cleanup
 **Date:** July 07, 2025
-**Status:** Current Release
+**Status:** (Historical)
 
 ### Administrative & Cleanup
 - **Zombie Script Hygiene:** Removed legacy performance scripts documented as obsolete in v2.30.2.
@@ -31,7 +43,7 @@
 **Status:** (Historical)
 
 ### UX & Aesthetic Refinement
-- **Granular Grid Pallet:** Replaced static color themes with a dynamic configuration engine in Settings. Users can now define Tailwind colors and specific weights (Cell BG, Text, Badge, Border) for all five taxonomic ranks.
+- **Granular Grid Pallet:** Replaced static color themes with a dynamic configuration engine in Settings. Users can now define Tailwind colors and specific weights (Cell BG, Text, Badge BG, and Badge Border) for all five taxonomic ranks.
 - **Status Value De-emphasis:** Changed Status column rendering from badges to subtle, regular-weight text to reduce visual clutter.
 - **Rank Badge Polish:** Switched Rank badges to use normal font weight while preserving the badge structure.
 - **Compact Column Picker:** Redesigned the Column Selector UI using a gap-free CSS multi-column layout for higher information density.
