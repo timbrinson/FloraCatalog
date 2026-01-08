@@ -18,12 +18,25 @@ import {
 } from 'lucide-react';
 
 
-// Implementation of Grid Display Spec v2.28.1
+// Implementation of Grid Display Spec v2.30.9
+// Comprehensive rank mapping including primary, secondary, and obsolete ranks from WCVP baseline.
 const RANK_LEVELS: Record<string, number> = {
     'family': 1,
     'genus': 2,
     'species': 3,
-    'subspecies': 4, 'variety': 4, 'form': 4, 'subvariety': 4, 'subform': 4, 'infraspecies': 4,
+    // Infraspecific Cluster (Level 4)
+    'subspecies': 4, 'subsp.': 4,
+    'variety': 4, 'var.': 4,
+    'subvariety': 4, 'subvar.': 4,
+    'form': 4, 'f.': 4,
+    'subform': 4, 'subf.': 4,
+    'infraspecies': 4,
+    'agamosp.': 4, 'convariety': 4, 'convar.': 4, 'ecas.': 4, 'grex': 4, 
+    'lusus': 4, 'microf.': 4, 'microgène': 4, 'micromorphe': 4, 
+    'modif.': 4, 'monstr.': 4, 'mut.': 4, 'nid': 4, 'nothof.': 4, 
+    'nothosubsp.': 4, 'nothovar.': 4, 'positio': 4, 'proles': 4, 
+    'provar.': 4, 'psp.': 4, 'stirps': 4, 'subap.': 4, 'sublusus': 4, 
+    'subproles': 4, 'subspecioid': 4, 'subsubsp.': 4, 'unterrasse': 4,
     'cultivar': 5,
     'unranked': 99
 };
@@ -391,7 +404,10 @@ const DataGrid: React.FC<DataGridProps> = ({
       const isRankMatch = (rank: string, target: string) => {
           const r = rank.toLowerCase();
           const t = target.toLowerCase();
-          if (t === 'infraspecies') return ['subspecies', 'variety', 'form', 'subvariety', 'subform', 'infraspecies'].includes(r);
+          if (t === 'infraspecies') {
+              // Ensure comprehensive infraspecific matching per Spec v2.30.9
+              return (RANK_LEVELS[r] === 4);
+          }
           return r === t;
       };
       const getTargetIdForRank = (row: Taxon, targetRank: string): string => {
@@ -511,7 +527,7 @@ const DataGrid: React.FC<DataGridProps> = ({
              if (field === 'family') return rank === 'family';
              if (field === 'genus') return rank === 'genus';
              if (field === 'species') return rank === 'species';
-             if (field === 'infraspecies') return ['variety', 'subspecies', 'form', 'subvariety', 'subform'].includes(rank);
+             if (field === 'infraspecies') return (RANK_LEVELS[rank] === 4);
              return rank === field.toLowerCase();
           });
           const itemsWithoutHeader = headerTaxon ? groupItems.filter(i => i.id !== headerTaxon.id) : groupItems;
@@ -774,9 +790,12 @@ const DataGrid: React.FC<DataGridProps> = ({
               {gridRows.map((row, idx) => {
                   const tr = row as TreeRow; const isExpanded = expandedRows.has(tr.id); 
                   let rankKey = String(tr.taxon_rank).toLowerCase() as keyof RankPallet;
-                  if (['subspecies', 'variety', 'form', 'subvariety', 'subform', 'infraspecies'].includes(rankKey)) rankKey = 'infraspecies';
+                  
+                  // Rank Normalization (Spec v2.30.9)
+                  // Use the Level mapping to bucket rare ranks into the standard Infraspecies pallet.
+                  if (RANK_LEVELS[rankKey] === 4) rankKey = 'infraspecies';
                   else if (!['family', 'genus', 'species', 'cultivar'].includes(rankKey)) { 
-                    rankKey = 'species'; // Default fallback for unknown ranks
+                    rankKey = 'species'; // Default fallback
                   }
                   
                   const p = activePallet[rankKey];
@@ -808,7 +827,7 @@ const DataGrid: React.FC<DataGridProps> = ({
                                    </div>
                                </td>;
                                if (col.id === 'descendant_count') return <td key={col.id} className="p-2 text-xs text-center text-slate-400 font-mono">{tr.is_tree_header ? (tr as any).child_count : (tr.descendant_count || '')}</td>;
-                               if (col.id === 'actions') return <td key={col.id} className="p-2 border-r border-slate-200 text-center"><div className="flex items-center justify-center gap-1"><button onClick={(e) => { e.stopPropagation(); setExpandedRows(prev => { const n = new Set(prev); n.has(tr.id) ? n.delete(tr.id) : n.add(tr.id); return n; }); }} className={`p-1.5 rounded shadow-sm ${isExpanded ? 'bg-slate-800 text-white' : 'bg-white border border-slate-200 text-slate-500 hover:text-slate-800'}`}>{isExpanded ? <ChevronUpIcon size={14}/> : <ChevronDownIcon size={14}/>}</button>{['genus', 'species', 'subspecies', 'variety', 'form', 'subvariety', 'subform'].includes(rankKey) && <button onClick={(e) => { e.stopPropagation(); onAction?.('enrich', tr); }} title="Analyze & Find Details" className="p-1.5 bg-indigo-50 border border-indigo-200 rounded text-indigo-600 hover:bg-indigo-100 shadow-sm"><PickaxeIcon size={14} /></button>}<button onClick={(e) => { e.stopPropagation(); onAction?.('enrich', tr); }} title="Enrich Data Layer" className="p-1.5 bg-amber-50 border border-amber-200 rounded text-amber-600 hover:bg-amber-100 shadow-sm"><Wand2Icon size={14} /></button></div></td>;
+                               if (col.id === 'actions') return <td key={col.id} className="p-2 border-r border-slate-200 text-center"><div className="flex items-center justify-center gap-1"><button onClick={(e) => { e.stopPropagation(); setExpandedRows(prev => { const n = new Set(prev); n.has(tr.id) ? n.delete(tr.id) : n.add(tr.id); return n; }); }} className={`p-1.5 rounded shadow-sm ${isExpanded ? 'bg-slate-800 text-white' : 'bg-white border border-slate-200 text-slate-500 hover:text-slate-800'}`}>{isExpanded ? <ChevronUpIcon size={14}/> : <ChevronDownIcon size={14}/>}</button>{(RANK_LEVELS[rankKey] >= 2 && RANK_LEVELS[rankKey] <= 4) && <button onClick={(e) => { e.stopPropagation(); onAction?.('enrich', tr); }} title="Analyze & Find Details" className="p-1.5 bg-indigo-50 border border-indigo-200 rounded text-indigo-600 hover:bg-indigo-100 shadow-sm"><PickaxeIcon size={14} /></button>}<button onClick={(e) => { e.stopPropagation(); onAction?.('enrich', tr); }} title="Enrich Data Layer" className="p-1.5 bg-amber-50 border border-amber-200 rounded text-amber-600 hover:bg-amber-100 shadow-sm"><Wand2Icon size={14} /></button></div></td>;
 
                                let displayVal: React.ReactNode = '';
                                if (typeof val === 'string' || typeof val === 'number') { displayVal = val; } else if (typeof val === 'boolean') { displayVal = val ? 'Yes' : 'No'; }
