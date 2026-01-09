@@ -13,9 +13,6 @@ This document tracks planned features and technical improvements to ensure conti
     3. Re-run the iterative hierarchy build (Step 7 of the automation script) to shift the entire database tree down one level (e.g., root.order_uuid.family_uuid...).
     4. Update the "Purge Non-WCVP" utility to ensure 'Derived' Order records are protected.
 - [ ] **Grid Virtualization:** Implement a virtual scrolling engine (e.g., react-window) to handle thousands of loaded rows without DOM degradation. This is critical for maintaining performance beyond the 5,000-record threshold.
-- [x] **Fix Finding Plant Details:** The Icon Button for searching for plant details doesn't function. Also the Icon is not obvious what it does. I'm not sure which of the two Icons to select but neither works. The Icon button needs a tool tip saying what it does.
-    * **Human Note:** The Tooltips are working and do help. The icons are not obvious but maybe others would not either. Actions gets stuck with activity "Initializing AI curator..." and never finishes. The same wording is used in the Activity Panel for both so you can't tell them apart.
-    > **AI Context:** Implemented the AI task orchestrator in handleAction (App.tsx). The "Pickaxe" button now triggers authoritative reference mining (findAdditionalLinks) and the "Wand" button triggers horticultural detail enrichment (enrichTaxon). Both tasks now update the database and grid state upon completion, resolving the "stuck" activity bug.
 - [ ] **Subtree Fetching:** We can perform a single query: WHERE hierarchy_path <@ 'root.family_id' to fetch every Genus, Species, and Cultivar in that family instantly. This is much faster than the current "fetch a batch and hope we have the parents" approach.
 - [ ] **Lineage Visuals:** We can show a true "Breadcrumb" in the Details Panel (e.g., Asparagaceae > Agave > parryi) by simply joining the names of the UUIDs in the path.
 - [ ] **Implement Ingestion Engine:** Rewrite the Add Plant functionality by following the Ingestion Engine design to implement the 5-stage validation pipeline and continuing to adhere to other decisions.
@@ -71,6 +68,9 @@ This document tracks planned features and technical improvements to ensure conti
 
 
 ## Archive
+- [x] **Fix Finding Plant Details:** The Icon Button for searching for plant details doesn't function. Also the Icon is not obvious what it does. I'm not sure which of the two Icons to select but neither works. The Icon button needs a tool tip saying what it does.
+    * **Human Note:** The Tooltips are working and do help. The icons are not obvious but maybe others would not either. Actions gets stuck with activity "Initializing AI curator..." and never finishes. The same wording is used in the Activity Panel for both so you can't tell them apart.
+    > **AI Context:** Implemented the AI task orchestrator in handleAction (App.tsx). The "Pickaxe" button now triggers authoritative reference mining (findAdditionalLinks) and the "Wand" button triggers horticultural detail enrichment (enrichTaxon). Both tasks now update the database and grid state upon completion, resolving the "stuck" activity bug.
 - [x] **Create Records for Family:** We have done a lot of work to accomodate Family level when it exists as an attribute and not a record or WCVP rank. Should we create records for all Family values used in WCVP? We would add teh Family Rank as an extension (like was done for Cultivar). We would need a special Status as well like 'Generated' or Extrapulated', that is an extension of teh WCVP vales (like was done for Registered and Provisional). 
 - [x] **Fix Expand/Collapse Levels:** This functionality was developed for the older string based hierarchy and does not work with Authority (IDs) for hierarchy, other than Family level.
 - [x] **Remove the Legacy (String) Mode:** It is no longer needed since Authority (IDs) has been implemented, is stable and working well.
@@ -79,13 +79,6 @@ This document tracks planned features and technical improvements to ensure conti
     * **Human Note:** I ran the script. I notice that filtering on Status = Accepted and (Rank = Form or I Rank = f.) causes a timeout but no other Ranks or I Ranks do.. Doing the same query in Supabase returns fast results.
     * **Human Note:** I ran the SQL. It had a couple timeouts early on but is working better now that I exercised it a few times.. There were a couple messages in the javascript console "Failed to load resource: the server responded with a status of 500 ()". When selecting the link in the error gives "{"message":"No API key found in request","hint":"No `apikey` request header or url param was found."}"
     > **AI Context:** Diagnostic analysis suggests the 500/API key error was caused by unquoted multi-word string literals in PostgREST 'or' filters (e.g., 'Artificial Hybrid'), which mangled the request URL structure. Hardened dataService.ts v2.30.2 to enforce quoting. Upgraded indices to V8.1 (Sort-Inclusive). Audit confirmed redundancy: removed shadowed wcvp_id, status, and rank indexes to reclaim space. Sparse rank timeouts mitigated to <1s.
-  1. Need an index on infraspecies_rank. Filtering on this usually timesout.
-  2. Need an index on infraspecies. 
-  3. "idx_app_taxa_name_sort" and "idx_app_taxa_name_exact" are two identical indexes on taxon_name. Which to keep?
-  4. "idx_app_taxa_name_sort" and "idx_app_taxa_name_exact" are two identical indexes on taxon_name. Which to keep?
-  5. There are two other indexes on source_id that are similar. Can we keep just one? These are:
-    - CREATE INDEX idx_app_taxa_source_id_filter ON public.app_taxa USING btree (source_id) WHERE ((source_id IS NULL) OR (source_id <> 1))
-    - CREATE INDEX idx_app_taxa_source_nulls ON public.app_taxa USING btree (source_id) WHERE (source_id IS NULL)
 - [x] **Stop Grid Flash** 
     > **AI Context:** Partially resolved in v2.29.0 via a "Render Blocking" lifecycle guard. The application now remains in a loading state until saved settings are retrieved or a timeout occurs. Minor frame flicker persists during data-stream ingestion, but the "System Default" transition is mitigated.
 - [x] **Save Settings:** Implemented cloud persistence for grid layout, filters, and theme preferences. Users can manually Save and Reload configuration via the Persistence panel in Settings (v2.28.0).

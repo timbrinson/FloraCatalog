@@ -1,8 +1,21 @@
 # Version History
 
+## v2.31.3 - API Resilience & Dynamic UX
+**Date:** July 09, 2025
+**Status:** Current Release
+
+### Resilience & Optimization
+- **500 Error Resolution:** Fixed a high-severity bug where multi-word status filters (e.g., 'Artificial Hybrid') caused 500 "No API key found" errors. Hardened `dataService.ts` to strictly quote PostgREST string literals in `or()` and `in()` request segments.
+- **Baseline Load Optimization:** Replaced expensive record scans with a hardcoded estimation (1.44M rows) for the "No Filter" baseline state, significantly reducing hardware strain and preventing "Statement Timeout" errors on fresh app loads.
+- **Filter Sanitization:** Removed the unsolicited 'Generated' status from all UI dropdowns and documentation to maintain a clean taxonomic extension layer.
+
+### UX Improvements
+- **Context-Aware Expansion:** Refactored Level buttons (1, 2, 3...) to calculate their range dynamically based on active grouping. The grid now correctly offers 4 levels when 'Family' is hidden and 5 levels when visible, resolving the "Empty Level" UI bug.
+- **Hierarchy Integrity:** Refined virtual row identification to ensure logical consistency between UI buckets and the relational `parent_id` state.
+
 ## v2.31.2 - Logic Sequence Correction
 **Date:** July 08, 2025
-**Status:** Current Release
+**Status:** (Historical)
 
 ### Build Pipeline Hardening
 - **Sequence Refactor:** Re-ordered the `automate_build.js` pipeline to ensure specific scientific linking (Species → Genus) occurs **before** the generic Family grafting. This prevents a logic bug where species would incorrectly link directly to families, bypassing their genera.

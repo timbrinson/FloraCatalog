@@ -1,5 +1,5 @@
 /**
- * AUTOMATED DATABASE BUILDER (CLI) v2.31.2
+ * AUTOMATED DATABASE BUILDER (CLI) v2.31.3
  * 
  * Orchestrates the transformation of raw WCVP data into the FloraCatalog database.
  * Optimized for free-tier environments using granular segmented iterative operations.
@@ -40,7 +40,7 @@ const DIR_TEMP = path.join(DIR_DATA, 'temp');
 const FILE_CLEAN_CSV = path.join(DIR_TEMP, 'wcvp_names_clean.csv');
 const FILE_SCHEMA = 'scripts/wcvp_schema.sql.txt';
 const FILE_OPTIMIZE = 'scripts/optimize_indexes.sql.txt';
-const APP_VERSION = 'v2.31.2';
+const APP_VERSION = 'v2.31.3';
 
 // Granular segments to prevent Supabase connection resets
 const SEGMENTS = [
@@ -252,7 +252,7 @@ async function stepBackbone(client, segments) {
             2, 
             'FloraCatalog System', 
             '${APP_VERSION} (Derived)', 
-            'Internal system layer used to derive taxonomic backbone records from authoritative WCVP v14 attributes.', 
+            'Internal system layer used to derive taxonomic backbone records (Families/Orders) from authoritative WCVP v14 attributes.', 
             5
         ) ON CONFLICT (id) DO NOTHING;
     `);
@@ -367,7 +367,7 @@ async function stepOptimize(client) {
 // --- MAIN LOOP ---
 
 async function main() {
-    console.log("\n🌿 FLORA CATALOG - DATABASE AUTOMATION v2.31.2 🌿\n");
+    console.log("\n🌿 FLORA CATALOG - DATABASE AUTOMATION v2.31.3 🌿\n");
     process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
     let dbUrl = process.env.DATABASE_URL;
     let finalConfig;
