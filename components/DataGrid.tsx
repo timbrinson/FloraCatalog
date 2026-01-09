@@ -781,7 +781,23 @@ const DataGrid: React.FC<DataGridProps> = ({
                                    </div>
                                </td>;
                                if (col.id === 'descendant_count') return <td key={col.id} className="p-2 text-xs text-center text-slate-400 font-mono">{tr.is_tree_header ? (tr as any).child_count : (tr.descendant_count || '')}</td>;
-                               if (col.id === 'actions') return <td key={col.id} className="p-2 border-r border-slate-200 text-center"><div className="flex items-center justify-center gap-1"><button onClick={(e) => { e.stopPropagation(); setExpandedRows(prev => { const n = new Set(prev); n.has(tr.id) ? n.delete(tr.id) : n.add(tr.id); return n; }); }} className={`p-1.5 rounded shadow-sm ${isExpanded ? 'bg-slate-800 text-white' : 'bg-white border border-slate-200 text-slate-500 hover:text-slate-800'}`}>{isExpanded ? <ChevronUpIcon size={14}/> : <ChevronDownIcon size={14}/>}</button>{(RANK_LEVELS[rankKey] >= 2 && RANK_LEVELS[rankKey] <= 4) && <button onClick={(e) => { e.stopPropagation(); onAction?.('enrich', tr); }} title="Analyze & Find Details" className="p-1.5 bg-indigo-50 border border-indigo-200 rounded text-indigo-600 hover:bg-indigo-100 shadow-sm"><PickaxeIcon size={14} /></button>}<button onClick={(e) => { e.stopPropagation(); onAction?.('enrich', tr); }} title="Enrich Data Layer" className="p-1.5 bg-amber-50 border border-amber-200 rounded text-amber-600 hover:bg-amber-100 shadow-sm"><Wand2Icon size={14} /></button></div></td>;
+                               if (col.id === 'actions') return (
+                                 <td key={col.id} className="p-2 border-r border-slate-200 text-center">
+                                   <div className="flex items-center justify-center gap-1">
+                                     <button onClick={(e) => { e.stopPropagation(); setExpandedRows(prev => { const n = new Set(prev); n.has(tr.id) ? n.delete(tr.id) : n.add(tr.id); return n; }); }} className={`p-1.5 rounded shadow-sm ${isExpanded ? 'bg-slate-800 text-white' : 'bg-white border border-slate-200 text-slate-500 hover:text-slate-800'}`}>
+                                       {isExpanded ? <ChevronUpIcon size={14}/> : <ChevronDownIcon size={14}/>}
+                                     </button>
+                                     {(RANK_LEVELS[rankKey] >= 2 && RANK_LEVELS[rankKey] <= 4) && (
+                                       <button onClick={(e) => { e.stopPropagation(); onAction?.('mine', tr); }} title="Analyze & Find References" className="p-1.5 bg-indigo-50 border border-indigo-200 rounded text-indigo-600 hover:bg-indigo-100 shadow-sm">
+                                         <PickaxeIcon size={14} />
+                                       </button>
+                                     )}
+                                     <button onClick={(e) => { e.stopPropagation(); onAction?.('enrich', tr); }} title="Enrich Data Layer" className="p-1.5 bg-amber-50 border border-amber-200 rounded text-amber-600 hover:bg-amber-100 shadow-sm">
+                                       <Wand2Icon size={14} />
+                                     </button>
+                                   </div>
+                                 </td>
+                               );
 
                                let displayVal: React.ReactNode = '';
                                if (typeof val === 'string' || typeof val === 'number') { displayVal = val; } else if (typeof val === 'boolean') { displayVal = val ? 'Yes' : 'No'; }

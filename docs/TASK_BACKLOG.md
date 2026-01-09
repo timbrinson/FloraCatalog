@@ -2,9 +2,6 @@
 
 This document tracks planned features and technical improvements to ensure continuity across development sessions.
 ## Work on Now
-- [x] **Create Records for Family:** We have done a lot of work to accomodate Family level when it exists as an attribute and not a record or WCVP rank. Should we create records for all Family values used in WCVP? We would add teh Family Rank as an extension (like was done for Cultivar). We would need a special Status as well like 'Generated' or Extrapulated', that is an extension of teh WCVP vales (like was done for Registered and Provisional). 
-
-## High Priority
 - [ ] **Phylogenetic Extension (Order Level):** Extend the taxonomic hierarchy above the Family level by creating physical 'Order' records. This anchors the catalog to globally accepted phylogenetic standards: APG IV (Angiosperms), Christenhusz (Gymnosperms), and PPG I (Pteridophytes).
     * **Human Note:** Follow the implementation strategy defined in docs/design/ORDER_FAMILY_MAPPING_SPEC.md, prioritizing the WFO Backbone (Path A) for bulk efficiency.
     > **AI Context:** 
@@ -12,11 +9,14 @@ This document tracks planned features and technical improvements to ensure conti
     2. Perform a SQL join to map existing 'Family' records to their parent 'Order' records via parent_id.
     3. Re-run the iterative hierarchy build (Step 7 of the automation script) to shift the entire database tree down one level (e.g., root.order_uuid.family_uuid...).
     4. Update the "Purge Non-WCVP" utility to ensure 'Derived' Order records are protected.
+
+## High Priority
+- [x] **Fix Finding Plant Details:** The Icon Button for searching for plant details doesn't function. Also the Icon is not obvious what it does. I'm not sure which of the two Icons to select but neither works. The Icon button needs a tool tip saying what it does.
+    * **Human Note:** The Tooltips are working and do help. The icons are not obvious but maybe others would not either. Actions gets stuck with activity "Initializing AI curator..." and never finishes. The same wording is used in the Activity Panel for both so you can't tell them apart.
+    > **AI Context:** Implemented the AI task orchestrator in handleAction (App.tsx). The "Pickaxe" button now triggers authoritative reference mining (findAdditionalLinks) and the "Wand" button triggers horticultural detail enrichment (enrichTaxon). Both tasks now update the database and grid state upon completion, resolving the "stuck" activity bug.
 - [ ] **Subtree Fetching:** We can perform a single query: WHERE hierarchy_path <@ 'root.family_id' to fetch every Genus, Species, and Cultivar in that family instantly. This is much faster than the current "fetch a batch and hope we have the parents" approach.
 - [ ] **Lineage Visuals:** We can show a true "Breadcrumb" in the Details Panel (e.g., Asparagaceae > Agave > parryi) by simply joining the names of the UUIDs in the path.
 - [ ] **Implement Ingestion Engine:** Rewrite the Add Plant functionality by following the Ingestion Engine design to implement the 5-stage validation pipeline and continuing to adhere to other decisions.
-- [ ] **Fix Finding Plant Details:** The Icon Button for searching for plant details doesn't function. Also the Icon is not obvious what it does. I'm not sure which of the two Icons to select but neither works. The Icon button needs a tool tip saying what it does.
-    * **Human Note:** The Tooltips are working and do help. The icons are not obvious but maybe others would not either. Actions gets stuck with activity "Initializing AI curator..." and never finishes. The same wording is used in the Activity Panel for both so you can't tell them apart.
 - [ ] **Fix Missing Controls for Adding Plants:**
     * **Human Note:** Bulk Upload was removed as the AI rewrote the Add Plant interface after the file was corrupted where it simplified things due to many issues found when adding plants. Needs implemented again after the Ingestion Engine is implemented and ading a single plant is working smoothly.
     > **AI Context:** Implemented AddPlantModal with AI-assisted taxonomic parsing via Gemini 3 Pro. Restored Bulk Upload capability with .txt/.csv file parsing. Integrated all "Add" operations with the Activity Panel for asynchronous tracking and background processing. Cleaned up legacy files: PlantCard.tsx, ProcessMonitor.tsx, and defaultData.ts.
@@ -69,6 +69,7 @@ This document tracks planned features and technical improvements to ensure conti
 
 
 ## Archive
+- [x] **Create Records for Family:** We have done a lot of work to accomodate Family level when it exists as an attribute and not a record or WCVP rank. Should we create records for all Family values used in WCVP? We would add teh Family Rank as an extension (like was done for Cultivar). We would need a special Status as well like 'Generated' or Extrapulated', that is an extension of teh WCVP vales (like was done for Registered and Provisional). 
 - [x] **Fix Expand/Collapse Levels:** This functionality was developed for the older string based hierarchy and does not work with Authority (IDs) for hierarchy, other than Family level.
 - [x] **Remove the Legacy (String) Mode:** It is no longer needed since Authority (IDs) has been implemented, is stable and working well.
 - [x] **Index Cleanup and Refinement:** Update manual and automated DB installation scripts where needed Output any new scripts that need to be ran manually. Indicate any inndices that need to be removed manually.
@@ -79,7 +80,7 @@ This document tracks planned features and technical improvements to ensure conti
   1. Need an index on infraspecies_rank. Filtering on this usually timesout.
   2. Need an index on infraspecies. 
   3. "idx_app_taxa_name_sort" and "idx_app_taxa_name_exact" are two identical indexes on taxon_name. Which to keep?
-  4. "idx_app_taxa_source" and "idx_app_taxa_source_id" are two identical indexes on source_id. Which to keep?
+  4. "idx_app_taxa_name_sort" and "idx_app_taxa_name_exact" are two identical indexes on taxon_name. Which to keep?
   5. There are two other indexes on source_id that are similar. Can we keep just one? These are:
     - CREATE INDEX idx_app_taxa_source_id_filter ON public.app_taxa USING btree (source_id) WHERE ((source_id IS NULL) OR (source_id <> 1))
     - CREATE INDEX idx_app_taxa_source_nulls ON public.app_taxa USING btree (source_id) WHERE (source_id IS NULL)

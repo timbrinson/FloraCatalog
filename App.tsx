@@ -3,6 +3,7 @@ import { Loader2, Leaf, Activity, Settings, Plus } from 'lucide-react';
 import { Taxon, LoadingState, UserPreferences, ActivityItem, ActivityStatus, RankPallet } from './types';
 import { dataService } from './services/dataService';
 import { getIsOffline, reloadClient } from './services/supabaseClient';
+import { enrichTaxon, findAdditionalLinks } from './services/geminiService';
 import EmptyState from './components/EmptyState';
 import DataGrid from './components/DataGrid';
 import ConfirmDialog from './components/ConfirmDialog';
@@ -337,18 +338,71 @@ export default function App() {
       }
   };
 
-  const handleAction = (action: 'mine' | 'enrich', taxon: Taxon) => {
+  /**
+   * handleAction: Orchestrates AI Curator Tasks (Mining/Enrichment).
+   */
+  const handleAction = async (action: 'mine' | 'enrich', taxon: Taxon) => {
       const id = crypto.randomUUID();
+      const actionName = action === 'mine' ? 'Mining' : 'Enriching';
+      
       const newActivity: ActivityItem = {
           id,
-          name: `${action === 'mine' ? 'Mining' : 'Enriching'} ${taxon.taxon_name}`,
+          name: `${actionName} ${taxon.taxon_name}`,
           type: action === 'mine' ? 'mining' : 'enrichment',
           status: 'running',
-          message: 'Initializing AI curator...',
+          message: 'Connecting to botanical AI...',
           timestamp: Date.now()
       };
+      
       setActivities(prev => [newActivity, ...prev]);
       setShowActivityPanel(true);
+
+      try {
+          if (action === 'enrich') {
+              setActivities(prev => prev.map(a => a.id === id ? { ...a, message: 'Consulting primary authorities...' } : a));
+              const findings = await enrichTaxon(taxon);
+              
+              if (cancelledActivityIds.current.has(id)) return;
+
+              await handleTaxonUpdate(taxon.id, findings);
+              
+              setActivities(prev => prev.map(a => a.id === id ? { 
+                  ...a, 
+                  status: 'completed', 
+                  message: 'Horticultural record enriched.',
+                  details: findings
+              } : a));
+          } else {
+              setActivities(prev => prev.map(a => a.id === id ? { ...a, message: 'Searching herbaria and web records...' } : a));
+              const currentLinks = taxon.reference_links || [];
+              const findings = await findAdditionalLinks(taxon.taxon_name, currentLinks);
+              
+              if (cancelledActivityIds.current.has(id)) return;
+
+              if (findings.length > 0) {
+                  await handleTaxonUpdate(taxon.id, { reference_links: [...currentLinks, ...findings] });
+                  setActivities(prev => prev.map(a => a.id === id ? { 
+                      ...a, 
+                      status: 'completed', 
+                      message: `Found ${findings.length} authoritative links.`,
+                      details: findings
+                  } : a));
+              } else {
+                  setActivities(prev => prev.map(a => a.id === id ? { 
+                      ...a, 
+                      status: 'completed', 
+                      message: 'No new unique references discovered.' 
+                  } : a));
+              }
+          }
+      } catch (e: any) {
+          if (cancelledActivityIds.current.has(id)) return;
+          setActivities(prev => prev.map(a => a.id === id ? { 
+              ...a, 
+              status: 'error', 
+              message: e.message || 'AI service unavailable.' 
+          } : a));
+      }
   };
 
   const handleAddActivity = (activity: ActivityItem) => {
