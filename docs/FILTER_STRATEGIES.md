@@ -57,6 +57,7 @@ This document defines the logic and valid values for multi-select filters in the
 |	Unplaced	|	WCVP - Primary	|	Unplaced	|	Unplaced	|		|		|
 |	Registered	|	App Extension	|		|		|	Registered	|	Used for Cultivars registered with an International Cultivar Registration Authority (ICRA).	|
 |	Provisional	|	App Extension	|		|		|	Provisional	|	Used for manually added plants or trade names awaiting registration.	|
+|	Derived	|	App Extension	|		|		|	Derived	|	Used for system-generated taxonomic backbone records (e.g. Family or Order) created from attributes.	|
 |	Artificial Hybrid	|	WCVP - Secondary	|	Artificial Hybrid	|	Artificial Hybrid	|		|	Subtype of Synonym	|
 |	Illegitimate	|	WCVP - Secondary	|	Illegitimate	|	Illegitimate	|		|	Subtype of Synonym	|
 |	Invalid	|	WCVP - Secondary	|	Invalid	|	Invalid	|		|	Subtype of Synonym	|
@@ -154,7 +155,7 @@ This document defines the logic and valid values for multi-select filters in the
 ### Implicit Wildcard Wrapping (Fuzzy Mode)
 In **Fuzzy Mode**, the application automatically wraps the user's input in wildcards (`%`) before sending it to the database.
 *   **Logic:** Input `Ag%par` is transformed into the query `%Ag%par%`.
-*   **Effect:** This ensures the search behaves as a "Contains" logic, finding the string fragments anywhere in the plant name, even if they are not at the start.
+*   **Effect:** This ensures the search behaves as a "Contains" logic, find the string fragments anywhere in the plant name, even if they are not at the start.
 
 ### Index Selection & Query Optimization
 It is important to note that the application does not "choose" the index; it provides the query structure, and the **PostgreSQL Query Planner** determines the most efficient path:

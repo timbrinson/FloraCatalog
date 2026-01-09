@@ -156,9 +156,15 @@ export const dataService = {
 
     if (getIsOffline()) return { data: [], count: 0 };
 
+    // Baseline Optimization: If no active user-filters, use a safer counting approach
+    const isBaseline = Object.entries(filters).every(([k, v]) => {
+      if (k === 'taxon_status') return Array.isArray(v) && v.length === 1 && v[0] === 'Accepted';
+      return !v || (Array.isArray(v) && v.length === 0);
+    });
+
     let query = getSupabase()
       .from(DB_TABLE)
-      .select('*, details:app_taxon_details(*)', should_count ? { count: 'estimated' } : {});
+      .select('*, details:app_taxon_details(*)', (should_count && !isBaseline) ? { count: 'estimated' } : {});
 
     // --- Dynamic Filtering ---
     Object.entries(filters).forEach(([key, value]) => {
@@ -203,15 +209,15 @@ export const dataService = {
                  
                  // Quoting values for PostgREST 'or' logic to handle spaces (e.g. "Artificial Hybrid")
                  // This fixes 500 "No apikey found" errors caused by malformed request URLs.
-                 const quotedValues = realValues.map(v => `"${v}"`).join(',');
-
-                 if (hasNull && realValues.length > 0) {
-                     query = query.or(`${dbKey}.in.(${quotedValues}),${dbKey}.is.null`);
+                 if (realValues.length > 0) {
+                    const quotedValues = realValues.map(v => `"${v}"`).join(',');
+                    if (hasNull) {
+                        query = query.or(`${dbKey}.in.(${quotedValues}),${dbKey}.is.null`);
+                    } else {
+                        query = query.or(`${dbKey}.in.(${quotedValues})`);
+                    }
                  } else if (hasNull) {
-                     query = query.is(dbKey, null);
-                 } else {
-                     // Also quote values here to be safe for multi-word categories
-                     query = query.or(`${dbKey}.in.(${quotedValues})`);
+                    query = query.is(dbKey, null);
                  }
             }
         }
@@ -225,8 +231,17 @@ export const dataService = {
     const { data, count, error } = await query
       .range(offset, offset + limit - 1);
 
-    if (error) throw error;
-    return { data: (data || []).map(mapFromDB), count: count || -1 };
+    if (error) {
+      if (error.message?.includes('timeout') || error.code === '57014') {
+          throw new Error("The database timed out processing this large request. Try adding more specific filters.");
+      }
+      throw error;
+    }
+
+    // Baseline fallback count to avoid scanning 1.4M rows on every page load
+    const finalCount = isBaseline ? 1440000 : (count || -1);
+    
+    return { data: (data || []).map(mapFromDB), count: finalCount };
   },
 
   async getTaxonById(id: string): Promise<Taxon | null> {

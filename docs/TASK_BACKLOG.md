@@ -2,15 +2,17 @@
 
 This document tracks planned features and technical improvements to ensure continuity across development sessions.
 ## Work on Now
+
+## High Priority
+- [ ] **Loading on Demand:** Need ability to force loading records. Load an amount and/or load all children. They don't actually need to be loaded but they appear to be to the user.
 - [ ] **Phylogenetic Extension (Order Level):** Extend the taxonomic hierarchy above the Family level by creating physical 'Order' records. This anchors the catalog to globally accepted phylogenetic standards: APG IV (Angiosperms), Christenhusz (Gymnosperms), and PPG I (Pteridophytes).
-    * **Human Note:** Follow the implementation strategy defined in docs/design/ORDER_FAMILY_MAPPING_SPEC.md, prioritizing the WFO Backbone (Path A) for bulk efficiency.
+    * **Human Note:** Follow the implementation strategy defined in docs/design/ORDER_FAMILY_MAPPING_SPEC.md, prioritizing the WFO Backbone (Path A) for bulk efficiency. Use a new source based on where the data comes from.
     > **AI Context:** 
     1. Create 'Order' records with Rank: 'Order', Status: 'Derived', and Source: 2 (FloraCatalog System).
     2. Perform a SQL join to map existing 'Family' records to their parent 'Order' records via parent_id.
     3. Re-run the iterative hierarchy build (Step 7 of the automation script) to shift the entire database tree down one level (e.g., root.order_uuid.family_uuid...).
     4. Update the "Purge Non-WCVP" utility to ensure 'Derived' Order records are protected.
-
-## High Priority
+- [ ] **Grid Virtualization:** Implement a virtual scrolling engine (e.g., react-window) to handle thousands of loaded rows without DOM degradation. This is critical for maintaining performance beyond the 5,000-record threshold.
 - [x] **Fix Finding Plant Details:** The Icon Button for searching for plant details doesn't function. Also the Icon is not obvious what it does. I'm not sure which of the two Icons to select but neither works. The Icon button needs a tool tip saying what it does.
     * **Human Note:** The Tooltips are working and do help. The icons are not obvious but maybe others would not either. Actions gets stuck with activity "Initializing AI curator..." and never finishes. The same wording is used in the Activity Panel for both so you can't tell them apart.
     > **AI Context:** Implemented the AI task orchestrator in handleAction (App.tsx). The "Pickaxe" button now triggers authoritative reference mining (findAdditionalLinks) and the "Wand" button triggers horticultural detail enrichment (enrichTaxon). Both tasks now update the database and grid state upon completion, resolving the "stuck" activity bug.

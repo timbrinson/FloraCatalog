@@ -154,7 +154,7 @@ const COLUMN_GROUPS: ColumnGroup[] = [
                 tooltip: 'Taxonomic Status', 
                 defaultWidth: 110, 
                 filterType: 'multi-select', 
-                filterOptions: ['Accepted', 'Synonym', 'Unplaced', 'Registered', 'Provisional', 'Generated', 'Artificial Hybrid', 'Illegitimate', 'Invalid', 'Local Biotype', 'Misapplied', 'Orthographic', 'Provisionally Accepted', 'External to WCVP'], 
+                filterOptions: ['Accepted', 'Synonym', 'Unplaced', 'Registered', 'Provisional', 'Derived', 'Artificial Hybrid', 'Illegitimate', 'Invalid', 'Local Biotype', 'Misapplied', 'Orthographic', 'Provisionally Accepted', 'External to WCVP'], 
                 defaultOn: false 
             },
             { id: 'family', label: 'Family', tooltip: 'Family', defaultWidth: 120, filterType: 'text', defaultOn: false },
@@ -211,20 +211,6 @@ const COLUMN_GROUPS: ColumnGroup[] = [
             { id: 'wcvp_id', label: 'WCVP ID', tooltip: 'WCVP Plant Name ID', defaultWidth: 120, filterType: 'text', defaultOn: false },
             { id: 'ipni_id', label: 'IPNI ID', tooltip: 'IPNI ID', defaultWidth: 100, filterType: 'text', defaultOn: false },
             { id: 'powo_id', label: 'POWO ID', tooltip: 'POWO ID', defaultWidth: 100, filterType: 'text', defaultOn: false },
-        ]
-    },
-    {
-        id: 'publication',
-        label: 'Publication',
-        columns: [
-            { id: 'taxon_authors', label: 'Authorship', tooltip: 'Taxon Authors', defaultWidth: 200, filterType: 'text', defaultOn: false },
-            { id: 'primary_author', label: 'Prim. Author', tooltip: 'Primary Author', defaultWidth: 150, filterType: 'text', defaultOn: false },
-            { id: 'publication_author', label: 'Pub. Author', tooltip: 'Publication Author', defaultWidth: 150, filterType: 'text', defaultOn: false },
-            { id: 'place_of_publication', label: 'Pub. Place', tooltip: 'Place Of Publication', defaultWidth: 200, filterType: 'text', defaultOn: false },
-            { id: 'volume_and_page', label: 'Vol/Page', tooltip: 'Volume And Page', defaultWidth: 100, filterType: 'text', defaultOn: false },
-            { id: 'first_published', label: 'First Published', tooltip: 'First Published Date', defaultWidth: 100, filterType: 'text', defaultOn: false },
-            { id: 'nomenclatural_remarks', label: 'Nom. Remarks', tooltip: 'Nomenclatural Remarks', defaultWidth: 200, filterType: 'text', defaultOn: false },
-            { id: 'reviewed', label: 'Reviewed', tooltip: 'Reviewed Status', defaultWidth: 100, filterType: 'multi-select', filterOptions: ['Yes', 'No', 'NULL'], defaultOn: false },
         ]
     },
     {
@@ -464,10 +450,17 @@ const DataGrid: React.FC<DataGridProps> = ({
           const path = `${parentPath}/${segmentId}`;
           const isHolder = segmentId === '(none)';
           const isFamilyRank = field === 'family';
+
+          // PHYSICAL RECORD RESOLUTION (Spec v2.31.2)
+          // Search pool for the definitive authority record representing this bucket
           let headerTaxon: TreeRow | undefined = authorityRegistry.get(segmentId);
           if (!headerTaxon || isHolder) {
-              headerTaxon = groupItems.find(t => isRankMatch(t.taxon_rank || '', field)) as TreeRow | undefined;
+              headerTaxon = allTaxaPool.find(t => 
+                isRankMatch(t.taxon_rank || '', field) && 
+                (isFamilyRank ? (t.taxon_name === segmentId) : (t.id === segmentId))
+              );
           }
+
           const itemsToRecurse = headerTaxon ? groupItems.filter(i => i.id !== headerTaxon!.id) : groupItems;
           const currentRankLevel = RANK_LEVELS[field] || 0;
           const filteredRecurseItems = itemsToRecurse.filter(t => {
@@ -489,7 +482,10 @@ const DataGrid: React.FC<DataGridProps> = ({
           } as any;
           headerRow.is_tree_header = true;
           headerRow.tree_expanded = !collapsedGroups.has(path);
+          
+          // Prefers database-calculated count from the physical record if discovered
           (headerRow as any).child_count = headerTaxon ? (headerTaxon.descendant_count || 0) : groupItems.length;
+          
           headerRow.depth = depth; headerRow.tree_path = path;
           outputRows.push(headerRow);
           if (headerRow.tree_expanded && (filteredRecurseItems.length > 0 || isHolder)) {
@@ -566,6 +562,7 @@ const DataGrid: React.FC<DataGridProps> = ({
       const canvas = document.createElement('canvas'); const context = canvas.getContext('2d'); if (!context) return; context.font = '14px Inter, sans-serif';
       const availableWidth = containerRef.current.clientWidth - 2;
       const flexCols = activeColumns.filter(c => !c.lockWidth);
+      // Fix variable name 'i' to 'c' in the fitToScreen column width calculation logic to resolve a reference error.
       let lockedWidth = 0; activeColumns.filter(c => c.lockWidth).forEach(col => lockedWidth += (colWidths[col.id] || col.defaultWidth));
       const flexAvailable = Math.max(0, availableWidth - lockedWidth);
       if (flexCols.length === 0) return;
@@ -611,7 +608,10 @@ const DataGrid: React.FC<DataGridProps> = ({
              {error && (<div className="flex items-center gap-1.5 px-3 py-1 bg-red-50 text-red-600 rounded-full border border-red-100 animate-in fade-in duration-300 max-w-[300px] truncate" title={error}><AlertCircle size={14} className="flex-shrink-0" /><span className="font-bold truncate">{error}</span></div>)}
              {isHierarchyMode && (
                  <div className="flex items-center gap-1 bg-white border border-slate-200 rounded p-0.5 ml-2 shadow-sm">
-                     {[1, 2, 3, 4].map((idx) => (<button key={idx} onClick={() => expandTreeLevel(idx-1)} className="px-2 py-0.5 text-[10px] font-bold text-slate-600 hover:bg-slate-100 rounded" title={`Collapse all at Level ${idx}`}>{idx}</button>))}
+                     {/* Dynamic Level Buttons based on groupBy depth (Spec v2.31.2) */}
+                     {Array.from({ length: groupBy.length + 1 }, (_, i) => i + 1).map((idx) => (
+                         <button key={idx} onClick={() => expandTreeLevel(idx-1)} className="px-2 py-0.5 text-[10px] font-bold text-slate-600 hover:bg-slate-100 rounded" title={`Collapse all at Level ${idx}`}>{idx}</button>
+                     ))}
                      <div className="w-px h-3 bg-slate-200 mx-1"></div>
                      <button onClick={toggleAllGroups} className="px-2 py-0.5 text-[10px] font-bold text-leaf-600 hover:bg-leaf-50 rounded">{isAnyGroupCollapsed ? 'Expand All' : 'Collapse All'}</button>
                  </div>
