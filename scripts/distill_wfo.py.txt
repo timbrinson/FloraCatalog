@@ -9,11 +9,20 @@ def distill_wfo():
     root_dir = os.path.dirname(script_dir)
     INPUT_DIR = os.path.join(root_dir, 'data', 'input')
     TEMP_DIR = os.path.join(root_dir, 'data', 'temp')
-    OUTPUT_FILE = os.path.join(TEMP_DIR, 'wfo_family_order_map.csv')
     
-    # Target files
+    # Single Output consistent with WCVP naming
+    OUTPUT_FILE = os.path.join(TEMP_DIR, 'wfo_import.csv')
+    
+    # Target file in WFO archive
     target_csv = 'classification.csv'
     
+    # Higher ranks to extract for analysis
+    TARGET_RANKS = {
+        'kingdom', 'subkingdom', 'phylum', 'subphylum', 
+        'class', 'subclass', 'order', 'suborder', 
+        'family', 'subfamily', 'tribe', 'subtribe'
+    }
+
     # 1. Locate source
     source_path = None
     zip_path = None
@@ -21,7 +30,6 @@ def distill_wfo():
     if os.path.exists(os.path.join(INPUT_DIR, target_csv)):
         source_path = os.path.join(INPUT_DIR, target_csv)
     else:
-        # Check ZIPs
         if os.path.exists(INPUT_DIR):
             for f in os.listdir(INPUT_DIR):
                 if f.lower().endswith('.zip'):
@@ -38,45 +46,40 @@ def distill_wfo():
         print(f"Error: Could not find '{target_csv}' in {INPUT_DIR}")
         sys.exit(1)
 
-    print(f"Distilling WFO Backbone...")
-    
-    # Data structures
-    family_links = {} # parentID -> list of family names
-    order_names = {} # taxonID -> scientificName
+    print(f"Distilling WFO Backbone (Extraction: Family and above)...")
     
     def process_stream(f):
-        # Increase field size for large remarks
         csv.field_size_limit(sys.maxsize)
-        
-        # Darwin Core Archives typically use Tabs, but some versions use Comma.
         sample = f.readline()
         f.seek(0)
         delimiter = '\t' if '\t' in sample else ','
         
         reader = csv.DictReader(f, delimiter=delimiter)
+        headers = reader.fieldnames
              
         row_count = 0
-        for row in reader:
-            row_count += 1
-            rank = row.get('taxonRank', '').lower()
-            t_id = row.get('taxonID')
-            p_id = row.get('parentNameUsageID')
-            name = row.get('scientificName')
-            
-            if not t_id or not name:
-                continue
+        extracted_count = 0
+        
+        # Prepare Analysis File writer
+        with open(OUTPUT_FILE, 'w', encoding='utf-8', newline='') as of:
+            writer = csv.DictWriter(of, fieldnames=headers)
+            writer.writeheader()
 
-            if rank == 'family':
-                if p_id not in family_links: family_links[p_id] = []
-                family_links[p_id].append(name)
-            
-            # Cache potential orders (records that are parents of families)
-            order_names[t_id] = name
-            
-            if row_count % 100000 == 0:
-                print(f"  Analyzed {row_count:,} records...")
+            for row in reader:
+                row_count += 1
+                rank = (row.get('taxonRank') or '').lower()
+                
+                # Capture any record at family level or higher
+                if rank in TARGET_RANKS:
+                    writer.writerow(row)
+                    extracted_count += 1
+                
+                if row_count % 100000 == 0:
+                    print(f"  Analyzed {row_count:,} records... (Extracted {extracted_count:,} backbone rows)")
 
-    # Open with errors='replace' to handle messy encoding in the ~1GB file
+        print(f"Success!")
+        print(f"  Generated filtered staging file: {OUTPUT_FILE}")
+
     if zip_path:
         with zipfile.ZipFile(zip_path, 'r') as z:
             with io.TextIOWrapper(z.open(target_csv), encoding='utf-8', errors='replace') as f:
@@ -84,37 +87,6 @@ def distill_wfo():
     else:
         with open(source_path, 'r', encoding='utf-8', errors='replace') as f:
             process_stream(f)
-
-    # Resolve and Write with Deduplication
-    print(f"Resolving {len(family_links)} family-to-parent links...")
-    
-    unique_map = {} # family -> order
-    dup_count = 0
-    
-    for p_id, families in family_links.items():
-        order_name = order_names.get(p_id, "Unknown Order")
-        for fam in families:
-            # Enforce uniqueness of the 'family' primary key
-            if fam in unique_map:
-                dup_count += 1
-                # If we already have this family, only update if the new order is NOT "Unknown"
-                if unique_map[fam] == "Unknown Order" and order_name != "Unknown Order":
-                    unique_map[fam] = order_name
-            else:
-                unique_map[fam] = order_name
-
-    if dup_count > 0:
-        print(f"  Note: Deduplicated {dup_count} family entries found in source.")
-
-    # Convert dictionary to list of objects for DictWriter
-    final_rows = [{'family': k, 'order': v} for k, v in unique_map.items()]
-
-    with open(OUTPUT_FILE, 'w', encoding='utf-8', newline='') as f:
-        writer = csv.DictWriter(f, fieldnames=['family', 'order'])
-        writer.writeheader()
-        writer.writerows(final_rows)
-
-    print(f"Success! Distilled {len(final_rows)} unique family/order pairs to {OUTPUT_FILE}")
 
 if __name__ == "__main__":
     distill_wfo()

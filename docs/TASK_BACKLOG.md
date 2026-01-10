@@ -6,12 +6,11 @@ This document tracks planned features and technical improvements to ensure conti
     * **Human Note:** Follow the implementation strategy defined in docs/design/ORDER_FAMILY_MAPPING_SPEC.md, prioritizing the WFO Backbone (Path A) for bulk efficiency. Use a new source based on where the data comes from.
     * **Human Note:** The WFO _DwC_backbone_R.zip file was downloaded 2026-01-09. That file contains one file named "classification.csv". This text is from https://www.worldfloraonline.org/downloadData: "When citing the World Flora Online, you may use: "WFO ([Year]): World Flora Online. Version [Year].[Month]. Published on the Internet; http://www.worldfloraonline.org. Accessed on:[Date]". Please ensure that the [Date] of accession accords with the date for your use of the system and the [Year] and [Month] correspond to the file you are using."
     > **AI Context:** 
-    1. Source Identification: Use `_DwC_backbone_R.zip` from WFO (v2025.12). **WARNING:** The `classification.csv` is ~950MB. Local pre-filtering (distillation) via `scripts/distill_wfo.py.txt` is mandatory to prevent exceeding Supabase storage limits.
-    2. Automation: Refactored build pipeline to 13 steps. WFO logic is isolated in Steps 2, 5, and 9. Pipeline now supports granular selection (e.g. 2,5,9).
-    3. Create 'Order' records with Rank: 'Order', Status: 'Accepted', and Source: 3 (WFO).
+    1. Source Identification: Use `_DwC_backbone_R.zip` from WFO (v2025.12). **WARNING:** The `classification.csv` is ~950MB. Local pre-filtering (distillation) via `scripts/distill_wfo.py.txt` is mandatory to generate a manageable `wfo_import.csv` file.
+    2. Automation: Aligned WFO import with the WCVP staging pattern. Steps 2, 5, and 9 handle WFO-specific logic.
+    3. Creation: Step 9 now uses SQL set logic to populate all Orders from `wfo_import` and link 'Derived' Family records to their phylogenetic parents.
     4. Citation: "WFO (2025): World Flora Online. Version 2025.12. Published on the Internet; http://www.worldfloraonline.org. Accessed on: 2026-01-09".
-    5. Perform a SQL join to map existing 'Family' records (Source 2) to their parent 'Order' records (Source 3).
-    6. Re-run the iterative hierarchy build (Step 11 of the automation script) to shift the entire database tree down one level (e.g., root.order_uuid.family_uuid...).
+    5. Hierarchy: Re-running Step 11 (Hierarchy Build) shifts the entire database tree down, anchoring it to the new Order roots (e.g. root.order_uuid.family_uuid...).
 
 ## High Priority
 - [ ] **Fix Finding Plant Details:** The Icon Button for searching for plant details doesn't function. Also the Icon is not obvious what it does. I'm not sure which of the two Icons to select but neither works. The Icon button needs a tool tip saying what it does.

@@ -1,8 +1,8 @@
 /**
- * AUTOMATED DATABASE BUILDER (CLI) v2.31.6
+ * AUTOMATED DATABASE BUILDER (CLI) v2.31.8
  * 
  * Orchestrates the transformation of raw WCVP and WFO data into the FloraCatalog database.
- * v2.31.6: Restored interactive connection string construction and password prompting.
+ * v2.31.8: Parallel WFO/WCVP staging; SQL-driven phylogenetic mapping.
  */
 
 import pg from 'pg';
@@ -38,13 +38,12 @@ const DIR_DATA = 'data';
 const DIR_INPUT = path.join(DIR_DATA, 'input');
 const DIR_TEMP = path.join(DIR_DATA, 'temp');
 const FILE_CLEAN_CSV = path.join(DIR_TEMP, 'wcvp_names_clean.csv');
-const FILE_WFO_MAP = path.join(DIR_TEMP, 'wfo_family_order_map.csv');
+const FILE_WFO_IMPORT = path.join(DIR_TEMP, 'wfo_import.csv');
 const FILE_SCHEMA = 'scripts/wcvp_schema.sql.txt';
 const FILE_OPTIMIZE = 'scripts/optimize_indexes.sql.txt';
-const APP_VERSION = 'v2.31.6';
+const APP_VERSION = 'v2.31.8';
 
 const SEGMENTS = [
-    { label: "Symbols (+, etc)", start: " ", end: "A" },
     { label: "A", start: "A", end: "B" },
     { label: "B", start: "B", end: "C" },
     { label: "C", start: "C", end: "D" },
@@ -65,8 +64,7 @@ const SEGMENTS = [
     { label: "S", start: "S", end: "T" },
     { label: "T", start: "T", end: "U" },
     { label: "U - V", start: "U", end: "W" },
-    { label: "W - Z", start: "W", end: "{" },
-    { label: "Hybrids (×, etc)", start: "{", end: "\uffff" } 
+    { label: "W - Z", start: "W", end: "{" }
 ];
 
 // --- UTILS ---
@@ -86,260 +84,320 @@ const ensureDirs = () => {
     if (!fs.existsSync(DIR_TEMP)) fs.mkdirSync(DIR_TEMP, { recursive: true });
 };
 
-const getPythonCommand = () => {
-    try { execSync('python3 --version', { stdio: 'ignore' }); return 'python3'; } 
-    catch (e) { return 'python'; }
-};
+async function getClient() {
+    let connectionString = process.env.DATABASE_URL;
+    
+    if (!connectionString) {
+        log("Connection details not found in .env.");
+        const projId = await askQuestion(`Project ID (Default: ${DEFAULT_PROJECT_ID}): `) || DEFAULT_PROJECT_ID;
+        const password = await askQuestion("Database Password: ");
+        if (!password) { err("Password required."); process.exit(1); }
+        connectionString = `postgresql://postgres.${projId}:${password}@aws-0-us-west-2.pooler.supabase.com:6543/postgres`;
+    }
 
-const selectSegments = async () => {
-    console.log("\nAvailable Ranges: A, D, H, M, S, T, W, or 'All'");
-    const filter = await askQuestion("Target alphabetical range (e.g. 'All'): ");
-    if (!filter || filter.toLowerCase() === 'all') return SEGMENTS;
-    const startChar = filter.toUpperCase();
-    const filtered = SEGMENTS.filter(s => s.start >= startChar || s.label.startsWith(startChar));
-    return filtered.length === 0 ? SEGMENTS : filtered;
-};
+    const client = new pg.Client({ connectionString, ssl: { rejectUnauthorized: false } });
+    await client.connect();
+    // Disable timeout for massive operations
+    await client.query("SET statement_timeout = 0");
+    return client;
+}
 
 // --- STEPS ---
 
-async function stepPrepWCVP() {
-    log("Preparing WCVP Data...");
-    ensureDirs();
-    const pyCmd = getPythonCommand();
-    execSync(`${pyCmd} scripts/convert_wcvp.py.txt`, { stdio: 'inherit' });
-}
+const stepPrepWCVP = () => {
+    log("Preparing WCVP Data (Cleaning)...");
+    const py = fs.existsSync('scripts/convert_wcvp.py.txt') ? 'python3 scripts/convert_wcvp.py.txt' : null;
+    if (!py) throw new Error("Missing scripts/convert_wcvp.py.txt");
+    execSync(py, { stdio: 'inherit' });
+};
 
-async function stepPrepWFO() {
+const stepPrepWFO = () => {
     log("Preparing WFO Data (Distill Backbone)...");
-    ensureDirs();
-    const pyCmd = getPythonCommand();
-    execSync(`${pyCmd} scripts/distill_wfo.py.txt`, { stdio: 'inherit' });
-}
+    const py = fs.existsSync('scripts/distill_wfo.py.txt') ? 'python3 scripts/distill_wfo.py.txt' : null;
+    if (!py) throw new Error("Missing scripts/distill_wfo.py.txt");
+    execSync(py, { stdio: 'inherit' });
+};
 
-async function stepBuildSchema(client) {
-    log(`Applying Schema (Full DB Reset)...`);
+const stepResetDB = async (client) => {
+    log("Resetting Database Schema...");
     const sql = fs.readFileSync(FILE_SCHEMA, 'utf-8');
     await client.query(sql);
-}
+};
 
-async function stepImportWCVP(client) {
-    log("Streaming WCVP CSV to 'wcvp_import'...");
-    if (!fs.existsSync(FILE_CLEAN_CSV)) throw new Error("WCVP clean file missing. Run Step 1.");
-    const copyQuery = `COPY wcvp_import FROM STDIN WITH (FORMAT csv, HEADER true)`;
-    const stream = client.query(copyFrom(copyQuery));
+const stepImportWCVP = async (client) => {
+    log("Streaming WCVP Staging (1.4M rows)...");
+    if (!fs.existsSync(FILE_CLEAN_CSV)) throw new Error("Run Step 1 first.");
+    const stream = client.query(copyFrom(`COPY wcvp_import FROM STDIN WITH CSV HEADER`));
     const fileStream = fs.createReadStream(FILE_CLEAN_CSV);
     await pipeline(fileStream, stream);
-}
+    log("  Import finished.");
+};
 
-async function stepImportWFO(client) {
-    log("Streaming WFO Map to 'wfo_family_order_map'...");
-    if (!fs.existsSync(FILE_WFO_MAP)) throw new Error("WFO map file missing. Run Step 2.");
+const stepImportWFO = async (client) => {
+    log("Streaming WFO Staging (Filtered backbone)...");
     
-    // Ensure table exists in case Step 3 was skipped
-    await client.query(`CREATE TABLE IF NOT EXISTS wfo_family_order_map (family text PRIMARY KEY, "order" text NOT NULL);`);
-    await client.query(`TRUNCATE TABLE wfo_family_order_map;`);
-
-    const wfoQuery = `COPY wfo_family_order_map FROM STDIN WITH (FORMAT csv, HEADER true)`;
-    const wfoStream = client.query(copyFrom(wfoQuery));
-    const wfoFile = fs.createReadStream(FILE_WFO_MAP);
-    await pipeline(wfoFile, wfoStream);
-}
-
-async function stepPopulateApp(client, segments) {
-    log("Populating 'app_taxa' from WCVP Staging...");
-    await client.query("SET statement_timeout = 0;");
-    await client.query(`INSERT INTO app_data_sources (id, name, version, citation_text, url, trust_level) VALUES (1, 'WCVP', '14', 'Kew Gardens WCVP', 'https://powo.science.kew.org/', 5) ON CONFLICT (id) DO NOTHING;`);
-    
-    for (const seg of segments) {
-        log(`Processing Segment: ${seg.label}...`);
-        await client.query(`
-            INSERT INTO app_taxa (wcvp_id, ipni_id, taxon_rank, taxon_status, family, genus_hybrid, genus, species_hybrid, species, infraspecific_rank, infraspecies, taxon_name, taxon_authors, parent_plant_name_id, source_id)
-            SELECT plant_name_id, ipni_id, COALESCE(taxon_rank, 'Unranked'), taxon_status, family, genus_hybrid, genus, species_hybrid, species, infraspecific_rank, infraspecies, taxon_name, taxon_authors, parent_plant_name_id, 1
-            FROM wcvp_import WHERE taxon_name >= '${seg.start}' AND taxon_name < '${seg.end}' ON CONFLICT DO NOTHING;
-        `);
+    if (fs.existsSync(FILE_WFO_IMPORT)) {
+        const stream = client.query(copyFrom(`COPY wfo_import FROM STDIN WITH CSV HEADER`));
+        const fileStream = fs.createReadStream(FILE_WFO_IMPORT);
+        await pipeline(fileStream, stream);
+    } else {
+        warn("WFO import file not found. Skipping.");
     }
-}
+};
 
-async function stepIndexes(client) {
-    log("Building Essential Build Indexes...");
+const stepPopulateApp = async (client) => {
+    log("Populating 'app_taxa' from Staging...");
+    
+    // Ensure Sources
     await client.query(`
-        CREATE INDEX IF NOT EXISTS idx_app_taxa_wcvp ON app_taxa(wcvp_id);
-        CREATE INDEX IF NOT EXISTS idx_app_taxa_parent_plant_name_id ON app_taxa(parent_plant_name_id);
-        CREATE INDEX IF NOT EXISTS idx_app_taxa_parent ON app_taxa(parent_id);
-        CREATE INDEX IF NOT EXISTS idx_app_taxa_name_sort ON app_taxa (taxon_name COLLATE "C");
-        CREATE INDEX IF NOT EXISTS idx_app_taxa_family ON app_taxa(family);
+        INSERT INTO app_data_sources (id, name, version, citation_text, url, trust_level)
+        VALUES (1, 'WCVP', '14 (2025)', 'Kew Gardens WCVP v14', 'https://powo.science.kew.org/', 5)
+        ON CONFLICT (id) DO NOTHING;
     `);
-}
 
-async function stepLinkParents(client, segments) {
-    log("Linking WCVP Parents (Adjacency List)...");
-    await client.query("SET statement_timeout = 0;");
-    for (const seg of segments) {
-        log(`Linking Segment: ${seg.label}...`);
-        await client.query(`UPDATE app_taxa child SET parent_id = parent.id FROM app_taxa parent WHERE child.parent_plant_name_id = parent.wcvp_id AND child.parent_id IS NULL AND child.taxon_name >= '${seg.start}' AND child.taxon_name < '${seg.end}';`);
+    for (const seg of SEGMENTS) {
+        log(`  Populating Segment: ${seg.label}...`);
+        await client.query(`
+            INSERT INTO app_taxa (
+                wcvp_id, ipni_id, powo_id, accepted_plant_name_id, parent_plant_name_id, 
+                basionym_plant_name_id, homotypic_synonym, taxon_name, taxon_authors, family, 
+                genus, genus_hybrid, species, species_hybrid, infraspecies, infraspecific_rank, 
+                taxon_rank, taxon_status, hybrid_formula, parenthetical_author, primary_author, 
+                publication_author, replaced_synonym_author, place_of_publication, volume_and_page, 
+                first_published, nomenclatural_remarks, reviewed, geographic_area, lifeform_description, 
+                climate_description, source_id
+            )
+            SELECT 
+                plant_name_id, ipni_id, powo_id, accepted_plant_name_id, parent_plant_name_id, 
+                basionym_plant_name_id, homotypic_synonym, taxon_name, taxon_authors, family, 
+                genus, genus_hybrid, species, species_hybrid, infraspecies, infraspecific_rank, 
+                COALESCE(taxon_rank, 'Unranked'), taxon_status, hybrid_formula, parenthetical_author, primary_author, 
+                publication_author, replaced_synonym_author, place_of_publication, volume_and_page, 
+                first_published, nomenclatural_remarks, reviewed, geographic_area, lifeform_description, 
+                climate_description, 1
+            FROM wcvp_import
+            WHERE taxon_name >= $1 AND taxon_name < $2
+            ON CONFLICT DO NOTHING;
+        `, [seg.start, seg.end]);
     }
-}
+};
 
-async function stepCreateWFOOrders(client) {
-    log("Building Phylogenetic Layer (WFO Orders)...");
-    await client.query("SET statement_timeout = 0;");
+const stepBuildIndexes = async (client) => {
+    log("Building Structural Indexes...");
+    await client.query(`CREATE INDEX IF NOT EXISTS idx_temp_wcvp ON app_taxa(wcvp_id)`);
+    await client.query(`CREATE INDEX IF NOT EXISTS idx_temp_parent_attr ON app_taxa(parent_plant_name_id)`);
+};
 
-    // Source 3: World Flora Online
-    const wfoCitation = 'WFO (2025): World Flora Online. Version 2025.12. Published on the Internet; http://www.worldfloraonline.org. Accessed on: 2026-01-09';
-    await client.query(`INSERT INTO app_data_sources (id, name, version, citation_text, trust_level) VALUES (3, 'WFO', '2025.12', '${wfoCitation}', 5) ON CONFLICT (id) DO NOTHING;`);
+const stepLinkParents = async (client) => {
+    log("Linking Parents (Adjacency)...");
+    for (const seg of SEGMENTS) {
+        log(`  Linking Segment: ${seg.label}...`);
+        await client.query(`
+            UPDATE app_taxa child
+            SET parent_id = parent.id
+            FROM app_taxa parent
+            WHERE child.parent_plant_name_id = parent.wcvp_id
+              AND child.parent_id IS NULL
+              AND child.taxon_name >= $1 AND child.taxon_name < $2;
+        `, [seg.start, seg.end]);
+    }
+};
 
-    log("  Creating Order records from map...");
+const stepWFOOrders = async (client) => {
+    log("Creating WFO Orders & Linking Families (SQL Logic)...");
+    
+    await client.query(`
+        INSERT INTO app_data_sources (id, name, version, citation_text, url, trust_level)
+        VALUES (3, 'World Flora Online', '2025.12', 'WFO (2025): World Flora Online. Version 2025.12. Published on the Internet; http://www.worldfloraonline.org. Accessed on: 2026-01-09', 'http://www.worldfloraonline.org', 5)
+        ON CONFLICT (id) DO NOTHING;
+    `);
+
+    // 1. Create Physical Orders (All of them from staging)
     await client.query(`
         INSERT INTO app_taxa (taxon_name, taxon_rank, taxon_status, source_id, verification_level)
-        SELECT DISTINCT "order", 'Order', 'Accepted', 3, 'WFO Backbone 2025.12'
-        FROM wfo_family_order_map
+        SELECT scientificName, 'Order', taxonomicStatus, 3, 'WFO Backbone Distill'
+        FROM wfo_import
+        WHERE LOWER(taxonRank) = 'order'
         ON CONFLICT DO NOTHING;
     `);
 
-    log("  Linking existing Families to WFO Orders...");
+    // 2. Ensure Families exist (Source 2)
     await client.query(`
-        UPDATE app_taxa fam
-        SET parent_id = ord.id
-        FROM wfo_family_order_map map
-        JOIN app_taxa ord ON map."order" = ord.taxon_name AND ord.taxon_rank = 'Order'
-        WHERE fam.taxon_name = map.family AND fam.taxon_rank = 'Family' AND fam.parent_id IS NULL;
-    `);
-}
+        INSERT INTO app_data_sources (id, name, version, citation_text, trust_level)
+        VALUES (2, 'FloraCatalog System', 'v2.31.8 (Derived)', 'Internal system layer deriving backbone from attributes.', 5)
+        ON CONFLICT (id) DO NOTHING;
 
-async function stepCreateDerivedFamilies(client, segments) {
-    log("Generating Taxonomic Backbone (System Derived Families)...");
-    await client.query("SET statement_timeout = 0;");
-
-    // Source 2: FloraCatalog System
-    await client.query(`INSERT INTO app_data_sources (id, name, version, citation_text, trust_level) VALUES (2, 'FloraCatalog System', '${APP_VERSION}', 'Internal system layer for taxonomic derivation.', 5) ON CONFLICT (id) DO NOTHING;`);
-
-    log("  Creating Family records from attributes...");
-    await client.query(`
         INSERT INTO app_taxa (taxon_name, taxon_rank, taxon_status, family, source_id, verification_level)
-        SELECT DISTINCT family, 'Family', 'Derived', family, 2, 'FloraCatalog Derived'
-        FROM app_taxa WHERE family IS NOT NULL AND NOT EXISTS (SELECT 1 FROM app_taxa a WHERE a.taxon_name = app_taxa.family AND a.taxon_rank = 'Family')
+        SELECT DISTINCT family, 'Family', 'Derived', family, 2, 'FloraCatalog v2.31.8'
+        FROM app_taxa
+        WHERE family IS NOT NULL
+          AND NOT EXISTS (SELECT 1 FROM app_taxa a WHERE a.family = app_taxa.family AND a.taxon_rank = 'Family')
         ON CONFLICT DO NOTHING;
     `);
 
-    log("  Grafting remaining Orphans to Families...");
-    for (const seg of segments) {
-        log(`  Grafting Segment: ${seg.label}...`);
-        await client.query(`UPDATE app_taxa child SET parent_id = parent.id FROM app_taxa parent WHERE child.parent_id IS NULL AND child.family = parent.taxon_name AND parent.taxon_rank = 'Family' AND child.id != parent.id AND child.taxon_name >= '${seg.start}' AND child.taxon_name < '${seg.end}';`);
-    }
-}
+    // 3. Link Families to Orders via SQL self-join on wfo_import
+    await client.query(`
+        UPDATE app_taxa app_fam
+        SET parent_id = app_order.id
+        FROM wfo_import wfo_fam
+        JOIN wfo_import wfo_order ON wfo_fam.parentNameUsageID = wfo_order.taxonID
+        JOIN app_taxa app_order ON app_order.taxon_name = wfo_order.scientificName AND app_order.taxon_rank = 'Order'
+        WHERE app_fam.taxon_name = wfo_fam.family AND app_fam.taxon_rank = 'Family'
+          AND app_fam.parent_id IS NULL;
+    `);
+};
 
-async function stepHierarchy(client, segments) {
-    log("Building Ltree Hierarchy Paths...");
-    await client.query("SET statement_timeout = 0;");
+const stepDerivedFamilies = async (client) => {
+    log("Grafting orphaned WCVP roots to Family records...");
+    for (const seg of SEGMENTS) {
+        await client.query(`
+            UPDATE app_taxa child
+            SET parent_id = parent.id
+            FROM app_taxa parent
+            WHERE child.parent_id IS NULL
+              AND child.family = parent.family
+              AND parent.taxon_rank = 'Family'
+              AND child.id != parent.id
+              AND child.taxon_name >= $1 AND child.taxon_name < $2;
+        `, [seg.start, seg.end]);
+    }
+};
+
+const stepHierarchy = async (client) => {
+    log("Building Ltree Hierarchy (Iterative)...");
     
-    // Level 0: Orders/Orphans (New Root anchoring)
-    for (const seg of segments) {
-        await client.query(`UPDATE app_taxa SET hierarchy_path = text2ltree('root') || text2ltree(replace(id::text, '-', '_')) WHERE parent_id IS NULL AND hierarchy_path IS NULL AND taxon_name >= '${seg.start}' AND taxon_name < '${seg.end}';`);
-    }
+    // Clear paths
+    await client.query(`UPDATE app_taxa SET hierarchy_path = NULL`);
 
-    let level = 1;
+    // Level 1: Roots
+    log("  Processing Level 1: Roots...");
+    const rootRes = await client.query(`
+        UPDATE app_taxa 
+        SET hierarchy_path = text2ltree('root') || text2ltree(replace(id::text, '-', '_'))
+        WHERE parent_id IS NULL
+    `);
+    log(`    Found ${rootRes.rowCount} roots.`);
+
+    let level = 2;
     while (true) {
-        let levelUpdated = 0;
-        log(`Processing Level ${level}...`);
-        for (const seg of segments) {
-            const res = await client.query(`UPDATE app_taxa child SET hierarchy_path = parent.hierarchy_path || text2ltree(replace(child.id::text, '-', '_')) FROM app_taxa parent WHERE child.parent_id = parent.id AND parent.hierarchy_path IS NOT NULL AND child.hierarchy_path IS NULL AND child.taxon_name >= '${seg.start}' AND child.taxon_name < '${seg.end}';`);
-            levelUpdated += res.rowCount;
+        log(`  Processing Level ${level}...`);
+        let totalUpdated = 0;
+        
+        // Split by segment to prevent timeouts on the join
+        for (const seg of SEGMENTS) {
+            const res = await client.query(`
+                UPDATE app_taxa c
+                SET hierarchy_path = p.hierarchy_path || text2ltree(replace(c.id::text, '-', '_'))
+                FROM app_taxa p
+                WHERE c.parent_id = p.id
+                  AND p.hierarchy_path IS NOT NULL
+                  AND c.hierarchy_path IS NULL
+                  AND c.taxon_name >= $1 AND c.taxon_name < $2
+            `, [seg.start, seg.end]);
+            totalUpdated += res.rowCount;
         }
-        if (levelUpdated === 0 || level > 20) break;
+        
+        log(`    Processed ${totalUpdated} records.`);
+        if (totalUpdated === 0) break;
         level++;
     }
-}
 
-async function stepCounts(client, segments) {
-    log("Calculating Recursive Counts...");
-    for (const seg of segments) {
-        await client.query(`WITH counts AS (SELECT parent_id, COUNT(*) as cnt FROM app_taxa WHERE parent_id IS NOT NULL GROUP BY parent_id) UPDATE app_taxa SET descendant_count = counts.cnt FROM counts WHERE app_taxa.id = counts.parent_id AND app_taxa.taxon_name >= '${seg.start}' AND app_taxa.taxon_name < '${seg.end}';`);
+    // False Root Recovery (Protcol v2.31.5)
+    log("  Grafting temporary false roots...");
+    await client.query(`
+        UPDATE app_taxa c
+        SET hierarchy_path = p.hierarchy_path || text2ltree(replace(c.id::text, '-', '_'))
+        FROM app_taxa p
+        WHERE c.parent_id = p.id
+          AND p.hierarchy_path IS NOT NULL
+          AND c.hierarchy_path = (text2ltree('root') || text2ltree(replace(c.id::text, '-', '_')));
+    `);
+};
+
+const stepCounts = async (client) => {
+    log("Calculating Descendant Counts...");
+    for (const seg of SEGMENTS) {
+        log(`  Updating Counts for Segment: ${seg.label}...`);
+        await client.query(`
+            WITH counts AS (
+                SELECT parent_id, COUNT(*) as cnt
+                FROM app_taxa
+                WHERE parent_id IS NOT NULL
+                GROUP BY parent_id
+            )
+            UPDATE app_taxa
+            SET descendant_count = counts.cnt
+            FROM counts
+            WHERE app_taxa.id = counts.parent_id
+              AND app_taxa.taxon_name >= $1 AND app_taxa.taxon_name < $2;
+        `, [seg.start, seg.end]);
     }
-}
+};
 
-async function stepOptimize(client) {
-    log(`Optimizing Indexes (V8.1)...`);
+const stepOptimize = async (client) => {
+    log("Applying V8.1 Index Optimizations...");
     const sql = fs.readFileSync(FILE_OPTIMIZE, 'utf-8');
     await client.query(sql);
-}
+};
+
+// --- ORCHESTRATOR ---
+
+const STEPS = [
+    { id: 1, label: "Prepare WCVP", fn: stepPrepWCVP },
+    { id: 2, label: "Prepare WFO", fn: stepPrepWFO },
+    { id: 3, label: "Reset Database", fn: stepResetDB },
+    { id: 4, label: "Import WCVP", fn: stepImportWCVP },
+    { id: 5, label: "Import WFO", fn: stepImportWFO },
+    { id: 6, label: "Populate App", fn: stepPopulateApp },
+    { id: 7, label: "Build Indexes", fn: stepBuildIndexes },
+    { id: 8, label: "Link Parents", fn: stepLinkParents },
+    { id: 9, label: "WFO Orders", fn: stepWFOOrders },
+    { id: 10, label: "Derived Families", fn: stepDerivedFamilies },
+    { id: 11, label: "Hierarchy", fn: stepHierarchy },
+    { id: 12, label: "Counts", fn: stepCounts },
+    { id: 13, label: "Optimize", fn: stepOptimize }
+];
 
 async function main() {
-    console.log("\n🌿 FLORA CATALOG - DATABASE AUTOMATION v2.31.6 🌿\n");
-    process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
-    let dbUrl = process.env.DATABASE_URL;
-    let finalConfig;
+    console.log(`\n\x1b[32m🌿 FLORA CATALOG BUILDER ${APP_VERSION}\x1b[0m`);
+    console.log("------------------------------------------");
+    STEPS.forEach(s => console.log(`${s.id}. ${s.label}`));
+    console.log("------------------------------------------");
+    
+    const choice = await askQuestion("Select step to start (or comma-list for specific steps): ");
+    ensureDirs();
 
-    if (dbUrl) {
-        log("Using DATABASE_URL from .env");
-        finalConfig = { connectionString: dbUrl, ssl: { rejectUnauthorized: false } };
+    let sequence = [];
+    if (choice.includes(',')) {
+        sequence = choice.split(',').map(n => parseInt(n.trim())).filter(n => !isNaN(n));
     } else {
-        let dbPass = process.env.DATABASE_PASSWORD;
-        if (!dbPass) dbPass = (await askQuestion("🔑 Enter Database Password: ")).trim();
-        if (!dbPass) { err("Password required."); process.exit(1); }
-        const user = `postgres.${DEFAULT_PROJECT_ID}`;
-        const host = 'aws-0-us-west-2.pooler.supabase.com';
-        const connectionString = `postgresql://${encodeURIComponent(user)}:${encodeURIComponent(dbPass)}@${host}:6543/postgres`;
-        finalConfig = { connectionString, ssl: { rejectUnauthorized: false } };
+        const startId = parseInt(choice);
+        sequence = STEPS.filter(s => s.id >= startId).map(s => s.id);
     }
 
-    const client = new pg.Client(finalConfig);
-    
-    client.on('error', (e) => {
-        err(`Database Connection Error: ${e.message}`);
-        process.exit(1);
-    });
+    if (sequence.length === 0) { err("No steps selected."); process.exit(1); }
 
+    let client = null;
     try {
-        await client.connect();
-        log("✅ Database Connected Successfully");
+        // Only need client for DB steps
+        const dbStepIds = [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13];
+        if (sequence.some(id => dbStepIds.includes(id))) {
+            client = await getClient();
+        }
+
+        for (const id of sequence) {
+            const step = STEPS.find(s => s.id === id);
+            log(`\x1b[35m[STEP ${id}]\x1b[0m Executing: ${step.label}...`);
+            await step.fn(client);
+        }
+
+        log("\x1b[32mBuild Complete!\x1b[0m");
     } catch (e) {
-        err(`Initial Connection Failed: ${e.message}`);
-        process.exit(1);
+        err(`Process failed at step.`);
+        console.error(e);
+    } finally {
+        if (client) await client.end();
     }
-    
-    const steps = [
-        { id: '1', name: "Prepare WCVP Data (Pipe -> Comma)", fn: () => stepPrepWCVP() },
-        { id: '2', name: "Prepare WFO Data (Distill Backbone)", fn: () => stepPrepWFO() },
-        { id: '3', name: "Reset Database (Rebuild Schema)", fn: () => stepBuildSchema(client) },
-        { id: '4', name: "Import Staging: WCVP", fn: () => stepImportWCVP(client) },
-        { id: '5', name: "Import Staging: WFO Map", fn: () => stepImportWFO(client) },
-        { id: '6', name: "Populate App Taxa (WCVP -> Core)", fn: (segs) => stepPopulateApp(client, segs) },
-        { id: '7', name: "Build-Indexes (Essential)", fn: () => stepIndexes(client) },
-        { id: '8', name: "Link Parents (WCVP Lineage)", fn: (segs) => stepLinkParents(client, segs) },
-        { id: '9', name: "Build Backbone: WFO Orders", fn: () => stepCreateWFOOrders(client) },
-        { id: '10', name: "Build Backbone: Derived Families", fn: (segs) => stepCreateDerivedFamilies(client, segs) },
-        { id: '11', name: "Calculate Hierarchy (Ltree)", fn: (segs) => stepHierarchy(client, segs) },
-        { id: '12', name: "Calculate Counts (Grid)", fn: (segs) => stepCounts(client, segs) },
-        { id: '13', name: "Optimize Indexes (V8.1)", fn: () => stepOptimize(client) }
-    ];
-
-    console.log("\n--- FLORA CATALOG BUILD MENU v2.31.6 ---");
-    steps.forEach(s => console.log(`${s.id.padStart(2)}. Step ${s.id}: ${s.name}`));
-    const choice = await askQuestion("\nSelect step(s) (e.g. 'All', '9', or '2,5,9,10'): ");
-    
-    let targetSteps = [];
-    if (choice.toLowerCase() === 'all') {
-        targetSteps = steps;
-    } else if (choice.includes(',')) {
-        const ids = choice.split(',').map(s => s.trim());
-        targetSteps = steps.filter(s => ids.includes(s.id));
-    } else {
-        const startIndex = steps.findIndex(s => s.id === choice);
-        if (startIndex === -1) { err("Invalid selection"); process.exit(1); }
-        targetSteps = steps.slice(startIndex);
-    }
-
-    if (targetSteps.length === 0) { err("No steps selected."); process.exit(1); }
-
-    let targetSegments = SEGMENTS;
-    const needsSegments = targetSteps.some(s => ['6', '8', '10', '11', '12'].includes(s.id));
-    if (needsSegments) targetSegments = await selectSegments();
-
-    for (const step of targetSteps) {
-        await step.fn(targetSegments);
-    }
-    
-    await client.end();
-    log("Build process finished.");
 }
+
 main();

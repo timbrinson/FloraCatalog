@@ -13,7 +13,7 @@ DROP TABLE IF EXISTS app_taxa CASCADE;
 DROP TABLE IF EXISTS app_attribute_definitions CASCADE;
 DROP TABLE IF EXISTS app_data_sources CASCADE;
 DROP TABLE IF EXISTS wcvp_import CASCADE;
-DROP TABLE IF EXISTS wfo_family_order_map CASCADE;
+DROP TABLE IF EXISTS wfo_import CASCADE;
 DROP TABLE IF EXISTS app_settings_global CASCADE;
 
 -- =============================================================================
@@ -54,9 +54,31 @@ CREATE TABLE wcvp_import (
     reviewed text
 );
 
-CREATE TABLE wfo_family_order_map (
-    family text PRIMARY KEY,
-    "order" text NOT NULL
+-- Full Darwin Core Backbone for Higher Ranks (Staging)
+CREATE TABLE wfo_import (
+    taxonID text PRIMARY KEY,
+    scientificNameID text,
+    localID text,
+    scientificName text,
+    taxonRank text,
+    parentNameUsageID text,
+    scientificNameAuthorship text,
+    family text,
+    subfamily text,
+    tribe text,
+    subtribe text,
+    genus text,
+    subgenus text,
+    specificEpithet text,
+    infraspecificEpithet text,
+    verbatimTaxonRank text,
+    nomenclaturalStatus text,
+    taxonomicStatus text,
+    acceptedNameUsageID text,
+    originalNameUsageID text,
+    namePublishedIn text,
+    taxonRemarks text,
+    "references" text
 );
 
 -- =============================================================================
@@ -210,7 +232,7 @@ INSERT INTO app_settings_global (id, settings) VALUES ('default_config', '{}') O
 
 -- Permissions
 ALTER TABLE wcvp_import DISABLE ROW LEVEL SECURITY;
-ALTER TABLE wfo_family_order_map DISABLE ROW LEVEL SECURITY;
+ALTER TABLE wfo_import DISABLE ROW LEVEL SECURITY;
 ALTER TABLE app_data_sources DISABLE ROW LEVEL SECURITY;
 ALTER TABLE app_taxa DISABLE ROW LEVEL SECURITY;
 ALTER TABLE app_taxon_details DISABLE ROW LEVEL SECURITY;
