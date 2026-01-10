@@ -1,8 +1,8 @@
 /**
- * AUTOMATED DATABASE BUILDER (CLI) v2.31.5
+ * AUTOMATED DATABASE BUILDER (CLI) v2.31.6
  * 
  * Orchestrates the transformation of raw WCVP and WFO data into the FloraCatalog database.
- * v2.31.5: Added Granular Step Selection (comma-separated) and updated WFO 2026 access date.
+ * v2.31.6: Restored interactive connection string construction and password prompting.
  */
 
 import pg from 'pg';
@@ -33,6 +33,7 @@ const loadEnv = () => {
 loadEnv();
 
 // --- CONFIGURATION ---
+const DEFAULT_PROJECT_ID = 'uzzayfueabppzpwunvlf';
 const DIR_DATA = 'data';
 const DIR_INPUT = path.join(DIR_DATA, 'input');
 const DIR_TEMP = path.join(DIR_DATA, 'temp');
@@ -40,7 +41,7 @@ const FILE_CLEAN_CSV = path.join(DIR_TEMP, 'wcvp_names_clean.csv');
 const FILE_WFO_MAP = path.join(DIR_TEMP, 'wfo_family_order_map.csv');
 const FILE_SCHEMA = 'scripts/wcvp_schema.sql.txt';
 const FILE_OPTIMIZE = 'scripts/optimize_indexes.sql.txt';
-const APP_VERSION = 'v2.31.5';
+const APP_VERSION = 'v2.31.6';
 
 const SEGMENTS = [
     { label: "Symbols (+, etc)", start: " ", end: "A" },
@@ -263,11 +264,38 @@ async function stepOptimize(client) {
 }
 
 async function main() {
+    console.log("\n🌿 FLORA CATALOG - DATABASE AUTOMATION v2.31.6 🌿\n");
     process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
-    const dbUrl = process.env.DATABASE_URL;
-    if (!dbUrl) { err("DATABASE_URL not found in .env"); process.exit(1); }
-    const client = new pg.Client({ connectionString: dbUrl, ssl: { rejectUnauthorized: false } });
-    await client.connect();
+    let dbUrl = process.env.DATABASE_URL;
+    let finalConfig;
+
+    if (dbUrl) {
+        log("Using DATABASE_URL from .env");
+        finalConfig = { connectionString: dbUrl, ssl: { rejectUnauthorized: false } };
+    } else {
+        let dbPass = process.env.DATABASE_PASSWORD;
+        if (!dbPass) dbPass = (await askQuestion("🔑 Enter Database Password: ")).trim();
+        if (!dbPass) { err("Password required."); process.exit(1); }
+        const user = `postgres.${DEFAULT_PROJECT_ID}`;
+        const host = 'aws-0-us-west-2.pooler.supabase.com';
+        const connectionString = `postgresql://${encodeURIComponent(user)}:${encodeURIComponent(dbPass)}@${host}:6543/postgres`;
+        finalConfig = { connectionString, ssl: { rejectUnauthorized: false } };
+    }
+
+    const client = new pg.Client(finalConfig);
+    
+    client.on('error', (e) => {
+        err(`Database Connection Error: ${e.message}`);
+        process.exit(1);
+    });
+
+    try {
+        await client.connect();
+        log("✅ Database Connected Successfully");
+    } catch (e) {
+        err(`Initial Connection Failed: ${e.message}`);
+        process.exit(1);
+    }
     
     const steps = [
         { id: '1', name: "Prepare WCVP Data (Pipe -> Comma)", fn: () => stepPrepWCVP() },
@@ -285,7 +313,7 @@ async function main() {
         { id: '13', name: "Optimize Indexes (V8.1)", fn: () => stepOptimize(client) }
     ];
 
-    console.log("\n--- FLORA CATALOG BUILD MENU v2.31.5 ---");
+    console.log("\n--- FLORA CATALOG BUILD MENU v2.31.6 ---");
     steps.forEach(s => console.log(`${s.id.padStart(2)}. Step ${s.id}: ${s.name}`));
     const choice = await askQuestion("\nSelect step(s) (e.g. 'All', '9', or '2,5,9,10'): ");
     
