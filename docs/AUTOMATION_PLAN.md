@@ -1,7 +1,7 @@
 # Database Automation & Build Plan
 
 ## 1. Overview
-This document defines the standard operating procedure (SOP) for rebuilding the FloraCatalog database from scratch. This process transforms the raw data from Kew Gardens (WCVP) into the optimized hierarchical structure used by the application.
+This document defines the standard operating procedure (SOP) for rebuilding the FloraCatalog database from scratch. This process transforms the raw data from Kew Gardens (WCVP) and World Flora Online (WFO) into the optimized hierarchical structure used by the application.
 
 ## 2. Folder Structure
 The project is organized to separate application code from raw data and build tools.
@@ -17,15 +17,14 @@ The project is organized to separate application code from raw data and build to
   │   ├── DATA_MODEL.md
   │   └── ...guides
   ├── scripts/              # Build & Database Scripts
-  │   ├── automate_build.js # The Master Controller (v2.31.2)
+  │   ├── automate_build.js # The Master Controller (v2.31.5)
   │   ├── convert_wcvp.py   # Data cleaner
-  │   ├── split_csv.py      # CSV splitter for browser uploads
+  │   ├── distill_wfo.py    # WFO Phylogeny Distiller
   │   ├── wcvp_schema.sql.txt     # Core table definitions
-  │   ├── wcvp_populate.sql.txt   # Data transformation logic
-  │   ├── optimize_indexes.sql.txt # Performance tuning
+  │   ├── optimize_indexes.sql.txt # V8.1 Performance tuning
   │   └── ...segmented build scripts
   └── data/                 # Data storage (git-ignored)
-      ├── input/            # Place downloaded zip here
+      ├── input/            # Place downloaded zips here
       ├── temp/             # Extracted & Converted files
       └── logs/             # Build logs
 ```
@@ -43,8 +42,6 @@ Supabase recently moved to **IPv6 by default** for direct database connections. 
 6.  Copy the **URI** string.
 7.  Update your local `.env` file's `DATABASE_URL` with this new string.
 
-**Automation Script Default:** As of v2.5, the automation script defaults to using the **Transaction Pooler (Port 6543)**, explicitly forces the connection over **IPv4**, and enables **SSL** (which is mandatory for Supabase poolers).
-
 ---
 
 ## 4. Bootstrapping (Prerequisites)
@@ -52,7 +49,7 @@ Supabase recently moved to **IPv6 by default** for direct database connections. 
 If running this on a fresh computer (e.g., an Admin's laptop), follow these steps to set up the environment.
 
 ### A. Get the Code
-1.  **Choose a location:** Open your terminal (Terminal on Mac/Linux, PowerShell on Windows). Use `cd` to navigate to the folder where you want the project to live. 
+1.  **Choose a location:** Open your terminal. Use `cd` to navigate to the folder where you want the project to live. 
 2.  **Clone the Repository:**
     ```bash
     git clone https://github.com/timbrinson/FloraCatalog.git
@@ -62,15 +59,7 @@ If running this on a fresh computer (e.g., an Admin's laptop), follow these step
 ### B. Install Runtimes
 The automation relies on **Node.js** (for database orchestration) and **Python** (for CSV processing).
 
-**Mac (OSX)**
-1.  `brew install node python`
-
-**Windows**
-1.  Download **Node.js (LTS)**: https://nodejs.org/
-2.  Download **Python 3**: https://www.python.org/ (Check "Add Python to PATH").
-
 ### C. Install Project Dependencies
-Open your terminal inside the `FloraCatalog` folder.
 ```bash
 npm install
 ```
@@ -88,41 +77,65 @@ The script needs to know where your database is and how to log in.
     ```
 3.  If you only provide the URL without the password, the script will interactively prompt you for the password.
 
-### 🛑 Authentication Issues?
-If you receive a `password authentication failed` error:
-*   **The Database Password** is NOT your Supabase login password. It is the one you set when you first created the project.
-*   If you forgot it, go to **Settings -> Database -> Reset Database Password** in the Supabase Dashboard.
-*   Wait 60 seconds after resetting for the pooler to sync.
+### Authentication Issues?
+If the script fails to connect with "Authentication failed," or `password authentication failed` error:
+- Your database password does not contain special characters that require URL encoding (like `@` or `:`).
+- If it does, you must URL-encode them (e.g., `@` becomes `%40`).
+-   **The Database Password** is NOT your Supabase login password. It is the one you set when you first created the project.
+-   If you forgot it, go to **Settings -> Database -> Reset Database Password** in the Supabase Dashboard.
+   Wait 60 seconds after resetting for the pooler to sync.
 
 ---
 
-## 6. The Build Workflow
+## 6. The Build Workflow (v2.31.5)
 
-The `scripts/automate_build.js` is an interactive CLI that guides the Admin through the process.
+The `scripts/automate_build.js` is an interactive CLI with two execution modes:
+
+### Mode 1: Sequential (Full Rebuild)
+Select a single number. The script runs that step and every step following it. 
+*   **Use Case:** Initial setup or major schema updates.
+*   **Warning:** Destructive. Wipes all data.
+
+### Mode 2: Granular (Enrichment/Recovery)
+Enter a comma-separated list (e.g. `2, 5, 9, 10, 11, 13`). This executes **ONLY** the specified steps. 
+*   **Use Case:** Adding Phylogenetic (WFO) data to an existing WCVP baseline.
+*   **Use Case:** Resuming a failed build without re-streaming 1.4 million records.
 
 ### Step-by-Step Flow
 
 | # | Action | Automated? | Method | Description |
 | :--- | :--- | :--- | :--- | :--- |
-| **0** | **Download Data** | **Manual** | Web | Download WCVP Zip from [Kew Gardens](https://powo.science.kew.org/about-wcvp). Place in `data/input/`. |
-| **1** | **Prepare Data** | Auto | Python | Unzips and converts pipes (`|`) to commas (`,`). |
-| **2** | **Build Schema** | Auto | SQL | Runs `scripts/wcvp_schema.sql.txt`. Drops existing tables and recreates the empty schema. |
-| **3** | **Stream Import** | Auto | `COPY` | Streams `wcvp_names_clean.csv` to `wcvp_import` via TCP. |
-| **4** | **Populate** | Auto | SQL | Inserts data from staging to `app_taxa` in alphabetical segments. |
-| **5** | **Indexes** | Auto | SQL | Creates basic structural indexes for linking. **(Critical: Run before linking to prevent timeouts)**. |
-| **6** | **Link Parents** | Auto | SQL | Updates `parent_id` based on WCVP IDs (Adjacency List) in segments. |
-| **7** | **Backbone** | Auto | SQL | Creates physical Family records and performs **Segmented Fallthrough Grafting** for remaining orphans. |
-| **8** | **Hierarchy** | Auto | SQL | Calculates Ltree paths iteratively in segments. |
-| **9** | **Counts** | Auto | SQL | Calculates descendant counts for the UI grid. |
-| **10** | **Performance** | Auto | SQL | Runs `scripts/optimize_indexes.sql.txt`. |
+| **1** | **Prepare WCVP** | Auto | Python | Runs `convert_wcvp.py.txt` to clean pipe-delimited data. |
+| **2** | **Prepare WFO** | Auto | Python | Runs `distill_wfo.py.txt` to create the family-to-order map. |
+| **3** | **Reset Database** | Auto | SQL | Wipes schema and recreates empty tables (`wcvp_schema.sql.txt`). |
+| **4** | **Import WCVP** | Auto | `COPY` | Streams cleaned WCVP CSV into the `wcvp_import` staging table. |
+| **5** | **Import WFO** | Auto | `COPY` | Streams the distilled map into the `wfo_family_order_map` table. |
+| **6** | **Populate App** | Auto | SQL | Moves data from `wcvp_import` to the core `app_taxa` table in segments. |
+| **7** | **Build Indexes** | Auto | SQL | Creates structural indexes required for high-speed linking. |
+| **8** | **Link Parents** | Auto | SQL | Updates `parent_id` UUIDs based on scientific lineage in segments. |
+| **9** | **WFO Orders** | Auto | SQL | Creates 'Order' records (Source 3) and links them as Family parents. |
+| **10** | **Derived Families**| Auto | SQL | Creates physical 'Family' records (Source 2) for unlinked orphans. |
+| **11** | **Hierarchy** | Auto | SQL | Recursively calculates Ltree paths (`root.order.family...`) in segments. |
+| **12** | **Counts** | Auto | SQL | Calculates descendant counts for the UI Grid # column in segments. |
+| **13** | **Optimize** | Auto | SQL | Runs `optimize_indexes.sql.txt` for V8.1 production performance. |
+
+---
 
 ## 7. Segmented Recovery & Gap Closure
+
+### Alphabetical Recovery
+Because the 1.4 million record table is massive, the build process is "Segmented" alphabetically.
+1.  **Iterative Linking:** Step 8 (Link Parents) runs in segments (A, B, C...).
+2.  **Recovery:** If the script crashes during Segment 'M', you can restart at Step 8 (Link Parents) and select 'M' as your starting range to finish the job.
+3.  **Ltree Hierarchy (Step 11):** This is the most computationally expensive part. It walks the tree level-by-level to build the `hierarchy_path`.
+
+### Protocol for Gap Closure
 If you populated records in chunks (e.g., A-S first, then T-Z), you must run a **Gap Closure** pass:
 1.  **Why:** Children in the A-S range couldn't find parents in the T-Z range during the first pass.
 2.  **Protocol:** 
-    *   Run Step 6 (Link Parents) for **'All'** ranges.
-    *   Run Step 8 (Hierarchy) for **'All'** ranges.
-3.  **False Root Recovery:** Step 8 now automatically identifies and resets "False Roots"—records that were temporarily marked as roots because their parents were missing. This ensures they are correctly grafted into the tree once the parent is present.
+    *   Run **Step 8 (Link Parents)** for **'All'** ranges.
+    *   Run **Step 11 (Hierarchy)** for **'All'** ranges.
+3.  **False Root Recovery:** Step 11 now automatically identifies and resets "False Roots"—records that were temporarily marked as roots because their parents were missing. This ensures they are correctly grafted into the tree once the parent is present.
 
 ---
 
@@ -142,14 +155,30 @@ If you populated records in chunks (e.g., A-S first, then T-Z), you must run a *
 
 ---
 
+## 🚀 WFO Enrichment (Backbone Only)
+
+If your WCVP data is already loaded and you only want to add the Phylogenetic (Order) layer:
+1.  **Download WFO Backbone** (`_DwC_backbone_R.zip`) to `data/input/`.
+2.  Run `npm run db:build`.
+3.  Enter: `2, 5, 9, 10, 11, 13`.
+    *   **2:** Distills the 950MB WFO zip locally into a 50KB mapping file.
+    *   **5:** Streams the distilled map to the staging table.
+    *   **9:** Creates physical 'Order' records (Source 3).
+    *   **10:** Links Families to Orders.
+    *   **11:** Recalculates Hierarchy Paths (Select 'All' segments to shift the tree down).
+    *   **13:** Re-optimizes indexes for high-speed filtering.
+
+---
+
 ## 9. Troubleshooting Common Errors
 
 ### A. Error: `connect EHOSTUNREACH [IPv6 Address]`
-*   **Cause:** Local network or computer doesn't support IPv6.
-*   **Fix:** The script v2.5+ explicitly forces the connection to use the **IPv4** protocol. Ensure your `.env` uses the IPv4 pooler host (`...pooler.supabase.com`) on port **6543**.
+*   **Fix:** Ensure your `.env` uses the IPv4 pooler host (`...pooler.supabase.com`) on port **6543**.
 
-### B. Error: `Terminated due to timeout`
-*   **Fix:** Ensure you are using the **"Transaction"** mode pooler on port **6543**. The script sets `statement_timeout = 0`, but the pooler is much more stable for multi-minute operations like hierarchy calculation.
+### B. Error: `Terminated due to timeout` (57014)
+*   **Fix:** Use the **"Transaction"** mode pooler. The script sets `statement_timeout = 0`.
+*   **Fix:** Run Step 13 (Optimize) to build composite indexes that handle sorting.
 
 ### C. Python Error
 *   **Fix:** Ensure `python` or `python3` is in your system PATH. The script tries both.
+*   **macOS Fix:** If you get "Operation not permitted," grant your Terminal "Full Disk Access" in System Settings.

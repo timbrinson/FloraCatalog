@@ -13,11 +13,11 @@ DROP TABLE IF EXISTS app_taxa CASCADE;
 DROP TABLE IF EXISTS app_attribute_definitions CASCADE;
 DROP TABLE IF EXISTS app_data_sources CASCADE;
 DROP TABLE IF EXISTS wcvp_import CASCADE;
+DROP TABLE IF EXISTS wfo_family_order_map CASCADE;
 DROP TABLE IF EXISTS app_settings_global CASCADE;
 
 -- =============================================================================
--- WCVP Import Schema (Staging Table)
--- MUST MATCH CSV COLUMN ORDER EXACTLY FOR POSITIONAL COPY
+-- STAGING LAYER (Temporary Import Tables)
 -- =============================================================================
 
 CREATE TABLE wcvp_import (
@@ -54,6 +54,11 @@ CREATE TABLE wcvp_import (
     reviewed text
 );
 
+CREATE TABLE wfo_family_order_map (
+    family text PRIMARY KEY,
+    "order" text NOT NULL
+);
+
 -- =============================================================================
 -- APPLICATION LAYER (FloraCatalog Core)
 -- =============================================================================
@@ -67,7 +72,6 @@ CREATE TABLE app_data_sources (
     url text,
     trust_level int DEFAULT 1,
     last_accessed_at timestamptz DEFAULT NOW(),
-    -- Ensures we don't duplicate sources while adding via UI
     CONSTRAINT app_data_sources_name_version_key UNIQUE (name, version)
 );
 
@@ -97,7 +101,7 @@ CREATE TABLE app_taxa (
     parent_id uuid REFERENCES app_taxa(id),
     hierarchy_path ltree,
     
-    wcvp_id text UNIQUE, -- REQUIRED for ON CONFLICT logic in build script
+    wcvp_id text UNIQUE, 
     ipni_id text,
     powo_id text,
     accepted_plant_name_id text,
@@ -189,44 +193,27 @@ CREATE TABLE app_audit_log (
 );
 
 -- =============================================================================
--- OPTIMIZED INDICES (Standardized Baseline)
+-- OPTIMIZED INDICES
 -- =============================================================================
 
--- 1. Search & Sort (Essential for Grid Startup)
 CREATE INDEX IF NOT EXISTS idx_app_taxa_taxon_name_trgm ON app_taxa USING GIN (taxon_name gin_trgm_ops);
 CREATE INDEX IF NOT EXISTS idx_app_taxa_name_sort ON app_taxa (taxon_name);
-
--- 2. Hierarchy & Grouping
 CREATE INDEX IF NOT EXISTS idx_app_taxa_parent ON app_taxa(parent_id);
 CREATE INDEX IF NOT EXISTS idx_app_taxa_path_gist ON app_taxa USING GIST (hierarchy_path);
 CREATE INDEX IF NOT EXISTS idx_app_taxa_genus_species ON app_taxa (genus, species);
-
--- 3. Filter Columns (Prevents Timeouts on 1.4M rows)
 CREATE INDEX IF NOT EXISTS idx_app_taxa_family ON app_taxa(family);
 CREATE INDEX IF NOT EXISTS idx_app_taxa_rank ON app_taxa(taxon_rank);
 CREATE INDEX IF NOT EXISTS idx_app_taxa_status ON app_taxa(taxon_status);
-CREATE INDEX IF NOT EXISTS idx_app_taxa_infraspecific_rank ON app_taxa(infraspecific_rank);
-CREATE INDEX IF NOT EXISTS idx_app_taxa_infraspecies ON app_taxa(infraspecies);
-CREATE INDEX IF NOT EXISTS idx_app_taxa_cultivar ON app_taxa(cultivar);
-
--- 4. Identifiers (WCVP / IPNI / POWO)
 CREATE INDEX IF NOT EXISTS idx_app_taxa_wcvp ON app_taxa(wcvp_id);
-CREATE INDEX IF NOT EXISTS idx_app_taxa_parent_wcvp ON app_taxa(parent_plant_name_id);
 
--- 5. Maintenance / Purge Support
-CREATE INDEX IF NOT EXISTS idx_app_taxa_source_id ON app_taxa(source_id);
-CREATE INDEX IF NOT EXISTS idx_app_taxa_source_id_filter ON app_taxa (source_id) WHERE source_id IS NULL OR source_id <> 1;
-
--- Initial default settings row
 INSERT INTO app_settings_global (id, settings) VALUES ('default_config', '{}') ON CONFLICT DO NOTHING;
 
--- permissions
+-- Permissions
 ALTER TABLE wcvp_import DISABLE ROW LEVEL SECURITY;
+ALTER TABLE wfo_family_order_map DISABLE ROW LEVEL SECURITY;
 ALTER TABLE app_data_sources DISABLE ROW LEVEL SECURITY;
-ALTER TABLE app_attribute_definitions DISABLE ROW LEVEL SECURITY;
 ALTER TABLE app_taxa DISABLE ROW LEVEL SECURITY;
 ALTER TABLE app_taxon_details DISABLE ROW LEVEL SECURITY;
-ALTER TABLE app_taxon_source_records DISABLE ROW LEVEL SECURITY;
 ALTER TABLE app_audit_log DISABLE ROW LEVEL SECURITY;
 ALTER TABLE app_settings_global DISABLE ROW LEVEL SECURITY;
 

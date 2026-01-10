@@ -2,16 +2,22 @@
 
 This document tracks planned features and technical improvements to ensure continuity across development sessions.
 ## Work on Now
-
-## High Priority
-- [ ] **Loading on Demand:** Need ability to force loading records. Load an amount and/or load all children. They don't actually need to be loaded but they appear to be to the user.
 - [ ] **Phylogenetic Extension (Order Level):** Extend the taxonomic hierarchy above the Family level by creating physical 'Order' records. This anchors the catalog to globally accepted phylogenetic standards: APG IV (Angiosperms), Christenhusz (Gymnosperms), and PPG I (Pteridophytes).
     * **Human Note:** Follow the implementation strategy defined in docs/design/ORDER_FAMILY_MAPPING_SPEC.md, prioritizing the WFO Backbone (Path A) for bulk efficiency. Use a new source based on where the data comes from.
+    * **Human Note:** The WFO _DwC_backbone_R.zip file was downloaded 2026-01-09. That file contains one file named "classification.csv". This text is from https://www.worldfloraonline.org/downloadData: "When citing the World Flora Online, you may use: "WFO ([Year]): World Flora Online. Version [Year].[Month]. Published on the Internet; http://www.worldfloraonline.org. Accessed on:[Date]". Please ensure that the [Date] of accession accords with the date for your use of the system and the [Year] and [Month] correspond to the file you are using."
     > **AI Context:** 
-    1. Create 'Order' records with Rank: 'Order', Status: 'Derived', and Source: 2 (FloraCatalog System).
-    2. Perform a SQL join to map existing 'Family' records to their parent 'Order' records via parent_id.
-    3. Re-run the iterative hierarchy build (Step 7 of the automation script) to shift the entire database tree down one level (e.g., root.order_uuid.family_uuid...).
-    4. Update the "Purge Non-WCVP" utility to ensure 'Derived' Order records are protected.
+    1. Source Identification: Use `_DwC_backbone_R.zip` from WFO (v2025.12). **WARNING:** The `classification.csv` is ~950MB. Local pre-filtering (distillation) via `scripts/distill_wfo.py.txt` is mandatory to prevent exceeding Supabase storage limits.
+    2. Automation: Refactored build pipeline to 13 steps. WFO logic is isolated in Steps 2, 5, and 9. Pipeline now supports granular selection (e.g. 2,5,9).
+    3. Create 'Order' records with Rank: 'Order', Status: 'Accepted', and Source: 3 (WFO).
+    4. Citation: "WFO (2025): World Flora Online. Version 2025.12. Published on the Internet; http://www.worldfloraonline.org. Accessed on: 2026-01-09".
+    5. Perform a SQL join to map existing 'Family' records (Source 2) to their parent 'Order' records (Source 3).
+    6. Re-run the iterative hierarchy build (Step 11 of the automation script) to shift the entire database tree down one level (e.g., root.order_uuid.family_uuid...).
+
+## High Priority
+- [ ] **Fix Finding Plant Details:** The Icon Button for searching for plant details doesn't function. Also the Icon is not obvious what it does. I'm not sure which of the two Icons to select but neither works. The Icon button needs a tool tip saying what it does.
+    * **Human Note:** The Tooltips are working and do help. The icons are not obvious but maybe others would not either. Actions gets stuck with activity "Initializing AI curator..." and never finishes. The same wording is used in the Activity Panel for both so you can't tell them apart.
+    > **AI Context:** Implemented the AI task orchestrator in handleAction (App.tsx). The "Pickaxe" button now triggers authoritative reference mining (findAdditionalLinks) and the "Wand" button triggers horticultural detail enrichment (enrichTaxon). Both tasks now update the database and grid state upon completion, resolving the "stuck" activity bug.
+- [ ] **Loading on Demand:** Need ability to force loading records. Load an amount and/or load all children. They don't actually need to be loaded but they appear to be to the user.
 - [ ] **Grid Virtualization:** Implement a virtual scrolling engine (e.g., react-window) to handle thousands of loaded rows without DOM degradation. This is critical for maintaining performance beyond the 5,000-record threshold.
 - [ ] **Subtree Fetching:** We can perform a single query: WHERE hierarchy_path <@ 'root.family_id' to fetch every Genus, Species, and Cultivar in that family instantly. This is much faster than the current "fetch a batch and hope we have the parents" approach.
 - [ ] **Lineage Visuals:** We can show a true "Breadcrumb" in the Details Panel (e.g., Asparagaceae > Agave > parryi) by simply joining the names of the UUIDs in the path.
@@ -68,9 +74,6 @@ This document tracks planned features and technical improvements to ensure conti
 
 
 ## Archive
-- [x] **Fix Finding Plant Details:** The Icon Button for searching for plant details doesn't function. Also the Icon is not obvious what it does. I'm not sure which of the two Icons to select but neither works. The Icon button needs a tool tip saying what it does.
-    * **Human Note:** The Tooltips are working and do help. The icons are not obvious but maybe others would not either. Actions gets stuck with activity "Initializing AI curator..." and never finishes. The same wording is used in the Activity Panel for both so you can't tell them apart.
-    > **AI Context:** Implemented the AI task orchestrator in handleAction (App.tsx). The "Pickaxe" button now triggers authoritative reference mining (findAdditionalLinks) and the "Wand" button triggers horticultural detail enrichment (enrichTaxon). Both tasks now update the database and grid state upon completion, resolving the "stuck" activity bug.
 - [x] **Create Records for Family:** We have done a lot of work to accomodate Family level when it exists as an attribute and not a record or WCVP rank. Should we create records for all Family values used in WCVP? We would add teh Family Rank as an extension (like was done for Cultivar). We would need a special Status as well like 'Generated' or Extrapulated', that is an extension of teh WCVP vales (like was done for Registered and Provisional). 
 - [x] **Fix Expand/Collapse Levels:** This functionality was developed for the older string based hierarchy and does not work with Authority (IDs) for hierarchy, other than Family level.
 - [x] **Remove the Legacy (String) Mode:** It is no longer needed since Authority (IDs) has been implemented, is stable and working well.
@@ -88,7 +91,7 @@ This document tracks planned features and technical improvements to ensure conti
 - [x] **Unselect All Columns:** (Fixed - Pending User Verification) 
     > **AI Context:** Added "Hide All" button next to "Show All" in the Column Picker menu in DataGrid.tsx.
 - [x] **Fix Genus Column for Family:** (Fixed - Pending User Verification) 
-    > **AI Context:** Updated getRowValue in DataGrid.tsx to return an empty string for the 'genus' column when taxonRank is 'Family'.
+    > **AI Context:** Updated getRowValue in DataGrid.tsx to return an empty string for the 'genus' column when taxonRank ('Family').
 - [x] **Optimize Filtering:** Review the rules used for dynamic filtering in dataService.ts. 
     > **AI Context:** Implemented Hybrid Search Engine toggle and Intelligent Auto-Casing.
 - [x] **Fix 57014 Errors:** 
