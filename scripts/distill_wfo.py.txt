@@ -49,7 +49,6 @@ def distill_wfo():
         csv.field_size_limit(sys.maxsize)
         
         # Darwin Core Archives typically use Tabs, but some versions use Comma.
-        # We attempt to detect the header and set delimiter.
         sample = f.readline()
         f.seek(0)
         delimiter = '\t' if '\t' in sample else ','
@@ -86,20 +85,36 @@ def distill_wfo():
         with open(source_path, 'r', encoding='utf-8', errors='replace') as f:
             process_stream(f)
 
-    # Resolve and Write
+    # Resolve and Write with Deduplication
     print(f"Resolving {len(family_links)} family-to-parent links...")
-    final_map = []
+    
+    unique_map = {} # family -> order
+    dup_count = 0
+    
     for p_id, families in family_links.items():
         order_name = order_names.get(p_id, "Unknown Order")
         for fam in families:
-            final_map.append({'family': fam, 'order': order_name})
+            # Enforce uniqueness of the 'family' primary key
+            if fam in unique_map:
+                dup_count += 1
+                # If we already have this family, only update if the new order is NOT "Unknown"
+                if unique_map[fam] == "Unknown Order" and order_name != "Unknown Order":
+                    unique_map[fam] = order_name
+            else:
+                unique_map[fam] = order_name
+
+    if dup_count > 0:
+        print(f"  Note: Deduplicated {dup_count} family entries found in source.")
+
+    # Convert dictionary to list of objects for DictWriter
+    final_rows = [{'family': k, 'order': v} for k, v in unique_map.items()]
 
     with open(OUTPUT_FILE, 'w', encoding='utf-8', newline='') as f:
         writer = csv.DictWriter(f, fieldnames=['family', 'order'])
         writer.writeheader()
-        writer.writerows(final_map)
+        writer.writerows(final_rows)
 
-    print(f"Success! Distilled {len(final_map)} family/order pairs to {OUTPUT_FILE}")
+    print(f"Success! Distilled {len(final_rows)} unique family/order pairs to {OUTPUT_FILE}")
 
 if __name__ == "__main__":
     distill_wfo()
