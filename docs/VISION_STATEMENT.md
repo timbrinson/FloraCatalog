@@ -34,27 +34,34 @@ FloraCatalog selects WCVP due to its unique combination of rigor and dynamism:
 - **Continuous Currency:** Incorporates user feedback and new publications weekly.
 - **Community Trust:** Serves as the foundational "backbone" for the world's leading botanical gardens and research institutions.
 
-### 2. The Cultivated Layer (ICRAs & Community)
+### 2. The Phylogenetic Frame (WFO)
+While higher-level taxonomy (especially at the Phylum/Class level) can still be a "moving target" in botany, FloraCatalog utilizes the **World Flora Online (WFO)** Taxonomic Backbone as its primary phylogenetic frame for levels at and above the Order level.
+
+- **Succession:** WFO is the direct successor to *The Plant List* and acts as the official clearinghouse for the **Global Strategy for Plant Conservation**.
+- **Strategic Alignment:** By using WFO for the backbone (Orders/Families) and WCVP for the nodes (Species/Genera), the system essentially uses the world's most detailed botanical "map" (WCVP) inside the world's most agreed-upon "frame" (WFO). 
+- **Neutral Tracking:** This choice does not imply universal agreement with every taxonomic decision within the WFO dataset. Rather, it recognizes WFO as the most comprehensive source currently integrating international agreement at the Order level, making it the most reliable baseline for tracking phylogenetic data over time.
+
+### 3. The Cultivated Layer (ICRAs & Community)
 We leverage the registration standards of **International Cultivar Registration Authorities (ICRAs)** as the next foundational layer of the catalog.
 - **Role:** These organizations manage cultivar names following the *International Code of Nomenclature for Cultivated Plants (ICNCP)*.
 - **Connectivity:** We tie these registration lists directly to the accepted WCVP natural plant names.
 - **Non-Authoritative Cultivars:** Since many popular, accessible, and relevant cultivated plants do not get registered with an ICRA, FloraCatalog allows for the inclusion of these records. However, since these are not from an authoritative registration source, we prioritize "Trusted Sources" while visually distinguishing these records from authoritative data to maintain scientific integrity.
 
-### 3. The Knowledge Layer: Rich Horticultural Context
+### 4. The Knowledge Layer: Rich Horticultural Context
 Recognizing that authoritative lists often lack descriptive depth, FloraCatalog enriches records with community-vetted and AI-curated data:
 - **Physical Description:** Granular data on size (height/width), shape, color, and texture for all plant parts (foliage, flowers, stems, and underground growth).
 - **Temporal Dynamics:** Documentation of growth rates, seasonal variation, and flowering periods.
 - **Environmental Needs:** Reliable data on growing conditions, hardiness, and ecological requirements.
 - **Origin & History:** The "story" of a plant—its discovery, historical background, and development context.
 
-### 4. Universal Nomenclature (A.K.A.)
+### 5. Universal Nomenclature (A.K.A.)
 Beyond scientific synonyms, FloraCatalog serves as a cross-reference for all names a plant is "Also Known As." This includes:
 - **Commercial Designations:** Trade names, trademarks, and registered trademarks.
 - **Legal Markers:** Plant patents and intellectual property designations.
 - **Community Names:** Common names across multiple languages and regions.
 - **Usage History:** Identification of misapplied names and common misrepresentations to resolve confusion in the trade.
 
-### 5. Visual Identification & Media
+### 6. Visual Identification & Media
 A primary long-term goal is the integration of imagery to aid in identification and appreciation.
 - **Scope:** Images documenting various aspects of the plant at different ages, stages of growth, and seasonal conditions.
 - **Challenges:** We acknowledge the significant technical challenges (storage/hosting) and legal hurdles (licensing and copyright) associated with high-quality botanical imagery. Our strategy prioritizes linking to trusted external image repositories while selectively hosting community-contributed media.

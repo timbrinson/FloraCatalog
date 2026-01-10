@@ -3,6 +3,12 @@
 ## 1. Overview
 To extend the FloraCatalog hierarchy above the Family level, the system requires a reliable mapping of Families to their respective Orders. This mapping adheres to the globally accepted phylogenetic standards (APG IV, Christenhusz, PPG I).
 
+### 1.1 Phylogenetic Rationale
+While higher-level taxonomy remains a dynamic and sometimes contested field in botany, FloraCatalog adopts the **World Flora Online (WFO)** Taxonomic Backbone as its primary phylogenetic frame.
+
+- **The Strategy:** By utilizing WFO for the backbone (Orders/Families) and WCVP for the nodes (Species/Genera), FloraCatalog places the world's most detailed botanical "map" (WCVP) inside the world's most agreed-upon "frame" (WFO). 
+- **Neutral Observation:** This choice recognizes WFO as the primary international clearinghouse for the Global Strategy for Plant Conservation. We use it not as an endorsement of a specific taxonomic opinion, but as a robust source for tracking and aligning high-level taxonomic agreement over time.
+
 ## 2. Implementation Paths
 
 ### Path A: The WFO Backbone (Recursive Integration)

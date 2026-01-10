@@ -1,8 +1,8 @@
 /**
- * AUTOMATED DATABASE BUILDER (CLI) v2.31.8
+ * AUTOMATED DATABASE BUILDER (CLI) v2.31.9
  * 
  * Orchestrates the transformation of raw WCVP and WFO data into the FloraCatalog database.
- * v2.31.8: Parallel WFO/WCVP staging; SQL-driven phylogenetic mapping.
+ * v2.31.9: Self-healing WFO staging; SQL-driven phylogenetic mapping.
  */
 
 import pg from 'pg';
@@ -41,7 +41,7 @@ const FILE_CLEAN_CSV = path.join(DIR_TEMP, 'wcvp_names_clean.csv');
 const FILE_WFO_IMPORT = path.join(DIR_TEMP, 'wfo_import.csv');
 const FILE_SCHEMA = 'scripts/wcvp_schema.sql.txt';
 const FILE_OPTIMIZE = 'scripts/optimize_indexes.sql.txt';
-const APP_VERSION = 'v2.31.8';
+const APP_VERSION = 'v2.31.9';
 
 const SEGMENTS = [
     { label: "A", start: "A", end: "B" },
@@ -137,9 +137,39 @@ const stepImportWFO = async (client) => {
     log("Streaming WFO Staging (Filtered backbone)...");
     
     if (fs.existsSync(FILE_WFO_IMPORT)) {
+        // Self-healing: Ensure table exists if user skipped Step 3 (v2.31.9)
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS wfo_import (
+                taxonID text PRIMARY KEY,
+                scientificNameID text,
+                localID text,
+                scientificName text,
+                taxonRank text,
+                parentNameUsageID text,
+                scientificNameAuthorship text,
+                family text,
+                subfamily text,
+                tribe text,
+                subtribe text,
+                genus text,
+                subgenus text,
+                specificEpithet text,
+                infraspecificEpithet text,
+                verbatimTaxonRank text,
+                nomenclaturalStatus text,
+                taxonomicStatus text,
+                acceptedNameUsageID text,
+                originalNameUsageID text,
+                namePublishedIn text,
+                taxonRemarks text,
+                "references" text
+            );
+        `);
+
         const stream = client.query(copyFrom(`COPY wfo_import FROM STDIN WITH CSV HEADER`));
         const fileStream = fs.createReadStream(FILE_WFO_IMPORT);
         await pipeline(fileStream, stream);
+        log("  WFO Import finished.");
     } else {
         warn("WFO import file not found. Skipping.");
     }
@@ -224,11 +254,11 @@ const stepWFOOrders = async (client) => {
     // 2. Ensure Families exist (Source 2)
     await client.query(`
         INSERT INTO app_data_sources (id, name, version, citation_text, trust_level)
-        VALUES (2, 'FloraCatalog System', 'v2.31.8 (Derived)', 'Internal system layer deriving backbone from attributes.', 5)
+        VALUES (2, 'FloraCatalog System', 'v2.31.9 (Derived)', 'Internal system layer deriving backbone from attributes.', 5)
         ON CONFLICT (id) DO NOTHING;
 
         INSERT INTO app_taxa (taxon_name, taxon_rank, taxon_status, family, source_id, verification_level)
-        SELECT DISTINCT family, 'Family', 'Derived', family, 2, 'FloraCatalog v2.31.8'
+        SELECT DISTINCT family, 'Family', 'Derived', family, 2, 'FloraCatalog v2.31.9'
         FROM app_taxa
         WHERE family IS NOT NULL
           AND NOT EXISTS (SELECT 1 FROM app_taxa a WHERE a.family = app_taxa.family AND a.taxon_rank = 'Family')
