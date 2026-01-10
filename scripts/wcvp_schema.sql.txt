@@ -54,7 +54,7 @@ CREATE TABLE wcvp_import (
     reviewed text
 );
 
--- Full Darwin Core Backbone for Higher Ranks (Staging)
+-- Full Darwin Core Backbone for Higher Ranks (Staging) - 29 Columns
 CREATE TABLE wfo_import (
     taxonID text PRIMARY KEY,
     scientificNameID text,
@@ -73,12 +73,18 @@ CREATE TABLE wfo_import (
     infraspecificEpithet text,
     verbatimTaxonRank text,
     nomenclaturalStatus text,
+    namePublishedIn text,
     taxonomicStatus text,
     acceptedNameUsageID text,
     originalNameUsageID text,
-    namePublishedIn text,
+    nameAccordingToID text,
     taxonRemarks text,
-    "references" text
+    created text,
+    modified text,
+    "references" text,
+    source text,
+    majorGroup text,
+    tplID text
 );
 
 -- =============================================================================

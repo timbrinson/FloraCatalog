@@ -138,6 +138,7 @@ const stepImportWFO = async (client) => {
     
     if (fs.existsSync(FILE_WFO_IMPORT)) {
         // Self-healing: Ensure table exists if user skipped Step 3 (v2.31.9)
+        // Updated to full 29-column schema (v2.31.10)
         await client.query(`
             CREATE TABLE IF NOT EXISTS wfo_import (
                 taxonID text PRIMARY KEY,
@@ -157,12 +158,18 @@ const stepImportWFO = async (client) => {
                 infraspecificEpithet text,
                 verbatimTaxonRank text,
                 nomenclaturalStatus text,
+                namePublishedIn text,
                 taxonomicStatus text,
                 acceptedNameUsageID text,
                 originalNameUsageID text,
-                namePublishedIn text,
+                nameAccordingToID text,
                 taxonRemarks text,
-                "references" text
+                created text,
+                modified text,
+                "references" text,
+                source text,
+                majorGroup text,
+                tplID text
             );
         `);
 
