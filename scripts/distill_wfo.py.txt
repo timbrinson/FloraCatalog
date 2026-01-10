@@ -7,7 +7,7 @@ import io
 def distill_wfo():
     script_dir = os.path.dirname(os.path.abspath(__file__))
     root_dir = os.path.dirname(script_dir)
-    INPUT_DIR = path_join = os.path.join(root_dir, 'data', 'input')
+    INPUT_DIR = os.path.join(root_dir, 'data', 'input')
     TEMP_DIR = os.path.join(root_dir, 'data', 'temp')
     OUTPUT_FILE = os.path.join(TEMP_DIR, 'wfo_family_order_map.csv')
     
@@ -22,13 +22,17 @@ def distill_wfo():
         source_path = os.path.join(INPUT_DIR, target_csv)
     else:
         # Check ZIPs
-        for f in os.listdir(INPUT_DIR):
-            if f.lower().endswith('.zip'):
-                p = os.path.join(INPUT_DIR, f)
-                with zipfile.ZipFile(p, 'r') as z:
-                    if target_csv in z.namelist():
-                        zip_path = p
-                        break
+        if os.path.exists(INPUT_DIR):
+            for f in os.listdir(INPUT_DIR):
+                if f.lower().endswith('.zip'):
+                    p = os.path.join(INPUT_DIR, f)
+                    try:
+                        with zipfile.ZipFile(p, 'r') as z:
+                            if target_csv in z.namelist():
+                                zip_path = p
+                                break
+                    except Exception:
+                        continue
     
     if not source_path and not zip_path:
         print(f"Error: Could not find '{target_csv}' in {INPUT_DIR}")
@@ -43,11 +47,14 @@ def distill_wfo():
     def process_stream(f):
         # Increase field size for large remarks
         csv.field_size_limit(sys.maxsize)
-        reader = csv.DictReader(f, delimiter='\t' if source_path and source_path.endswith('.txt') else '\t')
-        # Check for tab or comma
-        if not reader.fieldnames or 'taxonID' not in reader.fieldnames:
-             f.seek(0)
-             reader = csv.DictReader(f, delimiter=',')
+        
+        # Darwin Core Archives typically use Tabs, but some versions use Comma.
+        # We attempt to detect the header and set delimiter.
+        sample = f.readline()
+        f.seek(0)
+        delimiter = '\t' if '\t' in sample else ','
+        
+        reader = csv.DictReader(f, delimiter=delimiter)
              
         row_count = 0
         for row in reader:
@@ -57,24 +64,26 @@ def distill_wfo():
             p_id = row.get('parentNameUsageID')
             name = row.get('scientificName')
             
+            if not t_id or not name:
+                continue
+
             if rank == 'family':
                 if p_id not in family_links: family_links[p_id] = []
                 family_links[p_id].append(name)
             
             # Cache potential orders (records that are parents of families)
-            # We don't know if it's an order yet, but if it matches a family's p_id, we'll check later.
             order_names[t_id] = name
             
             if row_count % 100000 == 0:
                 print(f"  Analyzed {row_count:,} records...")
 
-    # PASS 1 & 2 combined via caching (since orders are usually processed before families)
+    # Open with errors='replace' to handle messy encoding in the ~1GB file
     if zip_path:
         with zipfile.ZipFile(zip_path, 'r') as z:
-            with io.TextIOWrapper(z.open(target_csv), encoding='utf-8') as f:
+            with io.TextIOWrapper(z.open(target_csv), encoding='utf-8', errors='replace') as f:
                 process_stream(f)
     else:
-        with open(source_path, 'r', encoding='utf-8') as f:
+        with open(source_path, 'r', encoding='utf-8', errors='replace') as f:
             process_stream(f)
 
     # Resolve and Write

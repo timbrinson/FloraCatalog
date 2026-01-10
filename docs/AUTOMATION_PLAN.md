@@ -160,12 +160,13 @@ If you populated records in chunks (e.g., A-S first, then T-Z), you must run a *
 If your WCVP data is already loaded and you only want to add the Phylogenetic (Order) layer:
 1.  **Download WFO Backbone** (`_DwC_backbone_R.zip`) to `data/input/`.
 2.  Run `npm run db:build`.
-3.  Enter: `2, 5, 9, 10, 11, 13`.
+3.  Enter: `2, 5, 9, 10, 11, 12, 13`.
     *   **2:** Distills the 950MB WFO zip locally into a 50KB mapping file.
     *   **5:** Streams the distilled map to the staging table.
     *   **9:** Creates physical 'Order' records (Source 3).
     *   **10:** Links Families to Orders.
     *   **11:** Recalculates Hierarchy Paths (Select 'All' segments to shift the tree down).
+    *   **12:** Recalculates Counts (Updates Grid # for the new Order records).
     *   **13:** Re-optimizes indexes for high-speed filtering.
 
 ---
