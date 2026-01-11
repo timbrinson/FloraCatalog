@@ -235,12 +235,6 @@ const ALL_COLUMNS = COLUMN_GROUPS.flatMap(g => g.columns);
 
 const isTechnicalColumn = (colId: string) => colId === 'id' || colId.endsWith('_id') || colId === 'first_published';
 
-const genericFirstSort = (a: string, b: string) => {
-    if (a === '(none)') return -1;
-    if (b === '(none)') return 1;
-    return a.localeCompare(b);
-};
-
 interface DataGridProps {
     taxa: Taxon[];
     ancestors?: Taxon[]; 
@@ -262,7 +256,7 @@ interface DataGridProps {
     onLayoutUpdate?: (layout: { visibleColumns: string[], columnOrder: string[], colWidths: Record<string, number> }) => void;
 }
 
-const DataGrid: React.FC<DataGridProps> = ({ 
+export const DataGrid: React.FC<DataGridProps> = ({ 
     taxa, ancestors = [], onAction, onUpdate, preferences, onPreferenceChange,
     totalRecords, isLoadingMore, onLoadMore, 
     sortConfig, onSortChange,
@@ -274,12 +268,27 @@ const DataGrid: React.FC<DataGridProps> = ({
     onLayoutUpdate
 }) => {
   const [visibleColumns, setVisibleColumns] = useState<Set<string>>(() => {
-      if (propVisibleColumns !== undefined) return propVisibleColumns;
+      // Visibility Healer: If user has a saved layout but it's missing new defaultOn columns (like 'order')
+      if (propVisibleColumns !== undefined) {
+          const healed = new Set(propVisibleColumns);
+          // If 'order' is missing from the saved column order, it's a new feature.
+          // In that case, we auto-enable it based on its defaultOn setting.
+          if (propColumnOrder && !propColumnOrder.includes('order')) {
+             const col = ALL_COLUMNS.find(c => c.id === 'order');
+             if (col?.defaultOn) healed.add('order');
+          }
+          return healed;
+      }
       return new Set(ALL_COLUMNS.filter(c => c.defaultOn).map(c => c.id));
   });
   
   const [columnOrder, setColumnOrder] = useState<string[]>(() => {
-      if (propColumnOrder !== undefined) return propColumnOrder;
+      if (propColumnOrder !== undefined) {
+          // Column Healer: Append missing columns if they exist in ALL_COLUMNS but not propColumnOrder
+          const baseOrder = [...propColumnOrder];
+          const missing = ALL_COLUMNS.filter(c => !baseOrder.includes(c.id)).map(c => c.id);
+          return [...baseOrder, ...missing];
+      }
       return ALL_COLUMNS.map(c => c.id);
   });
   
@@ -290,7 +299,13 @@ const DataGrid: React.FC<DataGridProps> = ({
 
   // Layout Reconciliation (ADR-007)
   useEffect(() => { if (propVisibleColumns !== undefined) setVisibleColumns(propVisibleColumns); }, [propVisibleColumns]);
-  useEffect(() => { if (propColumnOrder !== undefined) setColumnOrder(propColumnOrder); }, [propColumnOrder]);
+  useEffect(() => { 
+      if (propColumnOrder !== undefined) {
+          const healed = [...propColumnOrder];
+          const missing = ALL_COLUMNS.filter(c => !healed.includes(c.id)).map(c => c.id);
+          setColumnOrder([...healed, ...missing]);
+      } 
+  }, [propColumnOrder]);
   useEffect(() => { if (propColWidths !== undefined) setColWidths(propColWidths); }, [propColWidths]);
 
   useEffect(() => {
@@ -350,7 +365,6 @@ const DataGrid: React.FC<DataGridProps> = ({
   const activeColumns = useMemo(() => columnOrder.filter(id => visibleColumns.has(id)).map(id => ALL_COLUMNS.find(c => c.id === id)).filter((c): c is ColumnConfig => !!c), [columnOrder, visibleColumns]);
   const totalTableWidth = useMemo(() => activeColumns.reduce((sum, col) => sum + (colWidths[col.id] || col.defaultWidth), 0), [activeColumns, colWidths]);
   
-  // HEALING LOGIC: Ensure pallet exists even if initialization is in progress
   const activePallet = useMemo(() => {
     return {
       ...DEFAULT_PALLET,
@@ -369,7 +383,6 @@ const DataGrid: React.FC<DataGridProps> = ({
   const getRowValue = (row: Taxon, colId: string) => {
        const tr = row as TreeRow;
        if (colId === 'descendant_count') { 
-         // Self-healing count: prefer DB count but fallback to visible child count
          return tr.is_tree_header ? (tr as any).child_count : (tr.descendant_count || 0); 
        }
        const isIndicator = ['genus_hybrid', 'species_hybrid', 'infraspecific_rank'].includes(colId);
@@ -400,15 +413,11 @@ const DataGrid: React.FC<DataGridProps> = ({
   const isRankMatch = (rank: string, target: string) => {
       const r = rank.toLowerCase();
       const t = target.toLowerCase();
-      if (t === 'infraspecies') {
-          // Ensure comprehensive infraspecific matching per Spec v2.30.9
-          return (RANK_LEVELS[r] === 5);
-      }
+      if (t === 'infraspecies') return (RANK_LEVELS[r] === 5);
       return r === t;
   };
 
   const getTargetIdForRank = (row: Taxon, targetRank: string): string => {
-      // ADR-006: Literal Bucketing for Order and Family
       if (targetRank === 'order') {
           if (row.order) return row.order;
           if (isRankMatch(row.taxon_rank || '', 'order')) return row.taxon_name;
@@ -494,7 +503,6 @@ const DataGrid: React.FC<DataGridProps> = ({
           const isOrderRank = field === 'order';
           const isFamilyRank = field === 'family';
 
-          // PHYSICAL RECORD RESOLUTION (Spec v2.31.21)
           let headerTaxon: TreeRow | undefined = authorityRegistry.get(segmentId);
           if (!headerTaxon || isHolder) {
               headerTaxon = allTaxaPool.find(t => 
@@ -525,10 +533,7 @@ const DataGrid: React.FC<DataGridProps> = ({
           } as any;
           headerRow.is_tree_header = true;
           headerRow.tree_expanded = !collapsedGroups.has(path);
-          
-          // Count healing: Prefer DB count if non-zero, otherwise use in-memory count
           (headerRow as any).child_count = Math.max(headerTaxon?.descendant_count || 0, groupItems.length);
-          
           headerRow.depth = depth; headerRow.tree_path = path;
           outputRows.push(headerRow);
           if (headerRow.tree_expanded && (filteredRecurseItems.length > 0 || isHolder)) {
@@ -550,25 +555,21 @@ const DataGrid: React.FC<DataGridProps> = ({
       if (!taxa) return;
       const newCollapsed = new Set<string>();
       const allPathsWithDepths: {path: string, depth: number}[] = [];
-      
       const walk = (subset: Taxon[], depth: number, parentPath: string) => {
           if (depth >= groupBy.length) return;
           const field = groupBy[depth];
           const groups: Record<string, Taxon[]> = {};
-          
           subset.forEach(row => {
               const segmentId = getTargetIdForRank(row, field);
               if (!groups[segmentId]) groups[segmentId] = [];
               groups[segmentId].push(row);
           });
-          
           Object.keys(groups).forEach(segmentId => {
               const path = `${parentPath}/${segmentId}`;
               allPathsWithDepths.push({ path, depth });
               walk(groups[segmentId], depth + 1, path);
           });
       };
-      
       walk(taxa, 0, 'root');
       allPathsWithDepths.forEach(item => { if (item.depth >= targetDepth) newCollapsed.add(item.path); });
       setCollapsedGroups(newCollapsed);
@@ -647,7 +648,6 @@ const DataGrid: React.FC<DataGridProps> = ({
              {error && (<div className="flex items-center gap-1.5 px-3 py-1 bg-red-50 text-red-600 rounded-full border border-red-100 animate-in fade-in duration-300 max-w-[300px] truncate" title={error}><AlertCircle size={14} className="flex-shrink-0" /><span className="font-bold truncate">{error}</span></div>)}
              {isHierarchyMode && (
                  <div className="flex items-center gap-1 bg-white border border-slate-200 rounded p-0.5 ml-2 shadow-sm">
-                     {/* Dynamic Level Buttons based on groupBy depth (Spec v2.31.21) */}
                      {Array.from({ length: groupBy.length + 1 }, (_, i) => i + 1).map((idx) => (
                          <button key={idx} onClick={() => expandTreeLevel(idx-1)} className="px-2 py-0.5 text-[10px] font-bold text-slate-600 hover:bg-slate-100 rounded" title={`Collapse all at Level ${idx}`}>{idx}</button>
                      ))}
@@ -672,7 +672,6 @@ const DataGrid: React.FC<DataGridProps> = ({
                                 const color = p?.base_color || 'slate';
                                 const badgeWeight = p?.badge_bg_weight || 100;
                                 const textWeight = p?.text_weight || 600;
-                                
                                 return (
                                     <div key={group.label} className="flex flex-col gap-1 border-b border-slate-50 pb-2 last:border-0">
                                         <div className="flex items-center gap-2">
@@ -783,28 +782,20 @@ const DataGrid: React.FC<DataGridProps> = ({
               {gridRows.map((row, idx) => {
                   const tr = row as TreeRow; const isExpanded = expandedRows.has(tr.id); 
                   let rankKey = String(tr.taxon_rank).toLowerCase() as keyof RankPallet;
-                  
-                  // Rank Normalization (Spec v2.30.11)
                   if (RANK_LEVELS[rankKey] === 5) rankKey = 'infraspecies';
-                  else if (!['order', 'family', 'genus', 'species', 'cultivar'].includes(rankKey)) { 
-                    rankKey = 'species'; // Default fallback
-                  }
-                  
+                  else if (!['order', 'family', 'genus', 'species', 'cultivar'].includes(rankKey)) { rankKey = 'species'; }
                   const p = activePallet[rankKey];
                   const color = p?.base_color || 'slate'; 
                   const isHybrid = tr.genus_hybrid === '×' || tr.genus_hybrid === 'x' || tr.species_hybrid === '×' || tr.species_hybrid === 'x';
                   const rowLevel = RANK_LEVELS[rankKey] || 99;
-
                   let debugClass = "";
                   if (preferences.debug_mode) {
                       if (tr.origin_type === 'ancestor') debugClass = "bg-blue-50/50 ring-1 ring-inset ring-blue-200";
                       else if (tr.origin_type === 'virtual') debugClass = "bg-amber-50/50 ring-1 ring-inset ring-amber-200";
                       else if (tr.origin_type === 'result') debugClass = "bg-green-50/50 ring-1 ring-inset ring-green-200";
                   }
-
                   const rowKey = `${tr.origin_type || 'row'}-${tr.tree_path || tr.id}-${idx}`;
                   const rowBg = isExpanded ? 'bg-blue-50/50' : `bg-${color}-${p?.cell_bg_weight || 50} ${isHybrid ? 'saturate-50' : ''}`;
-
                   return (
                      <React.Fragment key={rowKey}>
                         <tr className={`hover:bg-blue-50/50 transition-colors ${rowBg} ${tr.is_tree_header ? 'cursor-pointer group/header border-b-2 border-slate-200 font-medium' : ''} ${debugClass}`} onClick={tr.is_tree_header ? () => toggleGroup(tr.tree_path || '') : undefined}>
@@ -812,7 +803,6 @@ const DataGrid: React.FC<DataGridProps> = ({
                                const colLevel = COL_RANK_LEVELS[col.id];
                                const val = getRowValue(tr, col.id);
                                const depthIndent = (tr.depth || 0) * 20;
-                               
                                if (col.id === 'tree_control') return <td key={col.id} className={`p-2 relative ${tr.is_tree_header ? '' : 'border-slate-50'}`} style={{ paddingLeft: `${depthIndent}px` }}>
                                    <div className="flex justify-center w-full h-full min-h-[1.5rem]">
                                         {tr.is_tree_header && <span className={`transform transition-transform inline-block ${tr.tree_expanded ? 'rotate-90' : ''}`}><ChevronRightIcon size={14} /></span>}
@@ -836,22 +826,16 @@ const DataGrid: React.FC<DataGridProps> = ({
                                    </div>
                                  </td>
                                );
-
                                let displayVal: React.ReactNode = '';
                                if (typeof val === 'string' || typeof val === 'number') { displayVal = val; } else if (typeof val === 'boolean') { displayVal = val ? 'Yes' : 'No'; }
                                if ((col.id === 'genus_hybrid' || col.id === 'species_hybrid') && (val === 'x' || val === 'X' || val === '×')) displayVal = '×';
-
                                let isBold = false;
                                let placeholderStyle = "";
-                               
                                const isIndicatorCol = ['genus_hybrid', 'species_hybrid', 'infraspecific_rank'].includes(col.id);
-
                                if (colLevel && !isIndicatorCol) {
                                   if (colLevel === rowLevel) {
                                      isBold = true;
-                                     if (val === '(none)') {
-                                         placeholderStyle = `italic font-bold text-${color}-${p?.text_weight || 600}`;
-                                     }
+                                     if (val === '(none)') { placeholderStyle = `italic font-bold text-${color}-${p?.text_weight || 600}`; }
                                   } else if (colLevel < rowLevel) {
                                      if (val === '(none)' || !val) {
                                         displayVal = '(none)';
@@ -859,7 +843,6 @@ const DataGrid: React.FC<DataGridProps> = ({
                                      }
                                   }
                                }
-
                                if (col.id === 'taxon_rank') displayVal = <span className={`px-2 py-0.5 text-[10px] rounded border font-normal bg-${color}-${p?.badge_bg_weight || 100} text-${color}-${p?.text_weight || 600} border-${color}-${p?.badge_border_weight || 200} normal-case`}>{displayVal}</span>;
                                else if (col.id === 'taxon_name') {
                                  const content = tr.is_holder ? <span className="italic opacity-80 text-slate-400">(none)</span> : formatFullScientificName(tr, preferences);
@@ -872,13 +855,8 @@ const DataGrid: React.FC<DataGridProps> = ({
                                else if (col.id === 'taxon_status') { 
                                  displayVal = <span className="text-[11px] text-slate-500 font-normal normal-case">{tr.is_virtual ? '' : (displayVal || '-')}</span>; 
                                }
-
-                               const baseTextClass = isBold 
-                                 ? `font-bold text-${color}-${p?.text_weight || 900}`
-                                 : "font-normal text-slate-600";
-
+                               const baseTextClass = isBold ? `font-bold text-${color}-${p?.text_weight || 900}` : "font-normal text-slate-600";
                                const isSystemCol = ['tree_control', 'descendant_count'].includes(col.id);
-
                                return (
                                  <td key={col.id} className={`p-2 truncate overflow-hidden max-w-0 ${col.headerAlign === 'center' ? 'text-center' : ''} ${isSystemCol ? '' : 'border-r border-slate-50'}`} title={String(val || '')}>
                                    <span className={`${placeholderStyle || baseTextClass}`}>
@@ -899,4 +877,3 @@ const DataGrid: React.FC<DataGridProps> = ({
     </div>
   );
 };
-export default DataGrid;

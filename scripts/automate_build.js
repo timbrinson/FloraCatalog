@@ -104,7 +104,7 @@ async function getClient() {
         const projId = await askQuestion(`Project ID (Default: ${DEFAULT_PROJECT_ID}): `) || DEFAULT_PROJECT_ID;
         const password = await askQuestion("Database Password: ");
         if (!password) { err("Password required."); process.exit(1); }
-        connectionString = `postgresql://postgres.[PROJ-ID]:[PASSWORD]@aws-0-us-west-2.pooler.supabase.com:6543/postgres`;
+        connectionString = `postgresql://postgres.${projId}:${password}@aws-0-us-west-2.pooler.supabase.com:6543/postgres`;
     }
 
     const client = new pg.Client({ connectionString, ssl: { rejectUnauthorized: false } });

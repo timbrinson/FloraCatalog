@@ -5,7 +5,8 @@ import { dataService } from './services/dataService';
 import { getIsOffline, reloadClient } from './services/supabaseClient';
 import { enrichTaxon, findAdditionalLinks } from './services/geminiService';
 import EmptyState from './components/EmptyState';
-import DataGrid from './components/DataGrid';
+// Fix: DataGrid is a named export in components/DataGrid.tsx
+import { DataGrid } from './components/DataGrid';
 import ConfirmDialog from './components/ConfirmDialog';
 import SettingsModal from './components/SettingsModal';
 import ActivityPanel from './components/ActivityPanel';
