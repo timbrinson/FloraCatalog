@@ -181,3 +181,31 @@ SELECT
 FROM pg_locks l
 JOIN pg_stat_activity a ON l.pid = a.pid
 WHERE l.relation = 'app_taxa'::regclass;
+
+-- 16. REPAIR TASK AUDIT (New in v2.31.23)
+-- Verifies progress of Order literals and Child Counts.
+SELECT 
+    'Order Literals' as metric,
+    count(*) as total_records,
+    count("order") as with_order,
+    round(count("order") * 100.0 / count(*), 1) || '%' as completion
+FROM app_taxa
+UNION ALL
+SELECT 
+    'Child Counts' as metric,
+    count(*) as total_records,
+    count(CASE WHEN descendant_count > 0 THEN 1 END) as with_counts,
+    'N/A (Parents only)' as completion
+FROM app_taxa;
+
+-- 17. LOCK KILLER (New in v2.31.24)
+-- Provides the specific command to kill the session blocking your updates.
+SELECT 
+    'SELECT pg_terminate_backend(' || l.pid || ');' as kill_command, 
+    a.query as blocking_query, 
+    now() - a.query_start as duration
+FROM pg_locks l
+JOIN pg_stat_activity a ON l.pid = a.pid
+WHERE l.relation = 'app_taxa'::regclass 
+  AND l.pid != pg_backend_pid()
+  AND a.state != 'idle';

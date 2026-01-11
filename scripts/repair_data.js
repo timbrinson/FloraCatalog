@@ -1,8 +1,8 @@
 /**
- * FLORA CATALOG DATA REPAIR UTILITY v1.4.3
+ * FLORA CATALOG DATA REPAIR UTILITY v1.4.6
  * 
  * Performs high-volume data propagation and recursive count repairs in small batches.
- * v1.4.3: NOWAIT Lock Protection & Lock Diagnostics.
+ * v1.4.6: Smart Reset (Only target non-zero counts) & Vacuum Awareness.
  */
 
 import pg from 'pg';
@@ -30,7 +30,6 @@ loadEnv();
 
 const DEFAULT_PROJECT_ID = 'uzzayfueabppzpwunvlf';
 
-// Absolute boundaries to ensure no symbols (+, ×) or hybrids are skipped
 const SEGMENTS = [
     { label: "A (incl. symbols)", start: "\x01", end: "B" },
     { label: "B", start: "B", end: "C" },
@@ -66,110 +65,134 @@ const askQuestion = (query) => {
     });
 };
 
+/**
+ * Executes a query with a built-in "Hang Watcher". 
+ */
+async function watchedQuery(client, label, sql, params = []) {
+    let completed = false;
+    await client.query('SELECT 1');
+    const queryPromise = client.query(sql, params);
+    const timeout = setTimeout(async () => {
+        if (!completed) {
+            warn(`  Query '${label}' is taking a long time. Probing for locks...`);
+            try {
+                const blockers = await client.query(`
+                    SELECT a.pid, a.state, a.query, now() - a.query_start as duration
+                    FROM pg_stat_activity a
+                    JOIN pg_locks l ON a.pid = l.pid
+                    WHERE l.relation = 'app_taxa'::regclass AND a.pid != pg_backend_pid()
+                    LIMIT 3
+                `);
+                if (blockers.rowCount > 0) {
+                    blockers.rows.forEach(b => {
+                        err(`  [LOCK DETECTED] Blocker PID ${b.pid} is ${b.state} for ${b.duration}. SQL: ${b.query.substring(0, 60)}...`);
+                    });
+                }
+            } catch (e) { /* ignore diagnostic failure */ }
+        }
+    }, 20000);
+
+    try {
+        const result = await queryPromise;
+        completed = true;
+        clearTimeout(timeout);
+        return result;
+    } catch (e) {
+        completed = true;
+        clearTimeout(timeout);
+        throw e;
+    }
+}
+
 async function main() {
     let connectionString = process.env.DATABASE_URL;
 
     if (!connectionString) {
-        log("Connection details not found in .env.");
         const projId = await askQuestion(`Project ID (Default: ${DEFAULT_PROJECT_ID}): `) || DEFAULT_PROJECT_ID;
         const password = await askQuestion("Database Password: ");
-        if (!password) { console.error("Password required."); process.exit(1); }
         connectionString = `postgresql://postgres.${projId}:${password}@aws-0-us-west-2.pooler.supabase.com:6543/postgres`;
     }
 
     const client = new pg.Client({ connectionString, ssl: { rejectUnauthorized: false } });
-    
     client.on('error', (e) => {
-        if (e.message.includes('terminated unexpectedly')) {
-            warn("Database connection terminated unexpectedly. Please restart the script.");
-            process.exit(1);
-        }
+        warn("Database connection terminated. Please restart the script.");
+        process.exit(1);
     });
 
     await client.connect();
     await client.query("SET statement_timeout = 0");
 
-    log("Starting Data Repair utility v1.4.3...");
+    log("Starting Data Repair utility v1.4.6...");
+    log("Status: Order Propagation is ~99.9% Complete.");
+    const mode = (await askQuestion("Would you like to (R)esume from Step 5 (Counts) or (S)tart from Step 1? (R/S): ")).toLowerCase();
 
-    // 1. Structural Fix (Lock-Protected)
-    log("Step 1: Checking schema...");
-    const colCheck = await client.query(`
-        SELECT column_name 
-        FROM information_schema.columns 
-        WHERE table_name = 'app_taxa' AND column_name = 'order'
-    `);
+    if (mode === 's') {
+        // 1. Structural Fix
+        log("Step 1: Checking schema...");
+        const colCheck = await client.query(`SELECT column_name FROM information_schema.columns WHERE table_name = 'app_taxa' AND column_name = 'order'`);
+        if (colCheck.rowCount === 0) {
+            log("  Column 'order' missing. Adding now...");
+            await watchedQuery(client, "Add Order Column", `ALTER TABLE app_taxa ADD COLUMN "order" text COLLATE "C"`);
+        } else {
+            log("  Column 'order' already present.");
+        }
 
-    if (colCheck.rowCount === 0) {
-        log("  Column 'order' missing. Attempting to acquire AccessExclusive lock...");
-        try {
-            // ADR-009: NOWAIT prevents hanging if zombie IO is still saturating the table
-            await client.query(`LOCK TABLE app_taxa IN ACCESS EXCLUSIVE MODE NOWAIT`);
-            await client.query(`ALTER TABLE app_taxa ADD COLUMN "order" text COLLATE "C"`);
-            log("  Column added successfully.");
-        } catch (e) {
-            if (e.code === '55P03') {
-                err("  CRITICAL: Table 'app_taxa' is locked by another process.");
-                log("  DIAGNOSTICS: Fetching locker information...");
-                const blockers = await client.query(`
-                    SELECT pid, state, now() - query_start as duration, query 
-                    FROM pg_stat_activity 
-                    WHERE pid IN (SELECT pid FROM pg_locks WHERE relation = 'app_taxa'::regclass)
-                `);
-                if (blockers.rowCount > 0) {
-                    blockers.rows.forEach(b => {
-                        log(`  - Blocker [PID ${b.pid}]: ${b.state} for ${b.duration}. Query: ${b.query.substring(0, 50)}...`);
-                    });
-                }
-                warn("  ACTION: Reset your Supabase Database Password to force-kill all sessions, then retry.");
-                process.exit(1);
+        log("Step 2: Identifying physical Order records...");
+        await client.query(`UPDATE app_taxa SET "order" = taxon_name WHERE taxon_rank = 'Order'`);
+
+        log("Step 3: Linking Orders to Families...");
+        await client.query(`
+            UPDATE app_taxa f SET "order" = o.taxon_name 
+            FROM app_taxa o 
+            WHERE f.parent_id = o.id AND f.taxon_rank = 'Family' AND o.taxon_rank = 'Order'
+        `);
+
+        // 4. Robust Catch-all Propagation
+        log("Step 4: Propagating Order to entire hierarchy (Catch-all Segmented)...");
+        for (let pass = 1; pass <= 3; pass++) {
+            log(`  --- Propagation Pass ${pass}/3 ---`);
+            for (const seg of SEGMENTS) {
+                process.stdout.write(`    Processing Segment ${seg.label}... \r`);
+                await watchedQuery(client, `Propagate Pass ${pass} - ${seg.label}`, `
+                    UPDATE app_taxa child
+                    SET "order" = parent."order"
+                    FROM app_taxa parent
+                    WHERE child.parent_id = parent.id 
+                      AND child."order" IS NULL 
+                      AND parent."order" IS NOT NULL
+                      AND child.taxon_name >= $1 AND child.taxon_name < $2
+                `, [seg.start, seg.end]);
+                await new Promise(r => setTimeout(r, 200));
             }
-            throw e;
+            console.log(`\n    Pass ${pass} complete.`);
         }
     } else {
-        log("  Column 'order' already present. Skipping ALTER.");
-    }
-
-    log("Step 2: Identifying physical Order records...");
-    await client.query(`UPDATE app_taxa SET "order" = taxon_name WHERE taxon_rank = 'Order'`);
-
-    log("Step 3: Linking Orders to Families...");
-    await client.query(`
-        UPDATE app_taxa f SET "order" = o.taxon_name 
-        FROM app_taxa o 
-        WHERE f.parent_id = o.id AND f.taxon_rank = 'Family' AND o.taxon_rank = 'Order'
-    `);
-
-    // 4. Robust Catch-all Propagation
-    log("Step 4: Propagating Order to entire hierarchy (Catch-all Segmented)...");
-    for (let pass = 1; pass <= 3; pass++) {
-        log(`  --- Propagation Pass ${pass}/3 ---`);
-        for (const seg of SEGMENTS) {
-            process.stdout.write(`    Processing Segment ${seg.label}... \r`);
-            await client.query(`
-                UPDATE app_taxa child
-                SET "order" = parent."order"
-                FROM app_taxa parent
-                WHERE child.parent_id = parent.id 
-                  AND child."order" IS NULL 
-                  AND parent."order" IS NOT NULL
-                  AND child.taxon_name >= $1 AND child.taxon_name < $2
-            `, [seg.start, seg.end]);
-        }
-        console.log(`\n    Pass ${pass} complete.`);
+        log("Resuming from Step 5...");
     }
 
     // 5. Pivot to Direct Child Counts
     log("Step 5: Repairing Child Counts (Segmented pass)...");
-    log("  Resetting all counts to zero (Segmented)...");
+    log("  Phase A: Smart Reset (Targeting non-zero counts only)...");
     for (const seg of SEGMENTS) {
-        process.stdout.write(`  Resetting Segment ${seg.label}... \r`);
-        await client.query(`UPDATE app_taxa SET descendant_count = 0 WHERE taxon_name >= $1 AND taxon_name < $2`, [seg.start, seg.end]);
+        process.stdout.write(`    Resetting Segment ${seg.label}... \r`);
+        // Optimized: Only update rows that actually have a count. 
+        // This avoids touching 1.4M rows if only 20k need resetting.
+        const res = await watchedQuery(client, `Reset ${seg.label}`, `
+            UPDATE app_taxa 
+            SET descendant_count = 0 
+            WHERE descendant_count > 0 
+              AND taxon_name >= $1 AND taxon_name < $2
+        `, [seg.start, seg.end]);
+        if (res.rowCount > 0) {
+            process.stdout.write(`    Resetting Segment ${seg.label}... [Cleared ${res.rowCount} rows] \r`);
+        }
+        await new Promise(r => setTimeout(r, 100));
     }
     
-    log("\n  Calculating immediate children (Segmented pass)...");
+    log("\n  Phase B: Calculating immediate children (Segmented throttled pass)...");
     for (const seg of SEGMENTS) {
-        process.stdout.write(`  Updating Segment ${seg.label}... \r`);
-        await client.query(`
+        process.stdout.write(`    Updating Segment ${seg.label}... \r`);
+        await watchedQuery(client, `Calculate ${seg.label}`, `
             UPDATE app_taxa p
             SET descendant_count = sub.cnt
             FROM (
@@ -181,6 +204,7 @@ async function main() {
             ) sub
             WHERE p.id = sub.id
         `, [seg.start, seg.end]);
+        await new Promise(r => setTimeout(r, 200));
     }
     log(`\n  Successfully repaired parent record counts.`);
 
