@@ -11,7 +11,7 @@ This document tracks planned features and technical improvements to ensure conti
     2. Automation: Aligned WFO import with the WCVP staging pattern. Steps 2, 5, and 9 handle WFO-specific logic. **v2.31.9 update:** Step 5 now includes a self-healing `CREATE TABLE IF NOT EXISTS` block to allow enriching an existing DB without a schema reset.
     3. Creation: Step 9 now uses SQL set logic to populate all Orders from `wfo_import` and link 'Derived' Family records to their phylogenetic parents.
     4. Citation: "WFO (2025): World Flora Online. Version 2025.12. Published on the Internet; http://www.worldfloraonline.org. Accessed on: 2026-01-09".
-    5. Hierarchy: Re-running Step 11 (Hierarchy Build) shifts the entire database tree down, anchoring it to the new Order roots (e.g. root.order_uuid.family_uuid...).
+    5. Hierarchy: Re-running Step 11 (Hierarchy Build) shifts the entire database tree down, anchoring it to the new Order roots. **Optimization Note:** Step 13 now includes the `idx_build_path_null` partial index specifically to speed up child-matching during this phase.
 
 ## High Priority
 - [ ] **Fix Finding Plant Details:** The Icon Button for searching for plant details doesn't function. Also the Icon is not obvious what it does. I'm not sure which of the two Icons to select but neither works. The Icon button needs a tool tip saying what it does.

@@ -52,6 +52,7 @@ DROP INDEX IF EXISTS idx_app_taxa_status_irank;
 -- Shadowed V8 Cleanup
 DROP INDEX IF EXISTS idx_app_taxa_status_rank_sort;
 DROP INDEX IF EXISTS idx_app_taxa_status_irank_sort;
+DROP INDEX IF EXISTS idx_build_path_null;
 
 -- 3. STORAGE LAYER OPTIMIZATION (CRITICAL)
 -- Ensure COLLATE "C" at the column level for all nomenclature and metadata.
@@ -105,5 +106,10 @@ CREATE INDEX IF NOT EXISTS idx_app_taxa_geo_trgm ON app_taxa USING GIN (geograph
 
 -- 9. Refresh Statistics
 ANALYZE app_taxa;
+
+-- 10. STEP 11 BUILD BOOSTER (Added v2.31.20)
+-- DANGER: This partial index is only useful DURING the build process.
+-- It shrinks as work is done, allowing Level 2, 3, 4 etc to run instantly.
+CREATE INDEX IF NOT EXISTS idx_build_path_null ON app_taxa (parent_id) WHERE hierarchy_path IS NULL;
 
 SELECT 'Index cleanup and V8.1 Sort-Inclusive optimization complete.' as status;
