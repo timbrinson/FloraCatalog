@@ -23,6 +23,15 @@ interface SettingsModalProps {
 const TAILWIND_COLORS = ['slate', 'gray', 'zinc', 'neutral', 'stone', 'red', 'orange', 'amber', 'yellow', 'lime', 'green', 'emerald', 'teal', 'cyan', 'sky', 'blue', 'indigo', 'violet', 'purple', 'fuchsia', 'pink', 'rose'];
 const WEIGHTS = [50, 100, 200, 300, 400, 500, 600, 700, 800, 900];
 
+const DEFAULT_PALLET_INTERNAL: RankPallet = {
+  order: { base_color: 'purple', cell_bg_weight: 50, text_weight: 600, badge_bg_weight: 100, badge_border_weight: 200 },
+  family: { base_color: 'rose', cell_bg_weight: 50, text_weight: 600, badge_bg_weight: 100, badge_border_weight: 200 },
+  genus: { base_color: 'emerald', cell_bg_weight: 50, text_weight: 600, badge_bg_weight: 100, badge_border_weight: 200 },
+  species: { base_color: 'amber', cell_bg_weight: 50, text_weight: 600, badge_bg_weight: 100, badge_border_weight: 200 },
+  infraspecies: { base_color: 'orange', cell_bg_weight: 50, text_weight: 600, badge_bg_weight: 100, badge_border_weight: 200 },
+  cultivar: { base_color: 'sky', cell_bg_weight: 50, text_weight: 600, badge_bg_weight: 100, badge_border_weight: 200 }
+};
+
 const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, preferences, onUpdate, onMaintenanceComplete, onSaveLayout, onReloadLayout }) => {
   const [dbUrl, setDbUrl] = useState(localStorage.getItem('supabase_url') || MANUAL_URL);
   const [dbKey, setDbKey] = useState(localStorage.getItem('supabase_anon_key') || MANUAL_KEY);
@@ -51,12 +60,10 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, preferen
 
   if (!isOpen) return null;
 
-  const pallet = preferences.grid_pallet || {
-    family: { base_color: 'rose', cell_bg_weight: 50, text_weight: 600, badge_bg_weight: 100, badge_border_weight: 200 },
-    genus: { base_color: 'emerald', cell_bg_weight: 50, text_weight: 600, badge_bg_weight: 100, badge_border_weight: 200 },
-    species: { base_color: 'amber', cell_bg_weight: 50, text_weight: 600, badge_bg_weight: 100, badge_border_weight: 200 },
-    infraspecies: { base_color: 'orange', cell_bg_weight: 50, text_weight: 600, badge_bg_weight: 100, badge_border_weight: 200 },
-    cultivar: { base_color: 'sky', cell_bg_weight: 50, text_weight: 600, badge_bg_weight: 100, badge_border_weight: 200 }
+  // HEALING LOGIC: Ensure all pallet levels are safe even if preferences object is stale
+  const pallet: RankPallet = {
+    ...DEFAULT_PALLET_INTERNAL,
+    ...(preferences.grid_pallet || {})
   };
 
   const handlePalletUpdate = (rank: keyof RankPallet, field: keyof PalletLevel, value: any) => {
@@ -120,6 +127,8 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, preferen
 
   const renderPalletRow = (label: string, key: keyof RankPallet) => {
     const p = pallet[key];
+    if (!p) return null; // Safety check
+    
     return (
       <div key={key} className="space-y-2 p-3 bg-white rounded-lg border border-slate-100 shadow-sm">
         <div className="flex items-center justify-between">
@@ -172,7 +181,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, preferen
         <div className="flex items-center gap-2 mb-6"><Settings className="text-slate-700" size={24} /><h3 className="text-xl font-bold text-slate-800">Settings</h3></div>
         <div className="space-y-8">
             
-            {/* NEW: Database Health Dashboard */}
+            {/* Database Health Dashboard */}
             <div>
                 <div className="flex justify-between items-center mb-3">
                     <h4 className="text-sm font-bold text-slate-700 uppercase tracking-wide flex items-center gap-2"><TrendingUp size={14}/> Database Health</h4>
@@ -306,6 +315,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, preferen
                 </div>
                 <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 space-y-3">
                     <p className="text-[10px] text-slate-500 mb-2">Granular control over grid colors and weights (Tailwind CSS v3 based).</p>
+                    {renderPalletRow('Order', 'order')}
                     {renderPalletRow('Family', 'family')}
                     {renderPalletRow('Genus', 'genus')}
                     {renderPalletRow('Species', 'species')}

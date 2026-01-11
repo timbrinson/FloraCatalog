@@ -70,6 +70,7 @@ const mapToDB = (taxon: Taxon) => {
     taxon_rank: taxon.taxon_rank,
     taxon_name: taxon.taxon_name,
     taxon_status: taxon.taxon_status,
+    "order": clean(taxon.order),
     family: clean(taxon.family),
     common_name: clean(taxon.common_name),
     genus: clean(taxon.genus),
@@ -178,7 +179,7 @@ export const dataService = {
 
             let cleanVal = rawSearch;
             if (search_mode === 'prefix') {
-                if (key === 'family' || key === 'genus') {
+                if (key === 'order' || key === 'family' || key === 'genus') {
                     cleanVal = rawSearch.charAt(0).toUpperCase() + rawSearch.slice(1).toLowerCase();
                 } else if (key === 'species' || key === 'infraspecies') {
                     cleanVal = rawSearch.toLowerCase();

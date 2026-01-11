@@ -1,5 +1,5 @@
 -- =============================================================================
--- DATA IMPORT DIAGNOSTIC TOOL (v2.31.19)
+-- DATA IMPORT DIAGNOSTIC TOOL (v2.31.21)
 -- Run this to see how much of your database is fully linked and calculated.
 -- =============================================================================
 
@@ -153,9 +153,18 @@ WHERE taxon_rank != 'Order'
   AND parent_id IS NULL 
   AND hierarchy_path IS NOT NULL;
 
--- 13. HIERARCHY VELOCITY (New in v2.31.19)
+-- 13. HIERARCHY VELOCITY
 -- Monitor this while Step 11 is running to see throughput.
 SELECT 
     count(hierarchy_path) as current_built,
     pg_size_pretty(pg_total_relation_size('app_taxa')) as current_disk_usage,
     now() as current_time;
+
+-- 14. LIVE BUILD FRONTIER (New in v2.31.21)
+-- Identifies exactly how much work is "Ready to Process" for the next loop.
+SELECT 
+    (SELECT count(*) FROM app_taxa WHERE hierarchy_path IS NULL) as "Total Remaining",
+    (SELECT count(*) FROM app_taxa c 
+     JOIN app_taxa p ON c.parent_id = p.id 
+     WHERE c.hierarchy_path IS NULL AND p.hierarchy_path IS NOT NULL) as "Ready for Next Level",
+    (SELECT max(nlevel(hierarchy_path)) FROM app_taxa) as "Current Max Depth";

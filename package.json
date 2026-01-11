@@ -7,7 +7,8 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "db:build": "node scripts/automate_build.js"
+    "db:build": "node scripts/automate_build.js",
+    "db:repair": "node scripts/repair_data.js"
   },
   "dependencies": {
     "react": "https://aistudiocdn.com/react@^19.2.0",

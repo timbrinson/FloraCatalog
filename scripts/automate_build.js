@@ -1,8 +1,8 @@
 /**
- * AUTOMATED DATABASE BUILDER (CLI) v2.31.20
+ * AUTOMATED DATABASE BUILDER (CLI) v2.31.21
  * 
  * Orchestrates the transformation of raw WCVP and WFO data into the FloraCatalog database.
- * v2.31.20: Resilience Overhaul (Auto-Reconnect, Retry, Resume-Capable Hierarchy).
+ * v2.31.21: Order Integration Fix.
  */
 
 import pg from 'pg';
@@ -41,7 +41,7 @@ const FILE_CLEAN_CSV = path.join(DIR_TEMP, 'wcvp_names_clean.csv');
 const FILE_WFO_IMPORT = path.join(DIR_TEMP, 'wfo_import.csv');
 const FILE_SCHEMA = 'scripts/wcvp_schema.sql.txt';
 const FILE_OPTIMIZE = 'scripts/optimize_indexes.sql.txt';
-const APP_VERSION = 'v2.31.20';
+const APP_VERSION = 'v2.31.21';
 
 const SEGMENTS = [
     { label: "A", start: "A", end: "B" },
@@ -288,28 +288,35 @@ const stepWFOOrders = async () => {
         VALUES (3, 'World Flora Online', '2025.12', 'WFO (2025): World Flora Online. Version 2025.12. Published on the Internet; http://www.worldfloraonline.org. Accessed on: 2026-01-09', 'http://www.worldfloraonline.org', 5)
         ON CONFLICT (id) DO NOTHING;
     `);
+    
+    // Create physical Order records
     await robustQuery(`
-        INSERT INTO app_taxa (taxon_name, taxon_rank, taxon_status, source_id, verification_level)
-        SELECT scientificName, 'Order', taxonomicStatus, 3, 'WFO Backbone Distill'
+        INSERT INTO app_taxa (taxon_name, taxon_rank, taxon_status, "order", source_id, verification_level)
+        SELECT scientificName, 'Order', taxonomicStatus, scientificName, 3, 'WFO Backbone Distill'
         FROM wfo_import
         WHERE LOWER(taxonRank) = 'order'
         ON CONFLICT DO NOTHING;
     `);
+
+    // Ensure Backbone Families (Source 2)
     await robustQuery(`
         INSERT INTO app_data_sources (id, name, version, citation_text, trust_level)
-        VALUES (2, 'FloraCatalog System', 'v2.31.20 (Derived)', 'Internal system layer deriving backbone from attributes.', 5)
+        VALUES (2, 'FloraCatalog System', 'v2.31.21 (Derived)', 'Internal system layer deriving backbone from attributes.', 5)
         ON CONFLICT (id) DO NOTHING;
 
         INSERT INTO app_taxa (taxon_name, taxon_rank, taxon_status, family, source_id, verification_level)
-        SELECT DISTINCT family, 'Family', 'Derived', family, 2, 'FloraCatalog v2.31.20'
+        SELECT DISTINCT family, 'Family', 'Derived', family, 2, 'FloraCatalog v2.31.21'
         FROM app_taxa
         WHERE family IS NOT NULL
           AND NOT EXISTS (SELECT 1 FROM app_taxa a WHERE a.family = app_taxa.family AND a.taxon_rank = 'Family')
         ON CONFLICT DO NOTHING;
     `);
+
+    // Link Families to Orders & Populate child 'order' column
     await robustQuery(`
         UPDATE app_taxa app_fam
-        SET parent_id = app_order.id
+        SET parent_id = app_order.id,
+            "order" = app_order.taxon_name
         FROM wfo_import wfo_fam
         JOIN wfo_import wfo_order ON wfo_fam.parentNameUsageID = wfo_order.taxonID
         JOIN app_taxa app_order ON app_order.taxon_name = wfo_order.scientificName AND app_order.taxon_rank = 'Order'
@@ -319,16 +326,42 @@ const stepWFOOrders = async () => {
 };
 
 const stepDerivedFamilies = async () => {
-    log("Grafting orphaned WCVP roots to Family records...");
+    log("Grafting orphaned WCVP roots to Family records & Segmented Order Sync...");
     for (const seg of SEGMENTS) {
+        log(`  Grafting/Syncing Segment: ${seg.label}...`);
+        
+        // 1. Direct Grafting
         await robustQuery(`
             UPDATE app_taxa child
-            SET parent_id = parent.id
+            SET parent_id = parent.id,
+                "order" = parent."order"
             FROM app_taxa parent
             WHERE child.parent_id IS NULL
               AND child.family = parent.family
               AND parent.taxon_rank = 'Family'
               AND child.id != parent.id
+              AND child.taxon_name >= $1 AND child.taxon_name < $2;
+        `, [seg.start, seg.end]);
+
+        // 2. Propagation to Genera (Segmented)
+        await robustQuery(`
+            UPDATE app_taxa child
+            SET "order" = parent."order"
+            FROM app_taxa parent
+            WHERE child.parent_id = parent.id 
+              AND parent.taxon_rank = 'Family'
+              AND child."order" IS NULL
+              AND child.taxon_name >= $1 AND child.taxon_name < $2;
+        `, [seg.start, seg.end]);
+
+        // 3. Propagation to Species (Segmented)
+        await robustQuery(`
+            UPDATE app_taxa child
+            SET "order" = parent."order"
+            FROM app_taxa parent
+            WHERE child.parent_id = parent.id 
+              AND parent.taxon_rank = 'Genus'
+              AND child."order" IS NULL
               AND child.taxon_name >= $1 AND child.taxon_name < $2;
         `, [seg.start, seg.end]);
     }
@@ -409,21 +442,19 @@ const stepHierarchy = async () => {
 };
 
 const stepCounts = async () => {
-    log("Calculating Descendant Counts...");
+    log("Calculating Recursive Descendant Counts...");
     for (const seg of SEGMENTS) {
-        log(`  Updating Counts for Segment: ${seg.label}...`);
+        log(`  Updating Segment: ${seg.label}...`);
         await robustQuery(`
-            WITH counts AS (
-                SELECT parent_id, COUNT(*) as cnt
-                FROM app_taxa
-                WHERE parent_id IS NOT NULL
-                GROUP BY parent_id
+            UPDATE app_taxa p
+            SET descendant_count = (
+                SELECT count(*) - 1 
+                FROM app_taxa c
+                WHERE c.hierarchy_path <@ p.hierarchy_path
             )
-            UPDATE app_taxa
-            SET descendant_count = counts.cnt
-            FROM counts
-            WHERE app_taxa.id = counts.parent_id
-              AND app_taxa.taxon_name >= $1 AND app_taxa.taxon_name < $2;
+            WHERE p.taxon_name >= $1 AND p.taxon_name < $2
+              AND p.taxon_rank IN ('Order', 'Family', 'Genus', 'Species')
+              AND p.hierarchy_path IS NOT NULL;
         `, [seg.start, seg.end]);
     }
 };

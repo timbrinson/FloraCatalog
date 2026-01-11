@@ -18,6 +18,7 @@ interface AppLayoutConfig {
 }
 
 const DEFAULT_PALLET: RankPallet = {
+  order: { base_color: 'purple', cell_bg_weight: 50, text_weight: 600, badge_bg_weight: 100, badge_border_weight: 200 },
   family: { base_color: 'rose', cell_bg_weight: 50, text_weight: 600, badge_bg_weight: 100, badge_border_weight: 200 },
   genus: { base_color: 'emerald', cell_bg_weight: 50, text_weight: 600, badge_bg_weight: 100, badge_border_weight: 200 },
   species: { base_color: 'amber', cell_bg_weight: 50, text_weight: 600, badge_bg_weight: 100, badge_border_weight: 200 },
@@ -91,12 +92,19 @@ export default function App() {
 
         if (saved && Object.keys(saved).length > 0) {
             if (saved.preferences) {
-                // Merge preferences with defaults to handle new schema fields (like grid_pallet)
-                setPreferences(prev => ({
-                    ...prev,
-                    ...saved.preferences,
-                    grid_pallet: saved.preferences.grid_pallet || DEFAULT_PALLET
-                }));
+                setPreferences(prev => {
+                    const mergedPrefs = { ...prev, ...saved.preferences };
+                    // HEALING LOGIC: Ensure all pallet levels exist even if user has a legacy save
+                    if (saved.preferences.grid_pallet) {
+                        mergedPrefs.grid_pallet = {
+                            ...DEFAULT_PALLET,
+                            ...saved.preferences.grid_pallet
+                        };
+                    } else {
+                        mergedPrefs.grid_pallet = DEFAULT_PALLET;
+                    }
+                    return mergedPrefs;
+                });
             }
             if (saved.filters) setGridFilters(saved.filters);
             

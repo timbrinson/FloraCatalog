@@ -140,6 +140,7 @@ CREATE TABLE app_taxa (
     taxon_rank text COLLATE "C",
     taxon_name text NOT NULL COLLATE "C",
     taxon_status text COLLATE "C",
+    "order" text COLLATE "C",
     family text COLLATE "C",
     common_name text,
     
@@ -229,6 +230,7 @@ CREATE INDEX IF NOT EXISTS idx_app_taxa_name_sort ON app_taxa (taxon_name);
 CREATE INDEX IF NOT EXISTS idx_app_taxa_parent ON app_taxa(parent_id);
 CREATE INDEX IF NOT EXISTS idx_app_taxa_path_gist ON app_taxa USING GIST (hierarchy_path);
 CREATE INDEX IF NOT EXISTS idx_app_taxa_genus_species ON app_taxa (genus, species);
+CREATE INDEX IF NOT EXISTS idx_app_taxa_order ON app_taxa("order");
 CREATE INDEX IF NOT EXISTS idx_app_taxa_family ON app_taxa(family);
 CREATE INDEX IF NOT EXISTS idx_app_taxa_rank ON app_taxa(taxon_rank);
 CREATE INDEX IF NOT EXISTS idx_app_taxa_status ON app_taxa(taxon_status);

@@ -19,8 +19,9 @@ Per **ADR-004 (Universal Naming Standardization)**, this document serves as the 
 | | descendant_count | Text | selected | (none) | # | Child Count | descendant_count | descendant_count | — | — | — | — | — |
 | | actions | — | unselected | — | Actions | Actions | — | — | — | — | — | — | — | — |
 | **Taxonomy** | taxon_name | Text | selected | (none) | Plant Name | Scientific Name | taxon_name | taxon_name | taxon_name | | chr | Concatenation of genus with species and, where applicable, infraspecific epithets to make a binomial or trinomial name. | |
-| | taxon_rank | Multi-select | unselected | (none) | Rank | Taxonomic Rank | taxon_rank | taxon_rank | taxon_rank | Convariety, Form, Genus, proles, Species, Subform, Subspecies, Subvariety, Variety | chr | The level in the taxonomic hierarchy where the taxon name fits. | |
+| | taxon_rank | Multi-select | unselected | (none) | Rank | Taxonomic Rank | taxon_rank | taxon_rank | taxon_rank | Order, Family, Genus, proles, Species, Subform, Subspecies, Subvariety, Variety | chr | The level in the taxonomic hierarchy where the taxon name fits. | |
 | | taxon_status | Multi-select | unselected | Accepted | Status | Taxonomic Status | taxon_status | taxon_status | taxon_status | Accepted, Artificial Hybrid, Illegitimate, Invalid, Local Biotype, Misapplied, Orthographic, Synonym, Unplaced, Provisionally Accepted | chr | Indication of nomenclatural status and taxonomic opinion re the name. | |
+| | order | Text | unselected | (none) | Order | Order | order | order | order | | chr | The name of the order from WFO to which the family belongs. | |
 | | family | Text | unselected | (none) | Family | Family | family | family | family | | chr | The name of the family to which the taxon belongs. | |
 | | hybrid_formula | Text | unselected | (none) | Hybrid Formula | Hybrid Formula | hybrid_formula | hybrid_formula | hybrid_formula | | chr | parents of hybrid | |
 | **Nomenclature** | genus | Text | selected | (none) | Genus | Genus Designation | genus | genus | genus | 0 | chr | The name of the genus to which the record refers. | |
@@ -81,4 +82,4 @@ These fields are stored in the `app_taxon_details` table and are used to enrich 
 
 ### Climate Literals
 **Values:** `desert or dry shrubland, montane tropical, seasonally dry tropical, subalpine or subarctic, subtropical, subtropical or tropical, temperate, temperate, subtropical or tropical, wet tropical.`
-*Note: These are strictly lowercase in the database.*
+*Note: These are strictly lowercase in the database.`

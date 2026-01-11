@@ -12,6 +12,7 @@ This document tracks planned features and technical improvements to ensure conti
     3. Creation: Step 9 now uses SQL set logic to populate all Orders from `wfo_import` and link 'Derived' Family records to their phylogenetic parents.
     4. Citation: "WFO (2025): World Flora Online. Version 2025.12. Published on the Internet; http://www.worldfloraonline.org. Accessed on: 2026-01-09".
     5. Hierarchy: Re-running Step 11 (Hierarchy Build) shifts the entire database tree down, anchoring it to the new Order roots. **Optimization Note:** Step 13 now includes the `idx_build_path_null` partial index specifically to speed up child-matching during this phase.
+    6. **Status (2026-01-10):** Build Successful. Verified 508 Orders and 471 Families acting as phylogenetic roots. Verified ~773k records successfully path-calculated. Next Phase: Synonym Grafting to bring the remaining ~660k synonyms into the tree hierarchy.
 
 ## High Priority
 - [ ] **Fix Finding Plant Details:** The Icon Button for searching for plant details doesn't function. Also the Icon is not obvious what it does. I'm not sure which of the two Icons to select but neither works. The Icon button needs a tool tip saying what it does.
