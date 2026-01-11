@@ -442,7 +442,7 @@ const stepHierarchy = async () => {
 };
 
 const stepCounts = async () => {
-    log("Calculating Recursive Descendant Counts...");
+    log("Calculating Recursive Descendant Counts (ltree logic)...");
     for (const seg of SEGMENTS) {
         log(`  Updating Segment: ${seg.label}...`);
         await robustQuery(`

@@ -1,13 +1,14 @@
 /**
- * FLORA CATALOG DATA REPAIR UTILITY v1.0.0
+ * FLORA CATALOG DATA REPAIR UTILITY v1.1.0
  * 
- * Performs high-volume data propagation and count repairs in small batches
- * to prevent Supabase / Browser gateway timeouts.
+ * Performs high-volume data propagation and recursive count repairs in small batches.
+ * v1.1.0: Added interactive auth prompts and refined recursive logic.
  */
 
 import pg from 'pg';
 import fs from 'fs';
 import path from 'path';
+import readline from 'readline';
 
 const loadEnv = () => {
     try {
@@ -27,6 +28,7 @@ const loadEnv = () => {
 };
 loadEnv();
 
+const DEFAULT_PROJECT_ID = 'uzzayfueabppzpwunvlf';
 const SEGMENTS = [
     { label: "A", start: "A", end: "B" },
     { label: "B", start: "B", end: "C" },
@@ -52,19 +54,29 @@ const SEGMENTS = [
 ];
 
 const log = (msg) => console.log(`\x1b[36m[Repair]\x1b[0m ${msg}`);
+const askQuestion = (query) => {
+    const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+    return new Promise(resolve => {
+        rl.question(query, ans => { rl.close(); resolve(ans); });
+    });
+};
 
 async function main() {
-    const connectionString = process.env.DATABASE_URL;
+    let connectionString = process.env.DATABASE_URL;
+
     if (!connectionString) {
-        console.error("Error: DATABASE_URL not found in .env");
-        process.exit(1);
+        log("Connection details not found in .env.");
+        const projId = await askQuestion(`Project ID (Default: ${DEFAULT_PROJECT_ID}): `) || DEFAULT_PROJECT_ID;
+        const password = await askQuestion("Database Password: ");
+        if (!password) { console.error("Password required."); process.exit(1); }
+        connectionString = `postgresql://postgres.${projId}:${password}@aws-0-us-west-2.pooler.supabase.com:6543/postgres`;
     }
 
     const client = new pg.Client({ connectionString, ssl: { rejectUnauthorized: false } });
     await client.connect();
     await client.query("SET statement_timeout = 0");
 
-    log("Starting Database Repair...");
+    log("Starting Data Repair utility...");
 
     // 1. Structural Fix
     log("Step 1: Ensuring 'order' column exists...");
