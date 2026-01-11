@@ -168,3 +168,16 @@ SELECT
      JOIN app_taxa p ON c.parent_id = p.id 
      WHERE c.hierarchy_path IS NULL AND p.hierarchy_path IS NOT NULL) as "Ready for Next Level",
     (SELECT max(nlevel(hierarchy_path)) FROM app_taxa) as "Current Max Depth";
+
+-- 15. LOCK MONITOR (New in v2.31.22)
+-- Identifies blocking sessions preventing schema updates.
+SELECT 
+    l.pid as blocking_pid, 
+    a.query as blocking_query, 
+    l.mode as lock_mode, 
+    l.granted, 
+    a.state as session_state,
+    now() - a.query_start as lock_duration
+FROM pg_locks l
+JOIN pg_stat_activity a ON l.pid = a.pid
+WHERE l.relation = 'app_taxa'::regclass;

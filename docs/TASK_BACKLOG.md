@@ -13,6 +13,9 @@ This document tracks planned features and technical improvements to ensure conti
     4. Citation: "WFO (2025): World Flora Online. Version 2025.12. Published on the Internet; http://www.worldfloraonline.org. Accessed on: 2026-01-09".
     5. Hierarchy: Re-running Step 11 (Hierarchy Build) shifts the entire database tree down, anchoring it to the new Order roots. **Optimization Note:** Step 13 now includes the `idx_build_path_null` partial index specifically to speed up child-matching during this phase.
     6. **Status (2026-01-10):** Build Successful. Verified 508 Orders and 471 Families acting as phylogenetic roots. Verified ~773k records successfully path-calculated. Next Phase: Synonym Grafting to bring the remaining ~660k synonyms into the tree hierarchy.
+    7. **Maintenance Note:** High IOPS with no visible `pg_stat_activity` workers indicates "Zombie Sessions." Use `pg_terminate_backend` on all non-idle non-current PIDs to clear the IO queue. Updated `repair_data.js` to perform lock-agnostic schema checks to prevent hangs during Step 1.
+    8. **Hybrid Boundary Fix (Jan 2026):** Resolved the issue where Order literals were missing for genus hybrids starting with `+` or `×`. Implemented symbol-inclusive absolute boundaries in all segment logic and added catch-all recursive inheritance to flow phylogenetic data down through unlinked/synonym branches.
+    9. **Lock Contention Mitigation (Jan 2026):** Resolved Step 1 hangs in the repair utility by implementing `NOWAIT` lock attempts and automated blocker PID detection. Added lock monitoring queries to the diagnostic toolset.
 
 ## High Priority
 - [ ] **Fix Finding Plant Details:** The Icon Button for searching for plant details doesn't function. Also the Icon is not obvious what it does. I'm not sure which of the two Icons to select but neither works. The Icon button needs a tool tip saying what it does.
@@ -120,3 +123,6 @@ This document tracks planned features and technical improvements to ensure conti
 - [x] **Rank Values Not Bold:** The rank values in the grid are badges with bold text. Change them to regular font but keep them as badges.
 - [x] **Direct Child Count Fix (Jan 2026):** Resolved the recursive count repair stall by pivoting to a high-speed direct child aggregation strategy. Optimized Step 12 in the build script and Step 7 in the repair utility. Updated ADR-002 and GRID_DISPLAY_SPEC to reflect the navigational clarity of immediate child counts.
 - [x] **Hybrid Order & Segment Optimization (Jan 2026):** Fixed missing Order propagation for genus hybrids starting with symbols (+, ×) by expanding segment boundaries. Optimized count updates by batching them across 21 segments to prevent database timeouts.
+- [x] **Zombie Session Mitigation (Jan 2026):** Resolved Step 1 hangs in the repair utility by implementing lock-agnostic schema checks and identifying orphaned Postgres backends consuming disk IO.
+- [x] **Symbol-Inclusive Propagation & Catch-all (Jan 2026):** Fixed missing Order literals for genus hybrids by using absolute Unicode segment boundaries and implementing a recursive catch-all Order inheritance pass in the repair utility.
+- [x] **NOWAIT Lock Protection (Jan 2026):** Hardened Step 1 of the repair utility to fail fast during lock contention and provide PID-level blocker diagnostics.

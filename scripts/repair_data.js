@@ -1,8 +1,8 @@
 /**
- * FLORA CATALOG DATA REPAIR UTILITY v1.4.0
+ * FLORA CATALOG DATA REPAIR UTILITY v1.4.3
  * 
  * Performs high-volume data propagation and recursive count repairs in small batches.
- * v1.4.0: Segmented Count Updates & Symbol-Inclusive Propagation.
+ * v1.4.3: NOWAIT Lock Protection & Lock Diagnostics.
  */
 
 import pg from 'pg';
@@ -30,9 +30,9 @@ loadEnv();
 
 const DEFAULT_PROJECT_ID = 'uzzayfueabppzpwunvlf';
 
-// Inclusive boundaries to handle leading symbols like + and ×
+// Absolute boundaries to ensure no symbols (+, ×) or hybrids are skipped
 const SEGMENTS = [
-    { label: "A (incl. symbols)", start: " ", end: "B" },
+    { label: "A (incl. symbols)", start: "\x01", end: "B" },
     { label: "B", start: "B", end: "C" },
     { label: "C", start: "C", end: "D" },
     { label: "D", start: "D", end: "E" },
@@ -52,10 +52,13 @@ const SEGMENTS = [
     { label: "S", start: "S", end: "T" },
     { label: "T", start: "T", end: "U" },
     { label: "U - V", start: "U", end: "W" },
-    { label: "W - Z (incl. hybrid symbols)", start: "W", end: "\uffff" }
+    { label: "W - Z (incl. max unicode)", start: "W", end: "\uffff" }
 ];
 
 const log = (msg) => console.log(`\x1b[36m[Repair]\x1b[0m ${msg}`);
+const warn = (msg) => console.log(`\x1b[33m[WARN]\x1b[0m ${msg}`);
+const err = (msg) => console.error(`\x1b[31m[ERROR]\x1b[0m ${msg}`);
+
 const askQuestion = (query) => {
     const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
     return new Promise(resolve => {
@@ -76,10 +79,9 @@ async function main() {
 
     const client = new pg.Client({ connectionString, ssl: { rejectUnauthorized: false } });
     
-    // Add connection listener to handle unexpected socket loss
     client.on('error', (e) => {
         if (e.message.includes('terminated unexpectedly')) {
-            console.warn("\x1b[33m[WARN]\x1b[0m Database connection terminated unexpectedly. Please restart the script.");
+            warn("Database connection terminated unexpectedly. Please restart the script.");
             process.exit(1);
         }
     });
@@ -87,11 +89,45 @@ async function main() {
     await client.connect();
     await client.query("SET statement_timeout = 0");
 
-    log("Starting Data Repair utility v1.4.0...");
+    log("Starting Data Repair utility v1.4.3...");
 
-    // 1. Structural Fix
-    log("Step 1: Ensuring 'order' column exists...");
-    await client.query(`ALTER TABLE app_taxa ADD COLUMN IF NOT EXISTS "order" text COLLATE "C"`);
+    // 1. Structural Fix (Lock-Protected)
+    log("Step 1: Checking schema...");
+    const colCheck = await client.query(`
+        SELECT column_name 
+        FROM information_schema.columns 
+        WHERE table_name = 'app_taxa' AND column_name = 'order'
+    `);
+
+    if (colCheck.rowCount === 0) {
+        log("  Column 'order' missing. Attempting to acquire AccessExclusive lock...");
+        try {
+            // ADR-009: NOWAIT prevents hanging if zombie IO is still saturating the table
+            await client.query(`LOCK TABLE app_taxa IN ACCESS EXCLUSIVE MODE NOWAIT`);
+            await client.query(`ALTER TABLE app_taxa ADD COLUMN "order" text COLLATE "C"`);
+            log("  Column added successfully.");
+        } catch (e) {
+            if (e.code === '55P03') {
+                err("  CRITICAL: Table 'app_taxa' is locked by another process.");
+                log("  DIAGNOSTICS: Fetching locker information...");
+                const blockers = await client.query(`
+                    SELECT pid, state, now() - query_start as duration, query 
+                    FROM pg_stat_activity 
+                    WHERE pid IN (SELECT pid FROM pg_locks WHERE relation = 'app_taxa'::regclass)
+                `);
+                if (blockers.rowCount > 0) {
+                    blockers.rows.forEach(b => {
+                        log(`  - Blocker [PID ${b.pid}]: ${b.state} for ${b.duration}. Query: ${b.query.substring(0, 50)}...`);
+                    });
+                }
+                warn("  ACTION: Reset your Supabase Database Password to force-kill all sessions, then retry.");
+                process.exit(1);
+            }
+            throw e;
+        }
+    } else {
+        log("  Column 'order' already present. Skipping ALTER.");
+    }
 
     log("Step 2: Identifying physical Order records...");
     await client.query(`UPDATE app_taxa SET "order" = taxon_name WHERE taxon_rank = 'Order'`);
@@ -103,44 +139,27 @@ async function main() {
         WHERE f.parent_id = o.id AND f.taxon_rank = 'Family' AND o.taxon_rank = 'Order'
     `);
 
-    // 4. Batch Propagation to Genera
-    log("Step 4: Propagating Order to Genera (Segmented)...");
-    for (const seg of SEGMENTS) {
-        process.stdout.write(`  Processing Segment ${seg.label}... \r`);
-        await client.query(`
-            UPDATE app_taxa g SET "order" = f."order" FROM app_taxa f 
-            WHERE g.parent_id = f.id AND f.taxon_rank = 'Family' AND g."order" IS NULL 
-            AND g.taxon_name >= $1 AND g.taxon_name < $2
-        `, [seg.start, seg.end]);
+    // 4. Robust Catch-all Propagation
+    log("Step 4: Propagating Order to entire hierarchy (Catch-all Segmented)...");
+    for (let pass = 1; pass <= 3; pass++) {
+        log(`  --- Propagation Pass ${pass}/3 ---`);
+        for (const seg of SEGMENTS) {
+            process.stdout.write(`    Processing Segment ${seg.label}... \r`);
+            await client.query(`
+                UPDATE app_taxa child
+                SET "order" = parent."order"
+                FROM app_taxa parent
+                WHERE child.parent_id = parent.id 
+                  AND child."order" IS NULL 
+                  AND parent."order" IS NOT NULL
+                  AND child.taxon_name >= $1 AND child.taxon_name < $2
+            `, [seg.start, seg.end]);
+        }
+        console.log(`\n    Pass ${pass} complete.`);
     }
-    console.log("\n  Genera propagation complete.");
 
-    // 5. Batch Propagation to Species
-    log("Step 5: Propagating Order to Species (Segmented)...");
-    for (const seg of SEGMENTS) {
-        process.stdout.write(`  Processing Segment ${seg.label}... \r`);
-        await client.query(`
-            UPDATE app_taxa s SET "order" = g."order" FROM app_taxa g 
-            WHERE s.parent_id = g.id AND s.taxon_rank = 'Genus' AND s."order" IS NULL 
-            AND s.taxon_name >= $1 AND s.taxon_name < $2
-        `, [seg.start, seg.end]);
-    }
-    console.log("\n  Species propagation complete.");
-
-    // 6. Batch Propagation to Children
-    log("Step 6: Finalizing propagation for Infraspecies/Cultivars...");
-    for (const seg of SEGMENTS) {
-        process.stdout.write(`  Processing Segment ${seg.label}... \r`);
-        await client.query(`
-            UPDATE app_taxa i SET "order" = s."order" FROM app_taxa s 
-            WHERE i.parent_id = s.id AND i."order" IS NULL 
-            AND i.taxon_name >= $1 AND i.taxon_name < $2
-        `, [seg.start, seg.end]);
-    }
-    console.log("\n  Hierarchy propagation complete.");
-
-    // 7. Pivot to Direct Child Counts
-    log("Step 7: Repairing Child Counts (Segmented pass)...");
+    // 5. Pivot to Direct Child Counts
+    log("Step 5: Repairing Child Counts (Segmented pass)...");
     log("  Resetting all counts to zero (Segmented)...");
     for (const seg of SEGMENTS) {
         process.stdout.write(`  Resetting Segment ${seg.label}... \r`);
@@ -165,7 +184,7 @@ async function main() {
     }
     log(`\n  Successfully repaired parent record counts.`);
 
-    log("Step 8: Rebuilding indexes and statistics...");
+    log("Step 6: Rebuilding indexes and statistics...");
     await client.query(`CREATE INDEX IF NOT EXISTS idx_app_taxa_order_col ON app_taxa("order")`);
     await client.query(`ANALYZE app_taxa`);
 

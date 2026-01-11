@@ -1,8 +1,8 @@
 /**
- * AUTOMATED DATABASE BUILDER (CLI) v2.31.21
+ * AUTOMATED DATABASE BUILDER (CLI) v2.31.22
  * 
  * Orchestrates the transformation of raw WCVP and WFO data into the FloraCatalog database.
- * v2.31.21: Order Integration Fix.
+ * v2.31.22: Inclusive Symbol Boundaries & Catch-all Order Propagation.
  */
 
 import pg from 'pg';
@@ -41,11 +41,11 @@ const FILE_CLEAN_CSV = path.join(DIR_TEMP, 'wcvp_names_clean.csv');
 const FILE_WFO_IMPORT = path.join(DIR_TEMP, 'wfo_import.csv');
 const FILE_SCHEMA = 'scripts/wcvp_schema.sql.txt';
 const FILE_OPTIMIZE = 'scripts/optimize_indexes.sql.txt';
-const APP_VERSION = 'v2.31.21';
+const APP_VERSION = 'v2.31.22';
 
-// Inclusive boundaries to handle leading symbols like + and ×
+// Absolute boundaries to ensure no symbols (+, ×) or hybrids are skipped
 const SEGMENTS = [
-    { label: "A (incl. symbols)", start: " ", end: "B" },
+    { label: "A (incl. symbols)", start: "\x01", end: "B" },
     { label: "B", start: "B", end: "C" },
     { label: "C", start: "C", end: "D" },
     { label: "D", start: "D", end: "E" },
@@ -65,7 +65,7 @@ const SEGMENTS = [
     { label: "S", start: "S", end: "T" },
     { label: "T", start: "T", end: "U" },
     { label: "U - V", start: "U", end: "W" },
-    { label: "W - Z (incl. hybrid symbols)", start: "W", end: "\uffff" }
+    { label: "W - Z (incl. max unicode)", start: "W", end: "\uffff" }
 ];
 
 // --- UTILS ---
@@ -327,11 +327,11 @@ const stepWFOOrders = async () => {
 };
 
 const stepDerivedFamilies = async () => {
-    log("Grafting orphaned WCVP roots to Family records & Segmented Order Sync...");
+    log("Grafting orphaned WCVP roots to Family records & Catch-all Order Sync...");
+    
+    // Pass 1: Direct Grafting (Link orphan roots to their named Family record)
+    log("  Pass 1: Direct Family Grafting...");
     for (const seg of SEGMENTS) {
-        log(`  Grafting/Syncing Segment: ${seg.label}...`);
-        
-        // 1. Direct Grafting
         await robustQuery(`
             UPDATE app_taxa child
             SET parent_id = parent.id,
@@ -343,28 +343,23 @@ const stepDerivedFamilies = async () => {
               AND child.id != parent.id
               AND child.taxon_name >= $1 AND child.taxon_name < $2;
         `, [seg.start, seg.end]);
+    }
 
-        // 2. Propagation to Genera (Segmented)
-        await robustQuery(`
-            UPDATE app_taxa child
-            SET "order" = parent."order"
-            FROM app_taxa parent
-            WHERE child.parent_id = parent.id 
-              AND parent.taxon_rank = 'Family'
-              AND child."order" IS NULL
-              AND child.taxon_name >= $1 AND child.taxon_name < $2;
-        `, [seg.start, seg.end]);
-
-        // 3. Propagation to Species (Segmented)
-        await robustQuery(`
-            UPDATE app_taxa child
-            SET "order" = parent."order"
-            FROM app_taxa parent
-            WHERE child.parent_id = parent.id 
-              AND parent.taxon_rank = 'Genus'
-              AND child."order" IS NULL
-              AND child.taxon_name >= $1 AND child.taxon_name < $2;
-        `, [seg.start, seg.end]);
+    // Pass 2: Recursive Order Propagation (Flow Order from Parent to Child regardless of rank)
+    log("  Pass 2: Recursive Order Propagation (3 passes for deep trees)...");
+    for (let p = 1; p <= 3; p++) {
+        log(`    - Pass ${p}/3...`);
+        for (const seg of SEGMENTS) {
+            await robustQuery(`
+                UPDATE app_taxa child
+                SET "order" = parent."order"
+                FROM app_taxa parent
+                WHERE child.parent_id = parent.id 
+                  AND child."order" IS NULL 
+                  AND parent."order" IS NOT NULL
+                  AND child.taxon_name >= $1 AND child.taxon_name < $2;
+            `, [seg.start, seg.end]);
+        }
     }
 };
 
