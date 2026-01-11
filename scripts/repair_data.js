@@ -1,8 +1,8 @@
 /**
- * FLORA CATALOG DATA REPAIR UTILITY v1.1.0
+ * FLORA CATALOG DATA REPAIR UTILITY v1.2.0
  * 
  * Performs high-volume data propagation and recursive count repairs in small batches.
- * v1.1.0: Added interactive auth prompts and refined recursive logic.
+ * v1.2.0: Optimized Step 7 with JOIN-based aggregation to prevent stalls.
  */
 
 import pg from 'pg';
@@ -76,7 +76,7 @@ async function main() {
     await client.connect();
     await client.query("SET statement_timeout = 0");
 
-    log("Starting Data Repair utility...");
+    log("Starting Data Repair utility v1.2.0...");
 
     // 1. Structural Fix
     log("Step 1: Ensuring 'order' column exists...");
@@ -128,20 +128,24 @@ async function main() {
     }
     console.log("\n  Hierarchy propagation complete.");
 
-    // 7. Recursive Count Repair
-    log("Step 7: Repairing Recursive Descendant Counts (Ltree logic)...");
+    // 7. Optimized Recursive Count Repair
+    log("Step 7: Repairing Recursive Descendant Counts (Optimized JOIN logic)...");
     for (const seg of SEGMENTS) {
         process.stdout.write(`  Repairing Counts for Segment ${seg.label}... \r`);
+        // Using Aggregated Join instead of Correlated Subquery to prevent 1.4M scan stall
         await client.query(`
             UPDATE app_taxa p
-            SET descendant_count = (
-                SELECT count(*) - 1 
-                FROM app_taxa c
-                WHERE c.hierarchy_path <@ p.hierarchy_path
-            )
-            WHERE p.taxon_name >= $1 AND p.taxon_name < $2
-              AND p.taxon_rank IN ('Order', 'Family', 'Genus', 'Species')
-              AND p.hierarchy_path IS NOT NULL
+            SET descendant_count = sub.cnt
+            FROM (
+                SELECT p2.id, count(c2.id) - 1 as cnt
+                FROM app_taxa p2
+                JOIN app_taxa c2 ON c2.hierarchy_path <@ p2.hierarchy_path
+                WHERE p2.taxon_name >= $1 AND p2.taxon_name < $2
+                  AND p2.taxon_rank IN ('Order', 'Family', 'Genus', 'Species')
+                  AND p2.hierarchy_path IS NOT NULL
+                GROUP BY p2.id
+            ) sub
+            WHERE p.id = sub.id
         `, [seg.start, seg.end]);
     }
     console.log("\n  Count repair complete.");

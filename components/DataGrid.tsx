@@ -160,7 +160,7 @@ const COLUMN_GROUPS: ColumnGroup[] = [
                 filterOptions: ['Accepted', 'Synonym', 'Unplaced', 'Registered', 'Provisional', 'Derived', 'Artificial Hybrid', 'Illegitimate', 'Invalid', 'Local Biotype', 'Misapplied', 'Orthographic', 'Provisionally Accepted', 'External to WCVP'], 
                 defaultOn: false 
             },
-            { id: 'order', label: 'Order', tooltip: 'Phylogenetic Order', defaultWidth: 120, filterType: 'text', defaultOn: false },
+            { id: 'order', label: 'Order', tooltip: 'Phylogenetic Order', defaultWidth: 120, filterType: 'text', defaultOn: true },
             { id: 'family', label: 'Family', tooltip: 'Family', defaultWidth: 120, filterType: 'text', defaultOn: false },
             { id: 'hybrid_formula', label: 'Hybrid Formula', tooltip: 'Hybrid Formula', defaultWidth: 180, filterType: 'text', defaultOn: false },
         ]

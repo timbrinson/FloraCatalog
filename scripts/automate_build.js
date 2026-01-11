@@ -104,7 +104,7 @@ async function getClient() {
         const projId = await askQuestion(`Project ID (Default: ${DEFAULT_PROJECT_ID}): `) || DEFAULT_PROJECT_ID;
         const password = await askQuestion("Database Password: ");
         if (!password) { err("Password required."); process.exit(1); }
-        connectionString = `postgresql://postgres.${projId}:${password}@aws-0-us-west-2.pooler.supabase.com:6543/postgres`;
+        connectionString = `postgresql://postgres.[PROJ-ID]:[PASSWORD]@aws-0-us-west-2.pooler.supabase.com:6543/postgres`;
     }
 
     const client = new pg.Client({ connectionString, ssl: { rejectUnauthorized: false } });
@@ -442,19 +442,22 @@ const stepHierarchy = async () => {
 };
 
 const stepCounts = async () => {
-    log("Calculating Recursive Descendant Counts (ltree logic)...");
+    log("Calculating Recursive Descendant Counts (ltree aggregation)...");
     for (const seg of SEGMENTS) {
         log(`  Updating Segment: ${seg.label}...`);
         await robustQuery(`
             UPDATE app_taxa p
-            SET descendant_count = (
-                SELECT count(*) - 1 
-                FROM app_taxa c
-                WHERE c.hierarchy_path <@ p.hierarchy_path
-            )
-            WHERE p.taxon_name >= $1 AND p.taxon_name < $2
-              AND p.taxon_rank IN ('Order', 'Family', 'Genus', 'Species')
-              AND p.hierarchy_path IS NOT NULL;
+            SET descendant_count = sub.cnt
+            FROM (
+                SELECT p2.id, count(c2.id) - 1 as cnt
+                FROM app_taxa p2
+                JOIN app_taxa c2 ON c2.hierarchy_path <@ p2.hierarchy_path
+                WHERE p2.taxon_name >= $1 AND p2.taxon_name < $2
+                  AND p2.taxon_rank IN ('Order', 'Family', 'Genus', 'Species')
+                  AND p2.hierarchy_path IS NOT NULL
+                GROUP BY p2.id
+            ) sub
+            WHERE p.id = sub.id
         `, [seg.start, seg.end]);
     }
 };
