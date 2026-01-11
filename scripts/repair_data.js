@@ -1,8 +1,8 @@
 /**
- * FLORA CATALOG DATA REPAIR UTILITY v1.3.0
+ * FLORA CATALOG DATA REPAIR UTILITY v1.4.0
  * 
  * Performs high-volume data propagation and recursive count repairs in small batches.
- * v1.3.0: Pivot to Direct Child Counts for 100x performance increase.
+ * v1.4.0: Segmented Count Updates & Symbol-Inclusive Propagation.
  */
 
 import pg from 'pg';
@@ -29,8 +29,10 @@ const loadEnv = () => {
 loadEnv();
 
 const DEFAULT_PROJECT_ID = 'uzzayfueabppzpwunvlf';
+
+// Inclusive boundaries to handle leading symbols like + and ×
 const SEGMENTS = [
-    { label: "A", start: "A", end: "B" },
+    { label: "A (incl. symbols)", start: " ", end: "B" },
     { label: "B", start: "B", end: "C" },
     { label: "C", start: "C", end: "D" },
     { label: "D", start: "D", end: "E" },
@@ -50,7 +52,7 @@ const SEGMENTS = [
     { label: "S", start: "S", end: "T" },
     { label: "T", start: "T", end: "U" },
     { label: "U - V", start: "U", end: "W" },
-    { label: "W - Z", start: "W", end: "{" }
+    { label: "W - Z (incl. hybrid symbols)", start: "W", end: "\uffff" }
 ];
 
 const log = (msg) => console.log(`\x1b[36m[Repair]\x1b[0m ${msg}`);
@@ -85,7 +87,7 @@ async function main() {
     await client.connect();
     await client.query("SET statement_timeout = 0");
 
-    log("Starting Data Repair utility v1.3.0...");
+    log("Starting Data Repair utility v1.4.0...");
 
     // 1. Structural Fix
     log("Step 1: Ensuring 'order' column exists...");
@@ -119,7 +121,7 @@ async function main() {
         process.stdout.write(`  Processing Segment ${seg.label}... \r`);
         await client.query(`
             UPDATE app_taxa s SET "order" = g."order" FROM app_taxa g 
-            WHERE s.parent_id = g.id AND g.taxon_rank = 'Genus' AND s."order" IS NULL 
+            WHERE s.parent_id = g.id AND s.taxon_rank = 'Genus' AND s."order" IS NULL 
             AND s.taxon_name >= $1 AND s.taxon_name < $2
         `, [seg.start, seg.end]);
     }
@@ -138,23 +140,30 @@ async function main() {
     console.log("\n  Hierarchy propagation complete.");
 
     // 7. Pivot to Direct Child Counts
-    log("Step 7: Repairing Child Counts (Pivoted to Direct Child Logic)...");
-    log("  Resetting all counts to zero...");
-    await client.query(`UPDATE app_taxa SET descendant_count = 0`);
+    log("Step 7: Repairing Child Counts (Segmented pass)...");
+    log("  Resetting all counts to zero (Segmented)...");
+    for (const seg of SEGMENTS) {
+        process.stdout.write(`  Resetting Segment ${seg.label}... \r`);
+        await client.query(`UPDATE app_taxa SET descendant_count = 0 WHERE taxon_name >= $1 AND taxon_name < $2`, [seg.start, seg.end]);
+    }
     
-    log("  Calculating immediate children (Fast Aggregation)...");
-    const countRes = await client.query(`
-        UPDATE app_taxa p
-        SET descendant_count = sub.cnt
-        FROM (
-            SELECT parent_id as id, count(*) as cnt
-            FROM app_taxa
-            WHERE parent_id IS NOT NULL
-            GROUP BY parent_id
-        ) sub
-        WHERE p.id = sub.id
-    `);
-    log(`  Successfully updated ${countRes.rowCount} parent records.`);
+    log("\n  Calculating immediate children (Segmented pass)...");
+    for (const seg of SEGMENTS) {
+        process.stdout.write(`  Updating Segment ${seg.label}... \r`);
+        await client.query(`
+            UPDATE app_taxa p
+            SET descendant_count = sub.cnt
+            FROM (
+                SELECT parent_id as id, count(*) as cnt
+                FROM app_taxa
+                WHERE parent_id IS NOT NULL
+                  AND parent_id IN (SELECT id FROM app_taxa WHERE taxon_name >= $1 AND taxon_name < $2)
+                GROUP BY parent_id
+            ) sub
+            WHERE p.id = sub.id
+        `, [seg.start, seg.end]);
+    }
+    log(`\n  Successfully repaired parent record counts.`);
 
     log("Step 8: Rebuilding indexes and statistics...");
     await client.query(`CREATE INDEX IF NOT EXISTS idx_app_taxa_order_col ON app_taxa("order")`);

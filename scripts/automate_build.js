@@ -43,8 +43,9 @@ const FILE_SCHEMA = 'scripts/wcvp_schema.sql.txt';
 const FILE_OPTIMIZE = 'scripts/optimize_indexes.sql.txt';
 const APP_VERSION = 'v2.31.21';
 
+// Inclusive boundaries to handle leading symbols like + and ×
 const SEGMENTS = [
-    { label: "A", start: "A", end: "B" },
+    { label: "A (incl. symbols)", start: " ", end: "B" },
     { label: "B", start: "B", end: "C" },
     { label: "C", start: "C", end: "D" },
     { label: "D", start: "D", end: "E" },
@@ -64,7 +65,7 @@ const SEGMENTS = [
     { label: "S", start: "S", end: "T" },
     { label: "T", start: "T", end: "U" },
     { label: "U - V", start: "U", end: "W" },
-    { label: "W - Z", start: "W", end: "{" }
+    { label: "W - Z (incl. hybrid symbols)", start: "W", end: "\uffff" }
 ];
 
 // --- UTILS ---
@@ -442,24 +443,30 @@ const stepHierarchy = async () => {
 };
 
 const stepCounts = async () => {
-    log("Calculating Direct Descendant Counts (Optimized Aggregation)...");
-    log("  Resetting current counts...");
-    await robustQuery(`UPDATE app_taxa SET descendant_count = 0`);
+    log("Calculating Direct Descendant Counts (Segmented Aggregation)...");
+    log("  Resetting current counts (Segmented)...");
+    for (const seg of SEGMENTS) {
+        process.stdout.write(`    Resetting ${seg.label}... \r`);
+        await robustQuery(`UPDATE app_taxa SET descendant_count = 0 WHERE taxon_name >= $1 AND taxon_name < $2`, [seg.start, seg.end]);
+    }
     
-    log("  Calculating immediate children for all parents (1.4M pass)...");
-    const res = await robustQuery(`
-        UPDATE app_taxa p
-        SET descendant_count = sub.cnt
-        FROM (
-            SELECT parent_id as id, count(*) as cnt
-            FROM app_taxa
-            WHERE parent_id IS NOT NULL
-            GROUP BY parent_id
-        ) sub
-        WHERE p.id = sub.id
-    `);
-    
-    log(`  Updated ${res.rowCount} parent nodes with child counts.`);
+    log("\n  Calculating immediate children (Segmented pass)...");
+    for (const seg of SEGMENTS) {
+        process.stdout.write(`    Updating ${seg.label}... \r`);
+        await robustQuery(`
+            UPDATE app_taxa p
+            SET descendant_count = sub.cnt
+            FROM (
+                SELECT parent_id as id, count(*) as cnt
+                FROM app_taxa
+                WHERE parent_id IS NOT NULL
+                  AND parent_id IN (SELECT id FROM app_taxa WHERE taxon_name >= $1 AND taxon_name < $2)
+                GROUP BY parent_id
+            ) sub
+            WHERE p.id = sub.id
+        `, [seg.start, seg.end]);
+    }
+    log("\n  Count update finished.");
 };
 
 const stepOptimize = async () => {
