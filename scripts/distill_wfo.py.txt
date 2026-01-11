@@ -16,6 +16,17 @@ def distill_wfo():
     # Target file in WFO archive
     target_csv = 'classification.csv'
     
+    # Standard WFO Column Set (29 columns as provided by user)
+    WFO_COLUMNS = [
+        'taxonID', 'scientificNameID', 'localID', 'scientificName', 'taxonRank', 
+        'parentNameUsageID', 'scientificNameAuthorship', 'family', 'subfamily', 
+        'tribe', 'subtribe', 'genus', 'subgenus', 'specificEpithet', 
+        'infraspecificEpithet', 'verbatimTaxonRank', 'nomenclaturalStatus', 
+        'namePublishedIn', 'taxonomicStatus', 'acceptedNameUsageID', 
+        'originalNameUsageID', 'nameAccordingToID', 'taxonRemarks', 'created', 
+        'modified', 'references', 'source', 'majorGroup', 'tplID'
+    ]
+
     # Higher ranks to extract for analysis
     TARGET_RANKS = {
         'kingdom', 'subkingdom', 'phylum', 'subphylum', 
@@ -55,14 +66,13 @@ def distill_wfo():
         delimiter = '\t' if '\t' in sample else ','
         
         reader = csv.DictReader(f, delimiter=delimiter)
-        headers = reader.fieldnames
-             
+        
         row_count = 0
         extracted_count = 0
         
         # Prepare Analysis File writer
         with open(OUTPUT_FILE, 'w', encoding='utf-8', newline='') as of:
-            writer = csv.DictWriter(of, fieldnames=headers)
+            writer = csv.DictWriter(of, fieldnames=WFO_COLUMNS, extrasaction='ignore')
             writer.writeheader()
 
             for row in reader:

@@ -1,19 +1,30 @@
-
 -- =============================================================================
--- DATA IMPORT DIAGNOSTIC TOOL
+-- DATA IMPORT DIAGNOSTIC TOOL (v2.31.14)
 -- Run this to see how much of your database is fully linked and calculated.
 -- =============================================================================
 
--- 1. OVERALL HEALTH
+-- 0. STAGING TABLE AUDIT
+SELECT 
+    'WCVP Staging' as table, count(*) as row_count FROM wcvp_import
+UNION ALL
+SELECT 
+    'WFO Staging' as table, count(*) as row_count FROM wfo_import
+UNION ALL
+SELECT 
+    'App Taxa (Active)' as table, count(*) as row_count FROM app_taxa;
+
+-- 1. OVERALL HEALTH & COMPLETION
 SELECT 
     count(*) as total_plants,
     count(parent_id) as parents_linked,
     count(hierarchy_path) as paths_calculated,
-    round(count(hierarchy_path) * 100.0 / count(*), 1) || '%' as overall_completion
+    CASE 
+        WHEN count(*) = 0 THEN '0% (TABLE EMPTY)'
+        ELSE round(count(hierarchy_path) * 100.0 / count(*), 1) || '%' 
+    END as overall_completion
 FROM app_taxa;
 
--- 2. PROGRESS BY FAMILY GROUP (To track Step 3 Batches)
--- This helps you see which batches (1a, 1b, 2, etc.) are finished.
+-- 2. PROGRESS BY FAMILY GROUP
 SELECT 
     CASE 
         WHEN family = 'Asteraceae' THEN 'Batch 1a: Asteraceae'
@@ -29,14 +40,76 @@ SELECT
     END as batch_group,
     count(*) as total_records,
     count(hierarchy_path) as paths_built,
-    round(count(hierarchy_path) * 100.0 / count(*), 1) || '%' as completion
+    round(count(hierarchy_path) * 100.0 / NULLIF(count(*), 0), 1) || '%' as completion
 FROM app_taxa
 GROUP BY 1
 ORDER BY 1;
 
--- 3. SPOT CHECK: HIERARCHY SAMPLE
--- If these look like "root.uuid.uuid...", it is working.
-SELECT taxon_name, hierarchy_path 
+-- 3. RANK COMPLETION HEATMAP
+SELECT 
+    taxon_rank,
+    count(*) as total,
+    count(hierarchy_path) as completed,
+    round(count(hierarchy_path) * 100.0 / NULLIF(count(*), 0), 1) || '%' as rank_progress
+FROM app_taxa
+GROUP BY taxon_rank
+ORDER BY completed DESC;
+
+-- 4. ACTIVE HIERARCHY WORKERS
+-- If this returns 0 rows, your build script is NOT currently updating paths.
+SELECT 
+    pid, 
+    state, 
+    now() - query_start as duration, 
+    wait_event_type, 
+    wait_event, 
+    query 
+FROM pg_stat_activity 
+WHERE query ILIKE '%hierarchy_path%' 
+  AND state != 'idle'
+  AND pid != pg_backend_pid();
+
+-- 5. DEPTH ANALYSIS
+SELECT 
+    nlevel(hierarchy_path) as path_depth,
+    count(*) as records_at_this_depth
+FROM app_taxa
+WHERE hierarchy_path IS NOT NULL
+GROUP BY 1
+ORDER BY 1;
+
+-- 6. SPOT CHECK: HIERARCHY SAMPLE
+SELECT taxon_name, taxon_rank, hierarchy_path 
 FROM app_taxa 
 WHERE hierarchy_path IS NOT NULL 
-LIMIT 5;
+LIMIT 10;
+
+-- 7. PARENTAGE AUDIT
+-- CRITICAL: If "Linked" is 0, Step 11 will fail to build a tree.
+SELECT 
+    taxon_rank,
+    count(*) as total,
+    count(CASE WHEN parent_id IS NULL THEN 1 END) as "Rooted (No Parent)",
+    count(CASE WHEN parent_id IS NOT NULL THEN 1 END) as "Linked (Has Parent)"
+FROM app_taxa
+GROUP BY taxon_rank
+ORDER BY total DESC;
+
+-- 8. LINEAGE PATH HEIGHT (New in v2.31.14)
+-- Goal: You want to see rows at depth 5 (Order->Family->Genus->Species->Infra).
+-- If most records are at Depth 2, your tree is "flat".
+SELECT 
+    nlevel(hierarchy_path) as tree_depth,
+    count(*) as record_count,
+    CASE 
+        WHEN nlevel(hierarchy_path) = 1 THEN 'Root (Order/Orphan)'
+        WHEN nlevel(hierarchy_path) = 2 THEN 'Level 1 (Family/Genus)'
+        WHEN nlevel(hierarchy_path) = 3 THEN 'Level 2 (Genus/Species)'
+        WHEN nlevel(hierarchy_path) = 4 THEN 'Level 3 (Species/Infra)'
+        WHEN nlevel(hierarchy_path) >= 5 THEN 'Level 4+ (Infra/Cultivar)'
+        ELSE 'Unknown'
+    END as height_label
+FROM app_taxa
+WHERE hierarchy_path IS NOT NULL
+GROUP BY 1
+ORDER BY 1;

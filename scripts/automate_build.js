@@ -1,8 +1,8 @@
 /**
- * AUTOMATED DATABASE BUILDER (CLI) v2.31.9
+ * AUTOMATED DATABASE BUILDER (CLI) v2.31.13
  * 
  * Orchestrates the transformation of raw WCVP and WFO data into the FloraCatalog database.
- * v2.31.9: Self-healing WFO staging; SQL-driven phylogenetic mapping.
+ * v2.31.13: Segmented Hierarchy Reset; Forced Analyze; Linkage Safety.
  */
 
 import pg from 'pg';
@@ -41,7 +41,7 @@ const FILE_CLEAN_CSV = path.join(DIR_TEMP, 'wcvp_names_clean.csv');
 const FILE_WFO_IMPORT = path.join(DIR_TEMP, 'wfo_import.csv');
 const FILE_SCHEMA = 'scripts/wcvp_schema.sql.txt';
 const FILE_OPTIMIZE = 'scripts/optimize_indexes.sql.txt';
-const APP_VERSION = 'v2.31.9';
+const APP_VERSION = 'v2.31.13';
 
 const SEGMENTS = [
     { label: "A", start: "A", end: "B" },
@@ -137,8 +137,7 @@ const stepImportWFO = async (client) => {
     log("Streaming WFO Staging (Filtered backbone)...");
     
     if (fs.existsSync(FILE_WFO_IMPORT)) {
-        // Self-healing: Ensure table exists if user skipped Step 3 (v2.31.9)
-        // Updated to full 29-column schema (v2.31.10)
+        // Ensure table exists (v2.31.12 - explicit columns)
         await client.query(`
             CREATE TABLE IF NOT EXISTS wfo_import (
                 taxonID text PRIMARY KEY,
@@ -173,7 +172,10 @@ const stepImportWFO = async (client) => {
             );
         `);
 
-        const stream = client.query(copyFrom(`COPY wfo_import FROM STDIN WITH CSV HEADER`));
+        // Use explicit columns in COPY to prevent "extra data" errors if table order differs from CSV
+        const columns = "taxonID,scientificNameID,localID,scientificName,taxonRank,parentNameUsageID,scientificNameAuthorship,family,subfamily,tribe,subtribe,genus,subgenus,specificEpithet,infraspecificEpithet,verbatimTaxonRank,nomenclaturalStatus,namePublishedIn,taxonomicStatus,acceptedNameUsageID,originalNameUsageID,nameAccordingToID,taxonRemarks,created,modified,\"references\",source,majorGroup,tplID";
+        
+        const stream = client.query(copyFrom(`COPY wfo_import (${columns}) FROM STDIN WITH CSV HEADER`));
         const fileStream = fs.createReadStream(FILE_WFO_IMPORT);
         await pipeline(fileStream, stream);
         log("  WFO Import finished.");
@@ -261,11 +263,11 @@ const stepWFOOrders = async (client) => {
     // 2. Ensure Families exist (Source 2)
     await client.query(`
         INSERT INTO app_data_sources (id, name, version, citation_text, trust_level)
-        VALUES (2, 'FloraCatalog System', 'v2.31.9 (Derived)', 'Internal system layer deriving backbone from attributes.', 5)
+        VALUES (2, 'FloraCatalog System', 'v2.31.13 (Derived)', 'Internal system layer deriving backbone from attributes.', 5)
         ON CONFLICT (id) DO NOTHING;
 
         INSERT INTO app_taxa (taxon_name, taxon_rank, taxon_status, family, source_id, verification_level)
-        SELECT DISTINCT family, 'Family', 'Derived', family, 2, 'FloraCatalog v2.31.9'
+        SELECT DISTINCT family, 'Family', 'Derived', family, 2, 'FloraCatalog v2.31.13'
         FROM app_taxa
         WHERE family IS NOT NULL
           AND NOT EXISTS (SELECT 1 FROM app_taxa a WHERE a.family = app_taxa.family AND a.taxon_rank = 'Family')
@@ -303,8 +305,25 @@ const stepDerivedFamilies = async (client) => {
 const stepHierarchy = async (client) => {
     log("Building Ltree Hierarchy (Iterative)...");
     
-    // Clear paths
-    await client.query(`UPDATE app_taxa SET hierarchy_path = NULL`);
+    // Forced Analyze to help the query planner (v2.31.13)
+    log("  Refreshing database statistics...");
+    await client.query(`ANALYZE app_taxa`);
+
+    // Safety check: Are parents linked?
+    const linkCheck = await client.query(`SELECT count(parent_id) as cnt FROM app_taxa WHERE parent_id IS NOT NULL`);
+    if (parseInt(linkCheck.rows[0].cnt) === 0) {
+        warn("No parent_id links found in app_taxa. Run Step 8 (Link Parents) first.");
+        const proceed = await askQuestion("Proceed anyway? (y/n): ");
+        if (proceed.toLowerCase() !== 'y') return;
+    }
+
+    // Segmented Clear: Setting 1.4M rows to NULL at once often hangs (v2.31.13)
+    log("  Resetting hierarchy paths (Segmented)...");
+    for (const seg of SEGMENTS) {
+        process.stdout.write(`    Resetting ${seg.label}... \r`);
+        await client.query(`UPDATE app_taxa SET hierarchy_path = NULL WHERE taxon_name >= $1 AND taxon_name < $2`, [seg.start, seg.end]);
+    }
+    console.log("\n    Reset complete.");
 
     // Level 1: Roots
     log("  Processing Level 1: Roots...");
@@ -332,9 +351,12 @@ const stepHierarchy = async (client) => {
                   AND c.taxon_name >= $1 AND c.taxon_name < $2
             `, [seg.start, seg.end]);
             totalUpdated += res.rowCount;
+            if (res.rowCount > 0) {
+                process.stdout.write(`    - Segment ${seg.label}: ${res.rowCount} updated\r`);
+            }
         }
         
-        log(`    Processed ${totalUpdated} records.`);
+        console.log(`\n    Level ${level} complete. Total: ${totalUpdated} records.`);
         if (totalUpdated === 0) break;
         level++;
     }
