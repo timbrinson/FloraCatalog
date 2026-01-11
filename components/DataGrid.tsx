@@ -267,27 +267,49 @@ export const DataGrid: React.FC<DataGridProps> = ({
     colWidths: propColWidths,
     onLayoutUpdate
 }) => {
+  
+  /**
+   * Layout Healers: Ensure new standard features (like 'Order' column) are injected 
+   * even if the user has a legacy saved layout from a previous session.
+   */
+  const healVisibleColumns = useCallback((incoming: Set<string>, incomingOrder?: string[]) => {
+      const healed = new Set(incoming);
+      // If 'order' is missing from the saved column order, it's a new feature.
+      // Auto-enable it if it was designed to be on by default.
+      if (incomingOrder && !incomingOrder.includes('order')) {
+          const col = ALL_COLUMNS.find(c => c.id === 'order');
+          if (col?.defaultOn) healed.add('order');
+      }
+      return healed;
+  }, []);
+
+  const healColumnOrder = useCallback((incoming: string[]) => {
+      let baseOrder = [...incoming];
+      const missing = ALL_COLUMNS.filter(c => !baseOrder.includes(c.id)).map(c => c.id);
+      
+      // Smart Inserter: If 'order' is missing, place it in Index 3 (after tree, count, actions) 
+      // for higher taxonomic visibility, rather than appending it to the end.
+      if (missing.includes('order')) {
+          baseOrder.splice(3, 0, 'order');
+          const remainingMissing = missing.filter(id => id !== 'order');
+          return [...baseOrder, ...remainingMissing];
+      }
+      
+      return [...baseOrder, ...missing];
+  }, []);
+
+  // INITIAL STATE ONLY: Rely on initialization and the key prop for resets.
+  // Over-aggressive synchronization effects were causing UI regressions.
   const [visibleColumns, setVisibleColumns] = useState<Set<string>>(() => {
-      // Visibility Healer: If user has a saved layout but it's missing new defaultOn columns (like 'order')
       if (propVisibleColumns !== undefined) {
-          const healed = new Set(propVisibleColumns);
-          // If 'order' is missing from the saved column order, it's a new feature.
-          // In that case, we auto-enable it based on its defaultOn setting.
-          if (propColumnOrder && !propColumnOrder.includes('order')) {
-             const col = ALL_COLUMNS.find(c => c.id === 'order');
-             if (col?.defaultOn) healed.add('order');
-          }
-          return healed;
+          return healVisibleColumns(propVisibleColumns, propColumnOrder);
       }
       return new Set(ALL_COLUMNS.filter(c => c.defaultOn).map(c => c.id));
   });
   
   const [columnOrder, setColumnOrder] = useState<string[]>(() => {
       if (propColumnOrder !== undefined) {
-          // Column Healer: Append missing columns if they exist in ALL_COLUMNS but not propColumnOrder
-          const baseOrder = [...propColumnOrder];
-          const missing = ALL_COLUMNS.filter(c => !baseOrder.includes(c.id)).map(c => c.id);
-          return [...baseOrder, ...missing];
+          return healColumnOrder(propColumnOrder);
       }
       return ALL_COLUMNS.map(c => c.id);
   });
@@ -297,16 +319,8 @@ export const DataGrid: React.FC<DataGridProps> = ({
       return Object.fromEntries(ALL_COLUMNS.map(c => [c.id, c.defaultWidth]));
   });
 
-  // Layout Reconciliation (ADR-007)
-  useEffect(() => { if (propVisibleColumns !== undefined) setVisibleColumns(propVisibleColumns); }, [propVisibleColumns]);
-  useEffect(() => { 
-      if (propColumnOrder !== undefined) {
-          const healed = [...propColumnOrder];
-          const missing = ALL_COLUMNS.filter(c => !healed.includes(c.id)).map(c => c.id);
-          setColumnOrder([...healed, ...missing]);
-      } 
-  }, [propColumnOrder]);
-  useEffect(() => { if (propColWidths !== undefined) setColWidths(propColWidths); }, [propColWidths]);
+  // NO OVERWRITE EFFECTS: Toggling is now durable for the session.
+  // App.tsx uses key={gridKey} to handle formal Reload/Reset events.
 
   useEffect(() => {
       onLayoutUpdate?.({
@@ -314,7 +328,7 @@ export const DataGrid: React.FC<DataGridProps> = ({
           columnOrder,
           colWidths
       });
-  }, [visibleColumns, columnOrder, colWidths]);
+  }, [visibleColumns, columnOrder, colWidths, onLayoutUpdate]);
 
   const [isHierarchyMode, setIsHierarchyMode] = useState<boolean>(true);
   const [groupBy, setGroupBy] = useState<string[]>([]);
@@ -362,7 +376,13 @@ export const DataGrid: React.FC<DataGridProps> = ({
       return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [showLegend, showColPicker]);
 
-  const activeColumns = useMemo(() => columnOrder.filter(id => visibleColumns.has(id)).map(id => ALL_COLUMNS.find(c => c.id === id)).filter((c): c is ColumnConfig => !!c), [columnOrder, visibleColumns]);
+  const activeColumns = useMemo(() => {
+      return columnOrder
+        .filter(id => visibleColumns.has(id))
+        .map(id => ALL_COLUMNS.find(c => c.id === id))
+        .filter((c): c is ColumnConfig => !!c);
+  }, [columnOrder, visibleColumns]);
+
   const totalTableWidth = useMemo(() => activeColumns.reduce((sum, col) => sum + (colWidths[col.id] || col.defaultWidth), 0), [activeColumns, colWidths]);
   
   const activePallet = useMemo(() => {

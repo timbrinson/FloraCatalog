@@ -92,3 +92,10 @@ To ensure visual stability and correct debugging, the grid algorithm must adhere
 1. **Direct Match:** The `parent_id` of a lower-level record MUST match the `id` of its direct parent in the hierarchy.
 2. **Indirect (Virtual) Match:** If a record is grouped under a Virtual Root (because the real parent is not loaded), the Virtual Root's "effective ID" must be derivable such that the relationship is logically consistent with the relational database state.
 3. **Correctness Check:** Any row rendered under a parent that does not share a logical `parent_id` link (either directly or via the materialzed `hierarchy_path`) is considered a display regression.
+
+---
+
+## 6. Navigational Counts (# Column)
+The count column (`#`) in the grid provides immediate feedback for tree navigation.
+- **Scope:** It displays the count of **Direct (Immediate) Children** currently cataloged in the database.
+- **Rationale:** This ensures the user knows exactly how many rows to expect upon expanding a node, prioritizing navigational precision over total recursive population figures.

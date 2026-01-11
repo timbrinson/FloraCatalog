@@ -139,16 +139,8 @@ export default function App() {
       setIsOffline(currentOffline);
 
       if (!currentOffline) {
-          const fallback = setTimeout(() => {
-              if (initialLayout === null) {
-                  setInitialLayout({});
-                  setIsInitialized(true);
-              }
-          }, 3000);
-
           try {
               const config = await loadGlobalSettings();
-              clearTimeout(fallback);
               setInitialLayout(config);
               setIsInitialized(true);
           } catch (e) {

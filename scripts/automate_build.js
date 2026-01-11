@@ -442,24 +442,24 @@ const stepHierarchy = async () => {
 };
 
 const stepCounts = async () => {
-    log("Calculating Recursive Descendant Counts (ltree aggregation)...");
-    for (const seg of SEGMENTS) {
-        log(`  Updating Segment: ${seg.label}...`);
-        await robustQuery(`
-            UPDATE app_taxa p
-            SET descendant_count = sub.cnt
-            FROM (
-                SELECT p2.id, count(c2.id) - 1 as cnt
-                FROM app_taxa p2
-                JOIN app_taxa c2 ON c2.hierarchy_path <@ p2.hierarchy_path
-                WHERE p2.taxon_name >= $1 AND p2.taxon_name < $2
-                  AND p2.taxon_rank IN ('Order', 'Family', 'Genus', 'Species')
-                  AND p2.hierarchy_path IS NOT NULL
-                GROUP BY p2.id
-            ) sub
-            WHERE p.id = sub.id
-        `, [seg.start, seg.end]);
-    }
+    log("Calculating Direct Descendant Counts (Optimized Aggregation)...");
+    log("  Resetting current counts...");
+    await robustQuery(`UPDATE app_taxa SET descendant_count = 0`);
+    
+    log("  Calculating immediate children for all parents (1.4M pass)...");
+    const res = await robustQuery(`
+        UPDATE app_taxa p
+        SET descendant_count = sub.cnt
+        FROM (
+            SELECT parent_id as id, count(*) as cnt
+            FROM app_taxa
+            WHERE parent_id IS NOT NULL
+            GROUP BY parent_id
+        ) sub
+        WHERE p.id = sub.id
+    `);
+    
+    log(`  Updated ${res.rowCount} parent nodes with child counts.`);
 };
 
 const stepOptimize = async () => {
