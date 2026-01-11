@@ -133,6 +133,17 @@ export interface Taxon {
   descendant_count?: number;
 }
 
+export interface BuildDashboardData {
+  total_records: number;
+  dirty_paths: number;
+  cleaned_rows: number;
+  paths_built: number;
+  wfo_order_roots: number;
+  orphaned_roots: number;
+  reset_completion: number;
+  build_completion: number;
+}
+
 export interface SearchCandidate {
   taxon_name: string;
   common_name?: string;

@@ -1,8 +1,8 @@
 /**
- * AUTOMATED DATABASE BUILDER (CLI) v2.31.13
+ * AUTOMATED DATABASE BUILDER (CLI) v2.31.20
  * 
  * Orchestrates the transformation of raw WCVP and WFO data into the FloraCatalog database.
- * v2.31.13: Segmented Hierarchy Reset; Forced Analyze; Linkage Safety.
+ * v2.31.20: Resilience Overhaul (Auto-Reconnect, Retry, Resume-Capable Hierarchy).
  */
 
 import pg from 'pg';
@@ -41,7 +41,7 @@ const FILE_CLEAN_CSV = path.join(DIR_TEMP, 'wcvp_names_clean.csv');
 const FILE_WFO_IMPORT = path.join(DIR_TEMP, 'wfo_import.csv');
 const FILE_SCHEMA = 'scripts/wcvp_schema.sql.txt';
 const FILE_OPTIMIZE = 'scripts/optimize_indexes.sql.txt';
-const APP_VERSION = 'v2.31.13';
+const APP_VERSION = 'v2.31.20';
 
 const SEGMENTS = [
     { label: "A", start: "A", end: "B" },
@@ -84,7 +84,19 @@ const ensureDirs = () => {
     if (!fs.existsSync(DIR_TEMP)) fs.mkdirSync(DIR_TEMP, { recursive: true });
 };
 
+// Global Client Reference for Robust Reconnection
+let activeClient = null;
+
 async function getClient() {
+    if (activeClient) {
+        try {
+            await activeClient.query('SELECT 1');
+            return activeClient;
+        } catch (e) {
+            log("Existing connection lost. Re-establishing...");
+        }
+    }
+
     let connectionString = process.env.DATABASE_URL;
     
     if (!connectionString) {
@@ -96,10 +108,42 @@ async function getClient() {
     }
 
     const client = new pg.Client({ connectionString, ssl: { rejectUnauthorized: false } });
+    
+    // CRITICAL: Handle the unexpected termination error event to prevent process crash
+    client.on('error', (e) => {
+        if (e.message.includes('terminated unexpectedly') || e.message.includes('Connection terminated')) {
+            warn("Database connection terminated by host.");
+            activeClient = null; // Mark for recreation on next call
+        } else {
+            err("Database Client Error: " + e.message);
+        }
+    });
+
     await client.connect();
-    // Disable timeout for massive operations
     await client.query("SET statement_timeout = 0");
+    activeClient = client;
     return client;
+}
+
+/**
+ * RobustQuery: Wraps a query with retry logic and connection healing.
+ */
+async function robustQuery(sql, params = [], retries = 3) {
+    for (let attempt = 1; attempt <= retries; attempt++) {
+        try {
+            const client = await getClient();
+            return await client.query(sql, params);
+        } catch (e) {
+            const isConnectionError = e.message.includes('terminated') || e.code === '57P01' || e.code === '08006';
+            if (isConnectionError && attempt < retries) {
+                warn(`Connection dropped. Retrying segment (${attempt}/${retries})...`);
+                activeClient = null; // Force new client on retry
+                await new Promise(r => setTimeout(r, 2000 * attempt));
+                continue;
+            }
+            throw e;
+        }
+    }
 }
 
 // --- STEPS ---
@@ -118,26 +162,26 @@ const stepPrepWFO = () => {
     execSync(py, { stdio: 'inherit' });
 };
 
-const stepResetDB = async (client) => {
+const stepResetDB = async () => {
     log("Resetting Database Schema...");
     const sql = fs.readFileSync(FILE_SCHEMA, 'utf-8');
-    await client.query(sql);
+    await robustQuery(sql);
 };
 
-const stepImportWCVP = async (client) => {
+const stepImportWCVP = async () => {
     log("Streaming WCVP Staging (1.4M rows)...");
     if (!fs.existsSync(FILE_CLEAN_CSV)) throw new Error("Run Step 1 first.");
+    const client = await getClient();
     const stream = client.query(copyFrom(`COPY wcvp_import FROM STDIN WITH CSV HEADER`));
     const fileStream = fs.createReadStream(FILE_CLEAN_CSV);
     await pipeline(fileStream, stream);
     log("  Import finished.");
 };
 
-const stepImportWFO = async (client) => {
+const stepImportWFO = async () => {
     log("Streaming WFO Staging (Filtered backbone)...");
-    
     if (fs.existsSync(FILE_WFO_IMPORT)) {
-        // Ensure table exists (v2.31.12 - explicit columns)
+        const client = await getClient();
         await client.query(`
             CREATE TABLE IF NOT EXISTS wfo_import (
                 taxonID text PRIMARY KEY,
@@ -171,10 +215,7 @@ const stepImportWFO = async (client) => {
                 tplID text
             );
         `);
-
-        // Use explicit columns in COPY to prevent "extra data" errors if table order differs from CSV
         const columns = "taxonID,scientificNameID,localID,scientificName,taxonRank,parentNameUsageID,scientificNameAuthorship,family,subfamily,tribe,subtribe,genus,subgenus,specificEpithet,infraspecificEpithet,verbatimTaxonRank,nomenclaturalStatus,namePublishedIn,taxonomicStatus,acceptedNameUsageID,originalNameUsageID,nameAccordingToID,taxonRemarks,created,modified,\"references\",source,majorGroup,tplID";
-        
         const stream = client.query(copyFrom(`COPY wfo_import (${columns}) FROM STDIN WITH CSV HEADER`));
         const fileStream = fs.createReadStream(FILE_WFO_IMPORT);
         await pipeline(fileStream, stream);
@@ -184,11 +225,9 @@ const stepImportWFO = async (client) => {
     }
 };
 
-const stepPopulateApp = async (client) => {
+const stepPopulateApp = async () => {
     log("Populating 'app_taxa' from Staging...");
-    
-    // Ensure Sources
-    await client.query(`
+    await robustQuery(`
         INSERT INTO app_data_sources (id, name, version, citation_text, url, trust_level)
         VALUES (1, 'WCVP', '14 (2025)', 'Kew Gardens WCVP v14', 'https://powo.science.kew.org/', 5)
         ON CONFLICT (id) DO NOTHING;
@@ -196,7 +235,7 @@ const stepPopulateApp = async (client) => {
 
     for (const seg of SEGMENTS) {
         log(`  Populating Segment: ${seg.label}...`);
-        await client.query(`
+        await robustQuery(`
             INSERT INTO app_taxa (
                 wcvp_id, ipni_id, powo_id, accepted_plant_name_id, parent_plant_name_id, 
                 basionym_plant_name_id, homotypic_synonym, taxon_name, taxon_authors, family, 
@@ -221,17 +260,17 @@ const stepPopulateApp = async (client) => {
     }
 };
 
-const stepBuildIndexes = async (client) => {
+const stepBuildIndexes = async () => {
     log("Building Structural Indexes...");
-    await client.query(`CREATE INDEX IF NOT EXISTS idx_temp_wcvp ON app_taxa(wcvp_id)`);
-    await client.query(`CREATE INDEX IF NOT EXISTS idx_temp_parent_attr ON app_taxa(parent_plant_name_id)`);
+    await robustQuery(`CREATE INDEX IF NOT EXISTS idx_temp_wcvp ON app_taxa(wcvp_id)`);
+    await robustQuery(`CREATE INDEX IF NOT EXISTS idx_temp_parent_attr ON app_taxa(parent_plant_name_id)`);
 };
 
-const stepLinkParents = async (client) => {
+const stepLinkParents = async () => {
     log("Linking Parents (Adjacency)...");
     for (const seg of SEGMENTS) {
         log(`  Linking Segment: ${seg.label}...`);
-        await client.query(`
+        await robustQuery(`
             UPDATE app_taxa child
             SET parent_id = parent.id
             FROM app_taxa parent
@@ -242,40 +281,33 @@ const stepLinkParents = async (client) => {
     }
 };
 
-const stepWFOOrders = async (client) => {
+const stepWFOOrders = async () => {
     log("Creating WFO Orders & Linking Families (SQL Logic)...");
-    
-    await client.query(`
+    await robustQuery(`
         INSERT INTO app_data_sources (id, name, version, citation_text, url, trust_level)
         VALUES (3, 'World Flora Online', '2025.12', 'WFO (2025): World Flora Online. Version 2025.12. Published on the Internet; http://www.worldfloraonline.org. Accessed on: 2026-01-09', 'http://www.worldfloraonline.org', 5)
         ON CONFLICT (id) DO NOTHING;
     `);
-
-    // 1. Create Physical Orders (All of them from staging)
-    await client.query(`
+    await robustQuery(`
         INSERT INTO app_taxa (taxon_name, taxon_rank, taxon_status, source_id, verification_level)
         SELECT scientificName, 'Order', taxonomicStatus, 3, 'WFO Backbone Distill'
         FROM wfo_import
         WHERE LOWER(taxonRank) = 'order'
         ON CONFLICT DO NOTHING;
     `);
-
-    // 2. Ensure Families exist (Source 2)
-    await client.query(`
+    await robustQuery(`
         INSERT INTO app_data_sources (id, name, version, citation_text, trust_level)
-        VALUES (2, 'FloraCatalog System', 'v2.31.13 (Derived)', 'Internal system layer deriving backbone from attributes.', 5)
+        VALUES (2, 'FloraCatalog System', 'v2.31.20 (Derived)', 'Internal system layer deriving backbone from attributes.', 5)
         ON CONFLICT (id) DO NOTHING;
 
         INSERT INTO app_taxa (taxon_name, taxon_rank, taxon_status, family, source_id, verification_level)
-        SELECT DISTINCT family, 'Family', 'Derived', family, 2, 'FloraCatalog v2.31.13'
+        SELECT DISTINCT family, 'Family', 'Derived', family, 2, 'FloraCatalog v2.31.20'
         FROM app_taxa
         WHERE family IS NOT NULL
           AND NOT EXISTS (SELECT 1 FROM app_taxa a WHERE a.family = app_taxa.family AND a.taxon_rank = 'Family')
         ON CONFLICT DO NOTHING;
     `);
-
-    // 3. Link Families to Orders via SQL self-join on wfo_import
-    await client.query(`
+    await robustQuery(`
         UPDATE app_taxa app_fam
         SET parent_id = app_order.id
         FROM wfo_import wfo_fam
@@ -286,10 +318,10 @@ const stepWFOOrders = async (client) => {
     `);
 };
 
-const stepDerivedFamilies = async (client) => {
+const stepDerivedFamilies = async () => {
     log("Grafting orphaned WCVP roots to Family records...");
     for (const seg of SEGMENTS) {
-        await client.query(`
+        await robustQuery(`
             UPDATE app_taxa child
             SET parent_id = parent.id
             FROM app_taxa parent
@@ -302,46 +334,44 @@ const stepDerivedFamilies = async (client) => {
     }
 };
 
-const stepHierarchy = async (client) => {
-    log("Building Ltree Hierarchy (Iterative)...");
-    
-    // Forced Analyze to help the query planner (v2.31.13)
-    log("  Refreshing database statistics...");
-    await client.query(`ANALYZE app_taxa`);
+const stepHierarchy = async () => {
+    log("Building Ltree Hierarchy (Iterative & Robust)...");
+    await robustQuery(`ANALYZE app_taxa`);
 
-    // Safety check: Are parents linked?
-    const linkCheck = await client.query(`SELECT count(parent_id) as cnt FROM app_taxa WHERE parent_id IS NOT NULL`);
-    if (parseInt(linkCheck.rows[0].cnt) === 0) {
-        warn("No parent_id links found in app_taxa. Run Step 8 (Link Parents) first.");
-        const proceed = await askQuestion("Proceed anyway? (y/n): ");
-        if (proceed.toLowerCase() !== 'y') return;
-    }
+    const pathCheck = await robustQuery(`SELECT count(hierarchy_path) as cnt FROM app_taxa WHERE hierarchy_path IS NOT NULL`);
+    const pathsExist = parseInt(pathCheck.rows[0].cnt) > 0;
 
-    // Segmented Clear: Setting 1.4M rows to NULL at once often hangs (v2.31.13)
-    log("  Resetting hierarchy paths (Segmented)...");
-    for (const seg of SEGMENTS) {
-        process.stdout.write(`    Resetting ${seg.label}... \r`);
-        await client.query(`UPDATE app_taxa SET hierarchy_path = NULL WHERE taxon_name >= $1 AND taxon_name < $2`, [seg.start, seg.end]);
+    if (pathsExist) {
+        warn("Existing hierarchy paths detected.");
+        const choice = await askQuestion("Would you like to (R)esume/Finish current build or (S)tart over from zero? (R/S): ");
+        if (choice.toLowerCase() === 's') {
+            log("  Resetting hierarchy paths (Segmented)...");
+            for (const seg of SEGMENTS) {
+                process.stdout.write(`    Resetting ${seg.label}... \r`);
+                await robustQuery(`UPDATE app_taxa SET hierarchy_path = NULL WHERE taxon_name >= $1 AND taxon_name < $2`, [seg.start, seg.end]);
+            }
+            console.log("\n    Reset complete.");
+        } else {
+            log("  Resuming build. Existing paths will be preserved.");
+        }
     }
-    console.log("\n    Reset complete.");
 
     // Level 1: Roots
     log("  Processing Level 1: Roots...");
-    const rootRes = await client.query(`
+    const rootRes = await robustQuery(`
         UPDATE app_taxa 
         SET hierarchy_path = text2ltree('root') || text2ltree(replace(id::text, '-', '_'))
-        WHERE parent_id IS NULL
+        WHERE parent_id IS NULL AND hierarchy_path IS NULL
     `);
-    log(`    Found ${rootRes.rowCount} roots.`);
+    log(`    Updated ${rootRes.rowCount} new roots.`);
 
     let level = 2;
     while (true) {
         log(`  Processing Level ${level}...`);
         let totalUpdated = 0;
         
-        // Split by segment to prevent timeouts on the join
         for (const seg of SEGMENTS) {
-            const res = await client.query(`
+            const res = await robustQuery(`
                 UPDATE app_taxa c
                 SET hierarchy_path = p.hierarchy_path || text2ltree(replace(c.id::text, '-', '_'))
                 FROM app_taxa p
@@ -357,13 +387,18 @@ const stepHierarchy = async (client) => {
         }
         
         console.log(`\n    Level ${level} complete. Total: ${totalUpdated} records.`);
-        if (totalUpdated === 0) break;
+        if (totalUpdated === 0) {
+            const orphans = await robustQuery(`SELECT count(*) as cnt FROM app_taxa WHERE hierarchy_path IS NULL`);
+            if (parseInt(orphans.rows[0].cnt) > 0) {
+                warn(`${orphans.rows[0].cnt} records still missing paths. Check linkage.`);
+            }
+            break;
+        }
         level++;
     }
 
-    // False Root Recovery (Protcol v2.31.5)
     log("  Grafting temporary false roots...");
-    await client.query(`
+    await robustQuery(`
         UPDATE app_taxa c
         SET hierarchy_path = p.hierarchy_path || text2ltree(replace(c.id::text, '-', '_'))
         FROM app_taxa p
@@ -373,11 +408,11 @@ const stepHierarchy = async (client) => {
     `);
 };
 
-const stepCounts = async (client) => {
+const stepCounts = async () => {
     log("Calculating Descendant Counts...");
     for (const seg of SEGMENTS) {
         log(`  Updating Counts for Segment: ${seg.label}...`);
-        await client.query(`
+        await robustQuery(`
             WITH counts AS (
                 SELECT parent_id, COUNT(*) as cnt
                 FROM app_taxa
@@ -393,10 +428,10 @@ const stepCounts = async (client) => {
     }
 };
 
-const stepOptimize = async (client) => {
+const stepOptimize = async () => {
     log("Applying V8.1 Index Optimizations...");
     const sql = fs.readFileSync(FILE_OPTIMIZE, 'utf-8');
-    await client.query(sql);
+    await robustQuery(sql);
 };
 
 // --- ORCHESTRATOR ---
@@ -436,18 +471,11 @@ async function main() {
 
     if (sequence.length === 0) { err("No steps selected."); process.exit(1); }
 
-    let client = null;
     try {
-        // Only need client for DB steps
-        const dbStepIds = [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13];
-        if (sequence.some(id => dbStepIds.includes(id))) {
-            client = await getClient();
-        }
-
         for (const id of sequence) {
             const step = STEPS.find(s => s.id === id);
             log(`\x1b[35m[STEP ${id}]\x1b[0m Executing: ${step.label}...`);
-            await step.fn(client);
+            await step.fn();
         }
 
         log("\x1b[32mBuild Complete!\x1b[0m");
@@ -455,7 +483,7 @@ async function main() {
         err(`Process failed at step.`);
         console.error(e);
     } finally {
-        if (client) await client.end();
+        if (activeClient) await activeClient.end();
     }
 }
 

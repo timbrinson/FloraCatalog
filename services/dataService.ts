@@ -1,5 +1,5 @@
 import { getSupabase, getIsOffline } from './supabaseClient';
-import { Taxon, Synonym, Link, DataSource } from '../types';
+import { Taxon, Synonym, Link, DataSource, BuildDashboardData } from '../types';
 
 /**
  * Service to handle interaction with the Supabase PostgreSQL Database.
@@ -242,6 +242,40 @@ export const dataService = {
     const finalCount = isBaseline ? 1440000 : (count || -1);
     
     return { data: (data || []).map(mapFromDB), count: finalCount };
+  },
+
+  async getBuildDashboard(): Promise<BuildDashboardData | null> {
+    if (getIsOffline()) return null;
+    
+    try {
+        const supabase = getSupabase();
+        
+        // Use parallel queries for dashboard performance
+        const [totalRes, builtRes, ordersRes, orphansRes] = await Promise.all([
+            supabase.from(DB_TABLE).select('*', { count: 'estimated', head: true }),
+            supabase.from(DB_TABLE).select('id', { count: 'exact', head: true }).not('hierarchy_path', 'is', null),
+            supabase.from(DB_TABLE).select('id', { count: 'exact', head: true }).eq('taxon_rank', 'Order').is('parent_id', null).not('hierarchy_path', 'is', null),
+            supabase.from(DB_TABLE).select('id', { count: 'exact', head: true }).neq('taxon_rank', 'Order').is('parent_id', null).not('hierarchy_path', 'is', null)
+        ]);
+
+        const total = totalRes.count || 1441043; // Fallback to your reported total
+        const built = builtRes.count || 0;
+        const cleaned = total - (total - built); // Logic: How many are NOT NULL?
+
+        // This matches your Query 9 and 10 logic
+        return {
+            total_records: total,
+            dirty_paths: total - built, 
+            cleaned_rows: built,
+            paths_built: built,
+            wfo_order_roots: ordersRes.count || 0,
+            orphaned_roots: orphansRes.count || 0,
+            reset_completion: built > 0 ? 100 : 0, // In Query 9 context, reset completion means hierarchy_path IS NULL
+            build_completion: Math.round((built * 100.0) / total)
+        };
+    } catch (e) {
+        return null;
+    }
   },
 
   async getTaxonById(id: string): Promise<Taxon | null> {

@@ -1,7 +1,12 @@
-import React, { useState } from 'react';
-import { X, Settings, Layout, Zap, Palette, Database, Save, Search as SearchIcon, Cpu, AlertTriangle, RefreshCw, Loader2, Trash2, Bug, RotateCcw, Download, Droplets, Type, Square, Grid2X2 } from 'lucide-react';
-import { UserPreferences, RankPallet, PalletLevel } from '../types';
-import { reloadClient, MANUAL_URL, MANUAL_KEY } from '../services/supabaseClient';
+import React, { useState, useEffect } from 'react';
+import { 
+    X, Settings, Layout, Zap, Palette, Database, Save, Search as SearchIcon, 
+    Cpu, AlertTriangle, RefreshCw, Loader2, Trash2, Bug, RotateCcw, 
+    Download, Droplets, Type, Square, Grid2X2, Activity, ShieldCheck, 
+    ServerCrash, CheckCircle2, TrendingUp
+} from 'lucide-react';
+import { UserPreferences, RankPallet, PalletLevel, BuildDashboardData } from '../types';
+import { reloadClient, MANUAL_URL, MANUAL_KEY, getIsOffline } from '../services/supabaseClient';
 import { dataService } from '../services/dataService';
 import ConfirmDialog from './ConfirmDialog';
 
@@ -19,14 +24,32 @@ const TAILWIND_COLORS = ['slate', 'gray', 'zinc', 'neutral', 'stone', 'red', 'or
 const WEIGHTS = [50, 100, 200, 300, 400, 500, 600, 700, 800, 900];
 
 const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, preferences, onUpdate, onMaintenanceComplete, onSaveLayout, onReloadLayout }) => {
-  if (!isOpen) return null;
-
   const [dbUrl, setDbUrl] = useState(localStorage.getItem('supabase_url') || MANUAL_URL);
   const [dbKey, setDbKey] = useState(localStorage.getItem('supabase_anon_key') || MANUAL_KEY);
   const [isPurging, setIsPurging] = useState(false);
   const [isWiping, setIsWiping] = useState(false);
   const [showPurgeConfirm, setShowPurgeConfirm] = useState(false);
   const [showWipeConfirm, setShowWipeConfirm] = useState(false);
+  
+  const [buildData, setBuildData] = useState<BuildDashboardData | null>(null);
+  const [isLoadingBuild, setIsLoadingBuild] = useState(false);
+
+  useEffect(() => {
+      if (!isOpen || getIsOffline()) return;
+
+      const refresh = async () => {
+          setIsLoadingBuild(true);
+          const data = await dataService.getBuildDashboard();
+          if (data) setBuildData(data);
+          setIsLoadingBuild(false);
+      };
+
+      refresh();
+      const interval = setInterval(refresh, 5000); // 5s auto-refresh
+      return () => clearInterval(interval);
+  }, [isOpen]);
+
+  if (!isOpen) return null;
 
   const pallet = preferences.grid_pallet || {
     family: { base_color: 'rose', cell_bg_weight: 50, text_weight: 600, badge_bg_weight: 100, badge_border_weight: 200 },
@@ -148,6 +171,86 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, preferen
         <button onClick={onClose} className="absolute top-4 right-4 text-slate-400 hover:text-slate-600"><X size={20} /></button>
         <div className="flex items-center gap-2 mb-6"><Settings className="text-slate-700" size={24} /><h3 className="text-xl font-bold text-slate-800">Settings</h3></div>
         <div className="space-y-8">
+            
+            {/* NEW: Database Health Dashboard */}
+            <div>
+                <div className="flex justify-between items-center mb-3">
+                    <h4 className="text-sm font-bold text-slate-700 uppercase tracking-wide flex items-center gap-2"><TrendingUp size={14}/> Database Health</h4>
+                    {isLoadingBuild && <Loader2 size={12} className="animate-spin text-leaf-500" />}
+                </div>
+                <div className="bg-slate-900 rounded-lg p-4 text-white space-y-4 shadow-inner">
+                    {buildData ? (
+                        <>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <span className="text-[9px] font-bold text-slate-400 uppercase block mb-1">Total Records</span>
+                                    <span className="text-lg font-mono font-bold leading-none">{(buildData.total_records || 0).toLocaleString()}</span>
+                                </div>
+                                <div>
+                                    <span className="text-[9px] font-bold text-slate-400 uppercase block mb-1">WFO Orders</span>
+                                    <div className="flex items-center gap-1.5">
+                                        <span className="text-lg font-mono font-bold leading-none">{buildData.wfo_order_roots || 0}</span>
+                                        {buildData.wfo_order_roots >= 507 ? <ShieldCheck size={14} className="text-leaf-400" /> : <AlertTriangle size={14} className="text-amber-400" />}
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="space-y-1.5">
+                                <div className="flex justify-between text-[9px] font-bold uppercase text-slate-400">
+                                    <span>Reset Phase (Query 9)</span>
+                                    <span>{buildData.cleaned_rows >= buildData.total_records ? '100%' : 'Cleaning...'}</span>
+                                </div>
+                                <div className="h-2 w-full bg-slate-800 rounded-full overflow-hidden border border-slate-700">
+                                    <div 
+                                        className="h-full bg-blue-500 transition-all duration-1000" 
+                                        style={{ width: `${Math.min(100, (buildData.cleaned_rows / buildData.total_records) * 100)}%` }}
+                                    ></div>
+                                </div>
+                                <div className="flex justify-between text-[8px] text-slate-500 font-mono italic">
+                                    <span>{buildData.cleaned_rows.toLocaleString()} Clean</span>
+                                    <span>{buildData.dirty_paths.toLocaleString()} Remaining</span>
+                                </div>
+                            </div>
+
+                            <div className="space-y-1.5">
+                                <div className="flex justify-between text-[9px] font-bold uppercase text-slate-400">
+                                    <span>Build Phase (Query 10)</span>
+                                    <span>{buildData.build_completion}%</span>
+                                </div>
+                                <div className="h-2 w-full bg-slate-800 rounded-full overflow-hidden border border-slate-700">
+                                    <div 
+                                        className="h-full bg-leaf-500 transition-all duration-1000" 
+                                        style={{ width: `${buildData.build_completion}%` }}
+                                    ></div>
+                                </div>
+                                <div className="flex justify-between text-[8px] text-slate-500 font-mono italic">
+                                    <span>{buildData.paths_built.toLocaleString()} Built</span>
+                                    <span>Orphans: {buildData.orphaned_roots}</span>
+                                </div>
+                            </div>
+
+                            <div className="flex items-center gap-2 pt-1">
+                                {buildData.build_completion >= 99 ? (
+                                    <span className="flex items-center gap-1.5 text-[10px] font-bold text-leaf-400 bg-leaf-400/10 px-2 py-0.5 rounded border border-leaf-400/20">
+                                        <CheckCircle2 size={12}/> V8.1 Production Baseline Ready
+                                    </span>
+                                ) : (
+                                    <span className="flex items-center gap-1.5 text-[10px] font-bold text-amber-400 bg-amber-400/10 px-2 py-0.5 rounded border border-amber-400/20 animate-pulse">
+                                        <Activity size={12}/> Active Hierarchy Construction
+                                    </span>
+                                )}
+                            </div>
+                        </>
+                    ) : (
+                        <div className="flex flex-col items-center justify-center py-6 text-slate-500">
+                            <ServerCrash size={32} className="mb-2 opacity-50" />
+                            <p className="text-xs font-bold uppercase tracking-tight">Diagnostics Unavailable</p>
+                            <p className="text-[10px] italic">Check network connectivity or SQL Table 'app_taxa'</p>
+                        </div>
+                    )}
+                </div>
+            </div>
+
             <div>
                 <div className="flex justify-between items-center mb-3">
                     <h4 className="text-sm font-bold text-slate-700 uppercase tracking-wide flex items-center gap-2"><Layout size={14}/> Persistence</h4>
