@@ -1,8 +1,20 @@
 # Version History
 
+## v2.31.4 - Baseline Verification & Atomic Repair
+**Date:** January 11, 2026
+**Status:** Current Release
+
+### Data Integrity & Verification
+- **Population Audit:** Verified that high-volume population counts (e.g., Asteraceae: 86k, Poaceae: 60k) are accurate representations of the WCVP dataset, confirming the system's ability to handle massive direct-child navigation nodes.
+- **Atomic Segmented Repair:** Finalized the `repair_data.js` utility (v1.4.8) to use single-transaction atomic updates per segment. This ensures grid counts are character-perfect mirrors of the physical database state without requiring multi-pass resets.
+- **Diagnostic Expansion:** Upgraded the diagnostic toolset with Query 18 to facilitate live mismatched count audits.
+
+### Infrastructure
+- **Version Sync:** Synchronized application version across manifest, components, and documentation.
+
 ## v2.31.3 - API Resilience & Dynamic UX
 **Date:** July 09, 2025
-**Status:** Current Release
+**Status:** (Historical)
 
 ### Resilience & Optimization
 - **500 Error Resolution:** Fixed a high-severity bug where multi-word status filters (e.g., 'Artificial Hybrid') caused 500 "No API key found" errors. Hardened `dataService.ts` to strictly quote PostgREST string literals in `or()` and `in()` request segments.
@@ -70,7 +82,7 @@
 - **Compact Column Picker:** Redesigned the Column Selector UI using a gap-free CSS multi-column layout for higher information density.
 - **Reordered Settings:** Relocated the Grid Customization section to be positioned logically right above the Maintenance area.
 
-## v2.29.0 - Stability Baseline & Evolution Cleanup
+## v2.29.0 - Persistence & Performance
 **Date:** July 05, 2025
 **Status:** (Historical)
 
