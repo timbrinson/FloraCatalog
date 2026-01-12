@@ -1,5 +1,5 @@
 -- =============================================================================
--- DATA IMPORT DIAGNOSTIC TOOL (v2.31.21)
+-- DATA IMPORT DIAGNOSTIC TOOL (v2.31.26)
 -- Run this to see how much of your database is fully linked and calculated.
 -- =============================================================================
 
@@ -209,3 +209,19 @@ JOIN pg_stat_activity a ON l.pid = a.pid
 WHERE l.relation = 'app_taxa'::regclass 
   AND l.pid != pg_backend_pid()
   AND a.state != 'idle';
+
+-- 18. DIRECT CHILD AUDIT (v2.31.26)
+-- Finds records with mismatched child counts (Stored vs Real).
+SELECT 
+    p.taxon_name, 
+    p.taxon_rank, 
+    p.descendant_count as stored_count,
+    (SELECT count(*) FROM app_taxa c WHERE c.parent_id = p.id) as real_child_rows,
+    CASE 
+        WHEN p.descendant_count != (SELECT count(*) FROM app_taxa c WHERE c.parent_id = p.id) THEN 'MISMATCH (ZOMBIE DATA)'
+        ELSE 'OK'
+    END as health_status
+FROM app_taxa p
+WHERE p.descendant_count > 0 OR EXISTS (SELECT 1 FROM app_taxa c WHERE c.parent_id = p.id)
+ORDER BY stored_count DESC
+LIMIT 50;
