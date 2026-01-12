@@ -24,6 +24,9 @@ const TAILWIND_COLORS = ['slate', 'gray', 'zinc', 'neutral', 'stone', 'red', 'or
 const WEIGHTS = [50, 100, 200, 300, 400, 500, 600, 700, 800, 900];
 
 const DEFAULT_PALLET_INTERNAL: RankPallet = {
+  kingdom: { base_color: 'slate', cell_bg_weight: 50, text_weight: 600, badge_bg_weight: 100, badge_border_weight: 200 },
+  phylum: { base_color: 'gray', cell_bg_weight: 50, text_weight: 600, badge_bg_weight: 100, badge_border_weight: 200 },
+  class: { base_color: 'zinc', cell_bg_weight: 50, text_weight: 600, badge_bg_weight: 100, badge_border_weight: 200 },
   order: { base_color: 'purple', cell_bg_weight: 50, text_weight: 600, badge_bg_weight: 100, badge_border_weight: 200 },
   family: { base_color: 'rose', cell_bg_weight: 50, text_weight: 600, badge_bg_weight: 100, badge_border_weight: 200 },
   genus: { base_color: 'emerald', cell_bg_weight: 50, text_weight: 600, badge_bg_weight: 100, badge_border_weight: 200 },
@@ -315,6 +318,9 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, preferen
                 </div>
                 <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 space-y-3">
                     <p className="text-[10px] text-slate-500 mb-2">Granular control over grid colors and weights (Tailwind CSS v3 based).</p>
+                    {renderPalletRow('Kingdom', 'kingdom')}
+                    {renderPalletRow('Phylum', 'phylum')}
+                    {renderPalletRow('Class', 'class')}
                     {renderPalletRow('Order', 'order')}
                     {renderPalletRow('Family', 'family')}
                     {renderPalletRow('Genus', 'genus')}

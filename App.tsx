@@ -18,7 +18,11 @@ interface AppLayoutConfig {
     colWidths?: Record<string, number>;
 }
 
+// Fix: DEFAULT_PALLET was missing kingdom, phylum, and class keys required by RankPallet
 const DEFAULT_PALLET: RankPallet = {
+  kingdom: { base_color: 'slate', cell_bg_weight: 50, text_weight: 600, badge_bg_weight: 100, badge_border_weight: 200 },
+  phylum: { base_color: 'gray', cell_bg_weight: 50, text_weight: 600, badge_bg_weight: 100, badge_border_weight: 200 },
+  class: { base_color: 'zinc', cell_bg_weight: 50, text_weight: 600, badge_bg_weight: 100, badge_border_weight: 200 },
   order: { base_color: 'purple', cell_bg_weight: 50, text_weight: 600, badge_bg_weight: 100, badge_border_weight: 200 },
   family: { base_color: 'rose', cell_bg_weight: 50, text_weight: 600, badge_bg_weight: 100, badge_border_weight: 200 },
   genus: { base_color: 'emerald', cell_bg_weight: 50, text_weight: 600, badge_bg_weight: 100, badge_border_weight: 200 },

@@ -87,7 +87,7 @@ If the script fails to connect with "Authentication failed," or `password authen
 
 ---
 
-## 6. The Build Workflow (v2.31.8)
+## 6. The Build Workflow (v2.32.0)
 
 The `scripts/automate_build.js` is an interactive CLI with two execution modes:
 
@@ -98,7 +98,7 @@ Select a single number. The script runs that step and every step following it.
 
 ### Mode 2: Granular (Enrichment/Recovery)
 Enter a comma-separated list (e.g. `2, 5, 9, 10, 11, 13`). This executes **ONLY** the specified steps. 
-*   **Use Case:** Adding Phylogenetic (WFO) data to an existing WCVP baseline.
+*   **Use Case:** Adding Phylogenetic and Higher Rank (WFO) data to an existing WCVP baseline.
 *   **Use Case:** Resuming a failed build without re-streaming 1.4 million records.
 
 ### Step-by-Step Flow
@@ -106,16 +106,16 @@ Enter a comma-separated list (e.g. `2, 5, 9, 10, 11, 13`). This executes **ONLY*
 | # | Action | Automated? | Method | Description |
 | :--- | :--- | :--- | :--- | :--- |
 | **1** | **Prepare WCVP** | Auto | Python | Runs `convert_wcvp.py.txt` to clean pipe-delimited data. |
-| **2** | **Prepare WFO** | Auto | Python | Runs `distill_wfo.py.txt` to export backbone ranks (Family and above). |
+| **2** | **Prepare WFO** | Auto | Python | Runs `distill_wfo.py.txt` to export backbone ranks (Kingdom down to Family). |
 | **3** | **Reset Database** | Auto | SQL | Wipes schema and recreates empty tables (`wcvp_schema.sql.txt`). |
 | **4** | **Import WCVP** | Auto | `COPY` | Streams cleaned WCVP CSV into the `wcvp_import` staging table. |
 | **5** | **Import WFO** | Auto | `COPY` | Streams the filtered WFO Darwin Core into the `wfo_import` table. |
 | **6** | **Populate App** | Auto | SQL | Moves data from `wcvp_import` to the core `app_taxa` table in segments. |
 | **7** | **Build Indexes** | Auto | SQL | Creates structural indexes required for high-speed linking. |
 | **8** | **Link Parents** | Auto | SQL | Updates `parent_id` UUIDs based on scientific lineage in segments. |
-| **9** | **WFO Orders** | Auto | SQL | Creates 'Order' records (Source 3) and links them to Family records via SQL. |
-| **10** | **Derived Families**| Auto | SQL | Creates physical 'Family' records (Source 2) for unlinked orphans. |
-| **11** | **Hierarchy** | Auto | SQL | Recursively calculates Ltree paths (`root.order.family...`) in segments. |
+| **9** | **WFO Higher Ranks** | Auto | SQL | Creates Kingdom, Phylum, Class, and Order records and links the backbone hierarchy. |
+| **10** | **Derived Backbone**| Auto | SQL | Links unlinked WCVP Families to their WFO parents and propagates literal strings. |
+| **11** | **Hierarchy** | Auto | SQL | Recursively calculates Ltree paths (`root.kingdom.phylum.class.order.family...`) in segments. |
 | **12** | **Counts** | Auto | SQL | Calculates descendant counts for the UI Grid # column in segments. |
 | **13** | **Optimize** | Auto | SQL | Runs `optimize_indexes.sql.txt` for V8.1 production performance. |
 
@@ -157,16 +157,16 @@ If you populated records in chunks (e.g., A-S first, then T-Z), you must run a *
 
 ## 🚀 WFO Enrichment (Backbone Only)
 
-If your WCVP data is already loaded and you only want to add the Phylogenetic (Order) layer:
+If your WCVP data is already loaded and you only want to add the Phylogenetic and Higher Rank (Kingdom, Phylum, Class, Order) layer:
 1.  **Download WFO Backbone** (`_DwC_backbone_R.zip`) to `data/input/`.
 2.  Run `npm run db:build`.
 3.  Enter: `2, 5, 9, 10, 11, 12, 13`.
     *   **2:** Distills the 950MB WFO zip locally into a filtered `wfo_import.csv` file.
     *   **5:** Streams the filtered table into the `wfo_import` staging table.
-    *   **9:** Creates physical 'Order' records (Source 3) and links Families using SQL set logic.
-    *   **10:** Links orphan Genera to Families.
-    *   **11:** Recalculates Hierarchy Paths (Select 'All' segments to shift the tree down).
-    *   **12:** Recalculates Counts (Updates Grid # for the new Order records).
+    *   **9:** Creates physical Kingdom, Phylum, Class, and Order records (Source 3) and links the hierarchy using SQL set logic.
+    *   **10:** Links WCVP Families to their WFO parents and propagates rank literals down the hierarchy.
+    *   **11:** Recalculates Hierarchy Paths (Select 'All' segments to shift the entire tree down).
+    *   **12:** Recalculates Counts (Updates Grid # for the new higher rank records).
     *   **13:** Re-optimizes indexes for high-speed filtering.
 
 ---

@@ -6,7 +6,7 @@ export interface PalletLevel {
   badge_border_weight: number;
 }
 
-export type RankPallet = Record<'order' | 'family' | 'genus' | 'species' | 'infraspecies' | 'cultivar', PalletLevel>;
+export type RankPallet = Record<'kingdom' | 'phylum' | 'class' | 'order' | 'family' | 'genus' | 'species' | 'infraspecies' | 'cultivar', PalletLevel>;
 
 export interface UserPreferences {
   hybrid_spacing: 'space' | 'nospace';
@@ -70,6 +70,9 @@ export interface Taxon {
   taxon_rank: string;
   taxon_name: string;
   taxon_status: string;
+  kingdom?: string;
+  phylum?: string;
+  class?: string;
   order?: string;
   family?: string;
   common_name?: string;

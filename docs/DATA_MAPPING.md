@@ -11,31 +11,32 @@ Per **ADR-004 (Universal Naming Standardization)**, this document serves as the 
 
 ## Master Mapping Table
 
-| Group | Grid Column(DataGridV2) | Grid Column Filter Type | Grid Column Default Setting | Grid Column Default Value | Grid Label | Grid Label Tooltip | System Literal (snake_case) | DB Column (Identity Check) | WCVP Column | WCVP Value | WCVP Class | WCVP Description | WCVP Remark (Notes) |
+| Group | Grid Column | Filter Type | Default Setting | Default Value | Grid Label | Grid Label Tooltip | System Literal (snake_case) | DB Column (Identity Check) | WCVP Column | WCVP Value | WCVP Class | WCVP Description | WCVP Remark (Notes) |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
 | **System** | id | Text | unselected | (none) | Internal ID | Internal UUID | id | id | — | — | — | — | — |
 | | parent_id | Text | unselected | (none) | Parent ID | Parent UUID | parent_id | parent_id | — | — | — | — | — |
-| | treeControl | — | selected | tree | Tree | Tree Control | — | — | — | — | — | — | — | — |
+| | tree_control | — | selected | tree | Tree | Tree Control | — | — | — | — | — | — | — | — |
 | | descendant_count | Text | selected | (none) | # | Child Count | descendant_count | descendant_count | — | — | — | — | — |
 | | actions | — | unselected | — | Actions | Actions | — | — | — | — | — | — | — | — |
-| **Taxonomy** | taxon_name | Text | selected | (none) | Plant Name | Scientific Name | taxon_name | taxon_name | taxon_name | | chr | Concatenation of genus with species and, where applicable, infraspecific epithets to make a binomial or trinomial name. | |
-| | taxon_rank | Multi-select | unselected | (none) | Rank | Taxonomic Rank | taxon_rank | taxon_rank | taxon_rank | Order, Family, Genus, proles, Species, Subform, Subspecies, Subvariety, Variety | chr | The level in the taxonomic hierarchy where the taxon name fits. | |
-| | taxon_status | Multi-select | unselected | Accepted | Status | Taxonomic Status | taxon_status | taxon_status | taxon_status | Accepted, Artificial Hybrid, Illegitimate, Invalid, Local Biotype, Misapplied, Orthographic, Synonym, Unplaced, Provisionally Accepted | chr | Indication of nomenclatural status and taxonomic opinion re the name. | |
-| | order | Text | unselected | (none) | Order | Order | order | order | order | | chr | The name of the order from WFO to which the family belongs. | |
-| | family | Text | unselected | (none) | Family | Family | family | family | family | | chr | The name of the family to which the taxon belongs. | |
-| | hybrid_formula | Text | unselected | (none) | Hybrid Formula | Hybrid Formula | hybrid_formula | hybrid_formula | hybrid_formula | | chr | parents of hybrid | |
-| **Nomenclature** | genus | Text | selected | (none) | Genus | Genus Designation | genus | genus | genus | 0 | chr | The name of the genus to which the record refers. | |
-| | genus_hybrid | Multi-select | selected | (none) | GH | Genus Hybrid Indicator | genus_hybrid | genus_hybrid | genus_hybrid | +, × | chr | Indication of hybrid status at genus level. | |
-| | species | Text | selected | (none) | Species | Species Designation | species | species | species | 0 | chr | The species epithet. | |
-| | species_hybrid | Multi-select | selected | (none) | SH | Species Hybrid Indicator | species_hybrid | species_hybrid | species_hybrid | +, × | chr | Indication of hybrid status at species level. | |
-| | infraspecific_rank | Multi-select | selected | (none) | I Rank | Infraspecific Rank | infraspecific_rank | infraspecific_rank | infraspecific_rank | agamosp., convar., ecas., f., grex, group, lusus, microf., microgene, micromorphe, modif., monstr., mut., nid, nothof., nothosubsp., nothovar., positio, proles, provar., psp., stirps, subf., sublusus, subproles, subsp., subspecioid, subvar., unterrasse, var. | chr | Taxonomic rank of the infraspecific epithet. | See Tech Notes |
-| | infraspecies | Text | selected | (none) | Infraspecies | Infraspecific Designation | infraspecies | infraspecies | infraspecies | 0 | chr | The infraspecific epithet. | |
-| | cultivar | Text | selected | (none) | Cultivar | Cultivar Name | cultivar | cultivar | — | — | — | — | — |
+| **Taxonomy** | taxon_name | Text | selected | (none) | Plant Name | Scientific Name | taxon_name | taxon_name | taxon_name | | chr | Full name string | |
+| | taxon_rank | Multi-select | unselected | (none) | Rank | Taxonomic Rank | taxon_rank | taxon_rank | taxon_rank | Kingdom, Phylum... | chr | Hierarchical level | |
+| | taxon_status | Multi-select | unselected | Accepted | Status | Taxonomic Status | taxon_status | taxon_status | taxon_status | Accepted, Synonym... | chr | Nomenclatural status | |
+| | kingdom | Text | unselected | (none) | Kingdom | Taxonomic Kingdom | kingdom | kingdom | (WFO) | | chr | WFO Backbone literal | |
+| | phylum | Text | unselected | (none) | Phylum | Taxonomic Phylum | phylum | phylum | (WFO) | | chr | WFO Backbone literal | |
+| | class | Text | unselected | (none) | Class | Taxonomic Class | class | class | (WFO) | | chr | WFO Backbone literal | |
+| | order | Text | selected | (none) | Order | Phylogenetic Order | order | order | (WFO) | | chr | WFO Backbone literal | |
+| | family | Text | unselected | (none) | Family | Family Name | family | family | family | | chr | Botanical Family | |
+| | hybrid_formula | Text | unselected | (none) | Hybrid Formula | Hybrid Formula | hybrid_formula | hybrid_formula | hybrid_formula | | chr | Hybrid parentage | |
+| **Nomenclature** | genus_hybrid | Multi-select | selected | (none) | GH | Genus Hybrid Indicator | genus_hybrid | genus_hybrid | genus_hybrid | +, × | chr | Hybrid marker | |
+| | genus | Text | selected | (none) | Genus | Genus Designation | genus | genus | genus | | chr | Botanical Genus | |
+| | species_hybrid | Multi-select | selected | (none) | SH | Species Hybrid Indicator | species_hybrid | species_hybrid | species_hybrid | +, × | chr | Hybrid marker | |
+| | species | Text | selected | (none) | Species | Species Designation | species | species | species | | chr | Specific epithet | |
+| | infraspecific_rank | Multi-select | selected | (none) | I Rank | Infraspecific Rank | infraspecific_rank | infraspecific_rank | infraspecific_rank | subsp., var... | chr | Rank of infraspecies | |
+| | infraspecies | Text | selected | (none) | Infraspecies | Infraspecific Designation | infraspecies | infraspecies | infraspecies | | chr | Infraspecific epithet | |
+| | cultivar | Text | selected | (none) | Cultivar | Cultivar Name | cultivar | cultivar | (ICNCP) | | chr | Cultivated variety | |
 | **Descriptive** | common_name | Text | unselected | (none) | Common Name | Common Name | common_name | common_name | — | — | — | — | — |
 | | description_text | Text | unselected | (none) | Description | Description | description_text | description_text | — | — | — | — | — |
-| | — | | unselected | (none) | — | — | reference_links | reference_links | — | — | — | — | — |
-| | — | | unselected | (none) | — | — | alternative_names | alternative_names | — | — | — | — | — |
-| | geographic_area | Text | unselected | (none) | Geography | Geographic Area | geographic_area | geographic_area | geographic_area | 0 | chr | Geographic distribution of the taxon. | See Tech Notes |
+| | geographic_area | Text | unselected | (none) | Geography | Geographic Area | geographic_area | geographic_area | geographic_area | 0 | chr | Geographic distribution of the taxon. | |
 | | lifeform_description| Text | unselected | (none) | Lifeform | Lifeform Description | lifeform_description | lifeform_description | lifeform_description| 0 | chr | Lifeform (or lifeforms) of the taxon. | Raunkiær system |
 | | climate_description | Multi-select | unselected | (none) | Climate | Climate Description | climate_description | climate_description | climate_description | desert or dry shrubland, montane tropical, etc. | chr | Habitat type of the taxon. | |
 | **Standard Identifiers**| wcvp_id | Text | unselected | (none) | WCVP ID | WCVP Plant Name ID | wcvp_id | wcvp_id | plant_name_id | | chr | World Checklist of Vascular Plants identifier | |
@@ -82,4 +83,4 @@ These fields are stored in the `app_taxon_details` table and are used to enrich 
 
 ### Climate Literals
 **Values:** `desert or dry shrubland, montane tropical, seasonally dry tropical, subalpine or subarctic, subtropical, subtropical or tropical, temperate, temperate, subtropical or tropical, wet tropical.`
-*Note: These are strictly lowercase in the database.`
+*Note: These are strictly lowercase in the database.*

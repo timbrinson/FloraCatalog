@@ -18,40 +18,49 @@ import {
 } from 'lucide-react';
 
 
-// Implementation of Grid Display Spec v2.31.21 (Order Level Extension)
-// Comprehensive rank mapping including phylogenetic backbone (Order).
+// Implementation of Grid Display Spec v2.32.0 (Higher Rank Extension)
+// Comprehensive rank mapping including Kingdom, Phylum, Class.
 const RANK_LEVELS: Record<string, number> = {
-    'order': 1,
-    'family': 2,
-    'genus': 3,
-    'species': 4,
-    // Infraspecific Cluster (Level 5)
-    'subspecies': 5, 'subsp.': 5,
-    'variety': 5, 'var.': 5,
-    'subvariety': 5, 'subvar.': 5,
-    'form': 5, 'f.': 5,
-    'subform': 5, 'subf.': 5,
-    'infraspecies': 5,
-    'unranked': 5,
-    'agamosp.': 5, 'convariety': 5, 'convar.': 5, 'ecas.': 5, 'grex': 5, 
-    'lusus': 5, 'microf.': 5, 'microgène': 5, 'micromorphe': 5, 
-    'modif.': 5, 'monstr.': 5, 'mut.': 5, 'nid': 5, 'nothof.': 5, 
-    'nothosubsp.': 5, 'nothovar.': 5, 'positio': 5, 'proles': 5, 
-    'provar.': 5, 'psp.': 5, 'stirps': 5, 'subap.': 5, 'sublusus': 5, 
-    'subproles': 5, 'subspecioid': 5, 'subsubsp.': 5, 'unterrasse': 5,
-    'cultivar': 6
+    'kingdom': 1,
+    'phylum': 2,
+    'class': 3,
+    'order': 4,
+    'family': 5,
+    'genus': 6,
+    'species': 7,
+    // Infraspecific Cluster (Level 8)
+    'subspecies': 8, 'subsp.': 8,
+    'variety': 8, 'var.': 8,
+    'subvariety': 8, 'subvar.': 8,
+    'form': 8, 'f.': 8,
+    'subform': 8, 'subf.': 8,
+    'infraspecies': 8,
+    'unranked': 8,
+    'agamosp.': 8, 'convariety': 8, 'convar.': 8, 'ecas.': 8, 'grex': 8, 
+    'lusus': 8, 'microf.': 8, 'microgène': 8, 'micromorphe': 8, 
+    'modif.': 8, 'monstr.': 8, 'mut.': 8, 'nid': 8, 'nothof.': 8, 
+    'nothosubsp.': 8, 'nothovar.': 8, 'positio': 8, 'proles': 8, 
+    'provar.': 8, 'psp.': 8, 'stirps': 8, 'subap.': 8, 'sublusus': 8, 
+    'subproles': 8, 'subspecioid': 8, 'subsubsp.': 8, 'unterrasse': 8,
+    'cultivar': 9
 };
 
 const COL_RANK_LEVELS: Record<string, number> = {
-    'order': 1,
-    'family': 2,
-    'genus': 3, 'genus_hybrid': 3,
-    'species': 4, 'species_hybrid': 4,
-    'infraspecific_rank': 5, 'infraspecies': 5,
-    'cultivar': 6
+    'kingdom': 1,
+    'phylum': 2,
+    'class': 3,
+    'order': 4,
+    'family': 5,
+    'genus': 6, 'genus_hybrid': 6,
+    'species': 7, 'species_hybrid': 7,
+    'infraspecific_rank': 8, 'infraspecies': 8,
+    'cultivar': 9
 };
 
 const DEFAULT_PALLET: RankPallet = {
+  kingdom: { base_color: 'slate', cell_bg_weight: 50, text_weight: 600, badge_bg_weight: 100, badge_border_weight: 200 },
+  phylum: { base_color: 'gray', cell_bg_weight: 50, text_weight: 600, badge_bg_weight: 100, badge_border_weight: 200 },
+  class: { base_color: 'zinc', cell_bg_weight: 50, text_weight: 600, badge_bg_weight: 100, badge_border_weight: 200 },
   order: { base_color: 'purple', cell_bg_weight: 50, text_weight: 600, badge_bg_weight: 100, badge_border_weight: 200 },
   family: { base_color: 'rose', cell_bg_weight: 50, text_weight: 600, badge_bg_weight: 100, badge_border_weight: 200 },
   genus: { base_color: 'emerald', cell_bg_weight: 50, text_weight: 600, badge_bg_weight: 100, badge_border_weight: 200 },
@@ -60,8 +69,11 @@ const DEFAULT_PALLET: RankPallet = {
   cultivar: { base_color: 'sky', cell_bg_weight: 50, text_weight: 600, badge_bg_weight: 100, badge_border_weight: 200 }
 };
 
-// Simplified Legend Configuration per Backlog (v2.31.21)
+// Simplified Legend Configuration per Backlog (v2.32.0)
 const LEGEND_GROUPS: { label: string; key: keyof RankPallet }[] = [
+    { label: 'Kingdom', key: 'kingdom' },
+    { label: 'Phylum', key: 'phylum' },
+    { label: 'Class', key: 'class' },
     { label: 'Order', key: 'order' },
     { label: 'Family', key: 'family' },
     { label: 'Genus', key: 'genus' },
@@ -147,7 +159,7 @@ const COLUMN_GROUPS: ColumnGroup[] = [
                 tooltip: 'Taxonomic Rank', 
                 defaultWidth: 110, 
                 filterType: 'multi-select', 
-                filterOptions: ['Order', 'Family', 'Genus', 'Species', 'Subspecies', 'Variety', 'Subvariety', 'Form', 'Subform', 'Cultivar', 'Unranked', 'agamosp.', 'Convariety', 'ecas.', 'grex', 'lusus', 'microf.', 'microgène', 'micromorphe', 'modif.', 'monstr.', 'mut.', 'nid', 'nothof.', 'nothosubsp.', 'nothovar.', 'positio', 'proles', 'provar.', 'psp.', 'stirps', 'subap.', 'sublusus', 'subproles', 'subspecioid', 'subsubsp.'], 
+                filterOptions: ['Kingdom', 'Phylum', 'Class', 'Order', 'Family', 'Genus', 'Species', 'Subspecies', 'Variety', 'Subvariety', 'Form', 'Subform', 'Cultivar', 'Unranked', 'agamosp.', 'Convariety', 'ecas.', 'grex', 'lusus', 'microf.', 'microgène', 'micromorphe', 'modif.', 'monstr.', 'mut.', 'nid', 'nothof.', 'nothosubsp.', 'nothovar.', 'positio', 'proles', 'provar.', 'psp.', 'stirps', 'subap.', 'sublusus', 'subproles', 'subspecioid', 'subsubsp.'], 
                 lockWidth: true, 
                 defaultOn: false 
             },
@@ -160,6 +172,9 @@ const COLUMN_GROUPS: ColumnGroup[] = [
                 filterOptions: ['Accepted', 'Synonym', 'Unplaced', 'Registered', 'Provisional', 'Derived', 'Artificial Hybrid', 'Illegitimate', 'Invalid', 'Local Biotype', 'Misapplied', 'Orthographic', 'Provisionally Accepted', 'External to WCVP'], 
                 defaultOn: false 
             },
+            { id: 'kingdom', label: 'Kingdom', tooltip: 'Kingdom', defaultWidth: 100, filterType: 'text', defaultOn: false },
+            { id: 'phylum', label: 'Phylum', tooltip: 'Phylum', defaultWidth: 100, filterType: 'text', defaultOn: false },
+            { id: 'class', label: 'Class', tooltip: 'Class', defaultWidth: 100, filterType: 'text', defaultOn: false },
             { id: 'order', label: 'Order', tooltip: 'Phylogenetic Order', defaultWidth: 120, filterType: 'text', defaultOn: true },
             { id: 'family', label: 'Family', tooltip: 'Family', defaultWidth: 120, filterType: 'text', defaultOn: false },
             { id: 'hybrid_formula', label: 'Hybrid Formula', tooltip: 'Hybrid Formula', defaultWidth: 180, filterType: 'text', defaultOn: false },
@@ -269,37 +284,38 @@ export const DataGrid: React.FC<DataGridProps> = ({
 }) => {
   
   /**
-   * Layout Healers: Ensure new standard features (like 'Order' column) are injected 
-   * even if the user has a legacy saved layout from a previous session.
+   * Layout Healers: Ensure new standard features are injected.
    */
   const healVisibleColumns = useCallback((incoming: Set<string>, incomingOrder?: string[]) => {
       const healed = new Set(incoming);
-      // If 'order' is missing from the saved column order, it's a new feature.
-      // Auto-enable it if it was designed to be on by default.
-      if (incomingOrder && !incomingOrder.includes('order')) {
-          const col = ALL_COLUMNS.find(c => c.id === 'order');
-          if (col?.defaultOn) healed.add('order');
+      const newDefaults = ['kingdom', 'phylum', 'class', 'order'];
+      if (incomingOrder) {
+          newDefaults.forEach(id => {
+              if (!incomingOrder.includes(id)) {
+                  const col = ALL_COLUMNS.find(c => c.id === id);
+                  if (col?.defaultOn) healed.add(id);
+              }
+          });
       }
       return healed;
   }, []);
 
   const healColumnOrder = useCallback((incoming: string[]) => {
       let baseOrder = [...incoming];
-      const missing = ALL_COLUMNS.filter(c => !baseOrder.includes(c.id)).map(c => c.id);
+      const newRanks = ['kingdom', 'phylum', 'class', 'order'];
+      const missing = newRanks.filter(id => !baseOrder.includes(id));
       
-      // Smart Inserter: If 'order' is missing, place it in Index 3 (after tree, count, actions) 
-      // for higher taxonomic visibility, rather than appending it to the end.
-      if (missing.includes('order')) {
-          baseOrder.splice(3, 0, 'order');
-          const remainingMissing = missing.filter(id => id !== 'order');
-          return [...baseOrder, ...remainingMissing];
+      if (missing.length > 0) {
+          // Place at index 3 onwards for high visibility
+          missing.forEach((id, idx) => {
+              baseOrder.splice(3 + idx, 0, id);
+          });
       }
       
-      return [...baseOrder, ...missing];
+      const finalMissing = ALL_COLUMNS.filter(c => !baseOrder.includes(c.id)).map(c => c.id);
+      return [...baseOrder, ...finalMissing];
   }, []);
 
-  // INITIAL STATE ONLY: Rely on initialization and the key prop for resets.
-  // Over-aggressive synchronization effects were causing UI regressions.
   const [visibleColumns, setVisibleColumns] = useState<Set<string>>(() => {
       if (propVisibleColumns !== undefined) {
           return healVisibleColumns(propVisibleColumns, propColumnOrder);
@@ -318,9 +334,6 @@ export const DataGrid: React.FC<DataGridProps> = ({
       if (propColWidths !== undefined) return propColWidths;
       return Object.fromEntries(ALL_COLUMNS.map(c => [c.id, c.defaultWidth]));
   });
-
-  // NO OVERWRITE EFFECTS: Toggling is now durable for the session.
-  // App.tsx uses key={gridKey} to handle formal Reload/Reset events.
 
   useEffect(() => {
       onLayoutUpdate?.({
@@ -357,6 +370,9 @@ export const DataGrid: React.FC<DataGridProps> = ({
   useEffect(() => { 
       if (isHierarchyMode) {
           const levels = [];
+          if (visibleColumns.has('kingdom')) levels.push('kingdom');
+          if (visibleColumns.has('phylum')) levels.push('phylum');
+          if (visibleColumns.has('class')) levels.push('class');
           if (visibleColumns.has('order')) levels.push('order');
           if (visibleColumns.has('family')) levels.push('family');
           levels.push('genus', 'species', 'infraspecies');
@@ -410,11 +426,19 @@ export const DataGrid: React.FC<DataGridProps> = ({
        if (isIndicator) return rawVal || '';
        const rank = (row.taxon_rank || '').toLowerCase();
        
+       if (colId === 'kingdom' && rank === 'kingdom') return row.taxon_name;
+       if (colId === 'phylum' && rank === 'phylum') return row.taxon_name;
+       if (colId === 'class' && rank === 'class') return row.taxon_name;
        if (colId === 'order' && rank === 'order') return row.taxon_name;
        if (colId === 'family' && rank === 'family') return row.taxon_name;
 
-       if (rank === 'family' && colId === 'genus') return '';
+       // Higher rank empty logic
+       if (rank === 'kingdom' && (colId === 'phylum' || colId === 'class' || colId === 'order' || colId === 'family' || colId === 'genus')) return '';
+       if (rank === 'phylum' && (colId === 'class' || colId === 'order' || colId === 'family' || colId === 'genus')) return '';
+       if (rank === 'class' && (colId === 'order' || colId === 'family' || colId === 'genus')) return '';
        if (rank === 'order' && (colId === 'family' || colId === 'genus')) return '';
+       if (rank === 'family' && colId === 'genus') return '';
+       
        if (tr.is_holder && COL_RANK_LEVELS[colId] === RANK_LEVELS[rank]) return '(none)';
        return rawVal;
   };
@@ -433,57 +457,52 @@ export const DataGrid: React.FC<DataGridProps> = ({
   const isRankMatch = (rank: string, target: string) => {
       const r = rank.toLowerCase();
       const t = target.toLowerCase();
-      if (t === 'infraspecies') return (RANK_LEVELS[r] === 5);
+      if (t === 'infraspecies') return (RANK_LEVELS[r] === 8);
       return r === t;
   };
 
   const getTargetIdForRank = (row: Taxon, targetRank: string): string => {
-      if (targetRank === 'order') {
-          if (row.order) return row.order;
-          if (isRankMatch(row.taxon_rank || '', 'order')) return row.taxon_name;
+      const r_target = targetRank.toLowerCase();
+      const isHigherRank = ['kingdom', 'phylum', 'class', 'order', 'family'].includes(r_target);
+      
+      if (isHigherRank) {
+          const storedVal = row[r_target as keyof Taxon];
+          if (storedVal) return storedVal as string;
+          if (isRankMatch(row.taxon_rank || '', r_target)) return row.taxon_name;
+          
           if (row.hierarchy_path) {
               const segments = row.hierarchy_path.split('.');
-              if (segments.length > 1) {
-                  const id = segments[1].replace(/_/g, '-');
+              for (let i = 1; i < segments.length; i++) {
+                  const id = segments[i].replace(/_/g, '-');
                   const auth = authorityRegistry.get(id) || allTaxaPool.find(t => t.id === id);
-                  if (auth && isRankMatch(auth.taxon_rank || '', 'order')) return auth.taxon_name;
+                  if (auth && isRankMatch(auth.taxon_rank || '', r_target)) return auth.taxon_name;
               }
           }
-          return '(none)';
-      }
-      if (targetRank === 'family') {
-          if (row.family) return row.family;
-          if (isRankMatch(row.taxon_rank || '', 'family')) return row.taxon_name;
-          if (row.hierarchy_path) {
-             const segments = row.hierarchy_path.split('.');
-             for (let i = 1; i < segments.length; i++) {
-                 const id = segments[i].replace(/_/g, '-');
-                 const auth = authorityRegistry.get(id) || allTaxaPool.find(t => t.id === id);
-                 if (auth && isRankMatch(auth.taxon_rank || '', 'family')) return auth.taxon_name;
-             }
-          }
+          
           let curr: Taxon | undefined = row;
           while (curr && curr.parent_id) {
               const auth = authorityRegistry.get(curr.parent_id) || allTaxaPool.find(t => t.id === curr!.parent_id);
-              if (auth?.family) return auth.family;
+              const authVal = auth?.[r_target as keyof Taxon];
+              if (authVal) return authVal as string;
               curr = auth;
           }
           return '(none)';
       }
+      
       if (row.hierarchy_path) {
           const segments = row.hierarchy_path.split('.');
           for (let i = 1; i < segments.length; i++) {
               const id = segments[i].replace(/_/g, '-');
               const auth = authorityRegistry.get(id) || allTaxaPool.find(t => t.id === id);
-              if (auth && isRankMatch(auth.taxon_rank || '', targetRank)) return id;
+              if (auth && isRankMatch(auth.taxon_rank || '', r_target)) return id;
           }
       }
-      if (isRankMatch(row.taxon_rank || '', targetRank)) return row.id;
+      if (isRankMatch(row.taxon_rank || '', r_target)) return row.id;
       let curr: Taxon | undefined = row;
       while (curr && curr.parent_id) {
           const parent: Taxon | undefined = authorityRegistry.get(curr.parent_id) || allTaxaPool.find(t => t.id === curr!.parent_id);
           if (parent) {
-              if (isRankMatch(parent.taxon_rank || '', targetRank)) return parent.id;
+              if (isRankMatch(parent.taxon_rank || '', r_target)) return parent.id;
               curr = parent;
           } else { break; }
       }
@@ -514,20 +533,19 @@ export const DataGrid: React.FC<DataGridProps> = ({
       const sortedKeys = groupOrder.sort((a, b) => {
           if (a === '(none)') return -1;
           if (b === '(none)') return 1;
-          return groupOrder.indexOf(a) - groupOrder.indexOf(b);
+          return a.localeCompare(b);
       });
       sortedKeys.forEach(segmentId => {
           const groupItems = groupMap.get(segmentId)!;
           const path = `${parentPath}/${segmentId}`;
           const isHolder = segmentId === '(none)';
-          const isOrderRank = field === 'order';
-          const isFamilyRank = field === 'family';
+          const isStringRank = ['kingdom', 'phylum', 'class', 'order', 'family'].includes(field);
 
           let headerTaxon: TreeRow | undefined = authorityRegistry.get(segmentId);
           if (!headerTaxon || isHolder) {
               headerTaxon = allTaxaPool.find(t => 
                 isRankMatch(t.taxon_rank || '', field) && 
-                ((isOrderRank || isFamilyRank) ? (t.taxon_name === segmentId) : (t.id === segmentId))
+                (isStringRank ? (t.taxon_name === segmentId) : (t.id === segmentId))
               ) as TreeRow | undefined;
           }
 
@@ -542,13 +560,16 @@ export const DataGrid: React.FC<DataGridProps> = ({
               id: `virtual:${segmentId}:${parentRecord?.id || 'root'}`,
               is_virtual: true, is_holder: isHolder, origin_type: 'virtual',
               taxon_rank: (field === 'infraspecies' ? 'Infraspecies' : field.charAt(0).toUpperCase() + field.slice(1)) as any,
-              name: isHolder ? '(none)' : ((isOrderRank || isFamilyRank) ? segmentId : (segmentId === '(unlinked)' ? '(unlinked)' : segmentId)),
-              taxon_name: isHolder ? '(none)' : ((isOrderRank || isFamilyRank) ? segmentId : (segmentId === '(unlinked)' ? '(unlinked)' : segmentId)),
+              name: isHolder ? '(none)' : segmentId,
+              taxon_name: isHolder ? '(none)' : segmentId,
               taxon_status: '', 
+              kingdom: field === 'kingdom' ? segmentId : (parentRecord?.kingdom || firstChild?.kingdom),
+              phylum: field === 'phylum' ? segmentId : (parentRecord?.phylum || firstChild?.phylum),
+              class: field === 'class' ? segmentId : (parentRecord?.class || firstChild?.class),
               order: field === 'order' ? segmentId : (parentRecord?.order || firstChild?.order),
               family: field === 'family' ? segmentId : (parentRecord?.family || firstChild?.family),
-              genus: field === 'genus' ? segmentId : (depth >= 1 ? (parentRecord?.genus || firstChild?.genus) : undefined),
-              species: field === 'species' ? segmentId : (depth >= 2 ? (parentRecord?.species || firstChild?.species) : undefined),
+              genus: field === 'genus' ? segmentId : (depth >= (groupBy.indexOf('genus')) ? (parentRecord?.genus || firstChild?.genus) : undefined),
+              species: field === 'species' ? segmentId : (depth >= (groupBy.indexOf('species')) ? (parentRecord?.species || firstChild?.species) : undefined),
               alternative_names: [], reference_links: [], created_at: 0
           } as any;
           headerRow.is_tree_header = true;
@@ -802,8 +823,9 @@ export const DataGrid: React.FC<DataGridProps> = ({
               {gridRows.map((row, idx) => {
                   const tr = row as TreeRow; const isExpanded = expandedRows.has(tr.id); 
                   let rankKey = String(tr.taxon_rank).toLowerCase() as keyof RankPallet;
-                  if (RANK_LEVELS[rankKey] === 5) rankKey = 'infraspecies';
-                  else if (!['order', 'family', 'genus', 'species', 'cultivar'].includes(rankKey)) { rankKey = 'species'; }
+                  const rankWeight = RANK_LEVELS[rankKey] || 99;
+                  if (rankWeight === 8) rankKey = 'infraspecies';
+                  else if (!['kingdom', 'phylum', 'class', 'order', 'family', 'genus', 'species', 'cultivar'].includes(rankKey)) { rankKey = 'species'; }
                   const p = activePallet[rankKey];
                   const color = p?.base_color || 'slate'; 
                   const isHybrid = tr.genus_hybrid === '×' || tr.genus_hybrid === 'x' || tr.species_hybrid === '×' || tr.species_hybrid === 'x';
@@ -835,7 +857,7 @@ export const DataGrid: React.FC<DataGridProps> = ({
                                      <button onClick={(e) => { e.stopPropagation(); setExpandedRows(prev => { const n = new Set(prev); n.has(tr.id) ? n.delete(tr.id) : n.add(tr.id); return n; }); }} className={`p-1.5 rounded shadow-sm ${isExpanded ? 'bg-slate-800 text-white' : 'bg-white border border-slate-200 text-slate-500 hover:text-slate-800'}`}>
                                        {isExpanded ? <ChevronUpIcon size={14}/> : <ChevronDownIcon size={14}/>}
                                      </button>
-                                     {(RANK_LEVELS[rankKey] >= 3 && RANK_LEVELS[rankKey] <= 5) && (
+                                     {(RANK_LEVELS[rankKey] >= 6 && RANK_LEVELS[rankKey] <= 8) && (
                                        <button onClick={(e) => { e.stopPropagation(); onAction?.('mine', tr); }} title="Analyze & Find References" className="p-1.5 bg-indigo-50 border border-indigo-200 rounded text-indigo-600 hover:bg-indigo-100 shadow-sm">
                                          <PickaxeIcon size={14} />
                                        </button>

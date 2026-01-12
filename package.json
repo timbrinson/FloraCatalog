@@ -1,7 +1,7 @@
 {
   "name": "FloraCatalog",
   "private": true,
-  "version": "2.31.4",
+  "version": "2.32.0",
   "type": "module",
   "scripts": {
     "dev": "vite",

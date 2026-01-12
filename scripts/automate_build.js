@@ -1,8 +1,8 @@
 /**
- * AUTOMATED DATABASE BUILDER (CLI) v2.31.22
+ * AUTOMATED DATABASE BUILDER (CLI) v2.32.0
  * 
  * Orchestrates the transformation of raw WCVP and WFO data into the FloraCatalog database.
- * v2.31.22: Inclusive Symbol Boundaries & Catch-all Order Propagation.
+ * v2.32.0: Higher Rank Extension (Kingdom, Phylum, Class).
  */
 
 import pg from 'pg';
@@ -41,7 +41,7 @@ const FILE_CLEAN_CSV = path.join(DIR_TEMP, 'wcvp_names_clean.csv');
 const FILE_WFO_IMPORT = path.join(DIR_TEMP, 'wfo_import.csv');
 const FILE_SCHEMA = 'scripts/wcvp_schema.sql.txt';
 const FILE_OPTIMIZE = 'scripts/optimize_indexes.sql.txt';
-const APP_VERSION = 'v2.31.22';
+const APP_VERSION = 'v2.32.0';
 
 // Absolute boundaries to ensure no symbols (+, ×) or hybrids are skipped
 const SEGMENTS = [
@@ -110,11 +110,10 @@ async function getClient() {
 
     const client = new pg.Client({ connectionString, ssl: { rejectUnauthorized: false } });
     
-    // CRITICAL: Handle the unexpected termination error event to prevent process crash
     client.on('error', (e) => {
         if (e.message.includes('terminated unexpectedly') || e.message.includes('Connection terminated')) {
             warn("Database connection terminated by host.");
-            activeClient = null; // Mark for recreation on next call
+            activeClient = null; 
         } else {
             err("Database Client Error: " + e.message);
         }
@@ -126,9 +125,6 @@ async function getClient() {
     return client;
 }
 
-/**
- * RobustQuery: Wraps a query with retry logic and connection healing.
- */
 async function robustQuery(sql, params = [], retries = 3) {
     for (let attempt = 1; attempt <= retries; attempt++) {
         try {
@@ -138,7 +134,7 @@ async function robustQuery(sql, params = [], retries = 3) {
             const isConnectionError = e.message.includes('terminated') || e.code === '57P01' || e.code === '08006';
             if (isConnectionError && attempt < retries) {
                 warn(`Connection dropped. Retrying segment (${attempt}/${retries})...`);
-                activeClient = null; // Force new client on retry
+                activeClient = null; 
                 await new Promise(r => setTimeout(r, 2000 * attempt));
                 continue;
             }
@@ -283,41 +279,89 @@ const stepLinkParents = async () => {
 };
 
 const stepWFOOrders = async () => {
-    log("Creating WFO Orders & Linking Families (SQL Logic)...");
+    log("Building Higher Ranks Backbone (Kingdom, Phylum, Class, Order)...");
     await robustQuery(`
         INSERT INTO app_data_sources (id, name, version, citation_text, url, trust_level)
         VALUES (3, 'World Flora Online', '2025.12', 'WFO (2025): World Flora Online. Version 2025.12. Published on the Internet; http://www.worldfloraonline.org. Accessed on: 2026-01-09', 'http://www.worldfloraonline.org', 5)
         ON CONFLICT (id) DO NOTHING;
     `);
     
-    // Create physical Order records
+    const RANKS = ['Kingdom', 'Phylum', 'Class', 'Order'];
+    
+    for (const rank of RANKS) {
+        log(`  Creating physical ${rank} records...`);
+        await robustQuery(`
+            INSERT INTO app_taxa (taxon_name, taxon_rank, taxon_status, "${rank.toLowerCase()}", source_id, verification_level)
+            SELECT scientificName, '${rank}', taxonomicStatus, scientificName, 3, 'WFO Backbone Distill v2.32.0'
+            FROM wfo_import
+            WHERE LOWER(taxonRank) = '${rank.toLowerCase()}'
+            ON CONFLICT DO NOTHING;
+        `);
+    }
+
+    log("  Linking Backbone hierarchy...");
+    // 1. Kingdom -> Phylum
     await robustQuery(`
-        INSERT INTO app_taxa (taxon_name, taxon_rank, taxon_status, "order", source_id, verification_level)
-        SELECT scientificName, 'Order', taxonomicStatus, scientificName, 3, 'WFO Backbone Distill'
-        FROM wfo_import
-        WHERE LOWER(taxonRank) = 'order'
-        ON CONFLICT DO NOTHING;
+        UPDATE app_taxa child
+        SET parent_id = parent.id,
+            kingdom = parent.taxon_name
+        FROM wfo_import wfo_child
+        JOIN wfo_import wfo_parent ON wfo_child.parentNameUsageID = wfo_parent.taxonID
+        JOIN app_taxa parent ON parent.taxon_name = wfo_parent.scientificName AND parent.taxon_rank = 'Kingdom'
+        WHERE child.taxon_name = wfo_child.scientificName AND child.taxon_rank = 'Phylum'
+          AND child.parent_id IS NULL;
+    `);
+
+    // 2. Phylum -> Class
+    await robustQuery(`
+        UPDATE app_taxa child
+        SET parent_id = parent.id,
+            phylum = parent.taxon_name,
+            kingdom = parent.kingdom
+        FROM wfo_import wfo_child
+        JOIN wfo_import wfo_parent ON wfo_child.parentNameUsageID = wfo_parent.taxonID
+        JOIN app_taxa parent ON parent.taxon_name = wfo_parent.scientificName AND parent.taxon_rank = 'Phylum'
+        WHERE child.taxon_name = wfo_child.scientificName AND child.taxon_rank = 'Class'
+          AND child.parent_id IS NULL;
+    `);
+
+    // 3. Class -> Order
+    await robustQuery(`
+        UPDATE app_taxa child
+        SET parent_id = parent.id,
+            class = parent.taxon_name,
+            phylum = parent.phylum,
+            kingdom = parent.kingdom
+        FROM wfo_import wfo_child
+        JOIN wfo_import wfo_parent ON wfo_child.parentNameUsageID = wfo_parent.taxonID
+        JOIN app_taxa parent ON parent.taxon_name = wfo_parent.scientificName AND parent.taxon_rank = 'Class'
+        WHERE child.taxon_name = wfo_child.scientificName AND child.taxon_rank = 'Order'
+          AND child.parent_id IS NULL;
     `);
 
     // Ensure Backbone Families (Source 2)
+    log("  Ensuring Backbone Families linked to Orders...");
     await robustQuery(`
         INSERT INTO app_data_sources (id, name, version, citation_text, trust_level)
-        VALUES (2, 'FloraCatalog System', 'v2.31.21 (Derived)', 'Internal system layer deriving backbone from attributes.', 5)
+        VALUES (2, 'FloraCatalog System', 'v2.32.0 (Derived)', 'Internal system layer deriving backbone from attributes.', 5)
         ON CONFLICT (id) DO NOTHING;
 
         INSERT INTO app_taxa (taxon_name, taxon_rank, taxon_status, family, source_id, verification_level)
-        SELECT DISTINCT family, 'Family', 'Derived', family, 2, 'FloraCatalog v2.31.21'
+        SELECT DISTINCT family, 'Family', 'Derived', family, 2, 'FloraCatalog v2.32.0'
         FROM app_taxa
         WHERE family IS NOT NULL
           AND NOT EXISTS (SELECT 1 FROM app_taxa a WHERE a.family = app_taxa.family AND a.taxon_rank = 'Family')
         ON CONFLICT DO NOTHING;
     `);
 
-    // Link Families to Orders & Populate child 'order' column
+    // Link Families to Orders
     await robustQuery(`
         UPDATE app_taxa app_fam
         SET parent_id = app_order.id,
-            "order" = app_order.taxon_name
+            "order" = app_order.taxon_name,
+            class = app_order.class,
+            phylum = app_order.phylum,
+            kingdom = app_order.kingdom
         FROM wfo_import wfo_fam
         JOIN wfo_import wfo_order ON wfo_fam.parentNameUsageID = wfo_order.taxonID
         JOIN app_taxa app_order ON app_order.taxon_name = wfo_order.scientificName AND app_order.taxon_rank = 'Order'
@@ -327,15 +371,18 @@ const stepWFOOrders = async () => {
 };
 
 const stepDerivedFamilies = async () => {
-    log("Grafting orphaned WCVP roots to Family records & Catch-all Order Sync...");
+    log("Grafting orphaned WCVP roots to Family records & Catch-all Higher Rank Sync...");
     
-    // Pass 1: Direct Grafting (Link orphan roots to their named Family record)
+    // Pass 1: Direct Grafting
     log("  Pass 1: Direct Family Grafting...");
     for (const seg of SEGMENTS) {
         await robustQuery(`
             UPDATE app_taxa child
             SET parent_id = parent.id,
-                "order" = parent."order"
+                "order" = parent."order",
+                class = parent.class,
+                phylum = parent.phylum,
+                kingdom = parent.kingdom
             FROM app_taxa parent
             WHERE child.parent_id IS NULL
               AND child.family = parent.family
@@ -345,18 +392,20 @@ const stepDerivedFamilies = async () => {
         `, [seg.start, seg.end]);
     }
 
-    // Pass 2: Recursive Order Propagation (Flow Order from Parent to Child regardless of rank)
-    log("  Pass 2: Recursive Order Propagation (3 passes for deep trees)...");
+    // Pass 2: Recursive Higher Rank Propagation
+    log("  Pass 2: Recursive Rank Propagation (3 passes)...");
     for (let p = 1; p <= 3; p++) {
         log(`    - Pass ${p}/3...`);
         for (const seg of SEGMENTS) {
             await robustQuery(`
                 UPDATE app_taxa child
-                SET "order" = parent."order"
+                SET "order" = COALESCE(child."order", parent."order"),
+                    class = COALESCE(child.class, parent.class),
+                    phylum = COALESCE(child.phylum, parent.phylum),
+                    kingdom = COALESCE(child.kingdom, parent.kingdom)
                 FROM app_taxa parent
                 WHERE child.parent_id = parent.id 
-                  AND child."order" IS NULL 
-                  AND parent."order" IS NOT NULL
+                  AND (child.kingdom IS NULL AND parent.kingdom IS NOT NULL)
                   AND child.taxon_name >= $1 AND child.taxon_name < $2;
             `, [seg.start, seg.end]);
         }
@@ -481,8 +530,8 @@ const STEPS = [
     { id: 6, label: "Populate App", fn: stepPopulateApp },
     { id: 7, label: "Build Indexes", fn: stepBuildIndexes },
     { id: 8, label: "Link Parents", fn: stepLinkParents },
-    { id: 9, label: "WFO Orders", fn: stepWFOOrders },
-    { id: 10, label: "Derived Families", fn: stepDerivedFamilies },
+    { id: 9, label: "WFO Higher Ranks", fn: stepWFOOrders },
+    { id: 10, label: "Derived Backbone", fn: stepDerivedFamilies },
     { id: 11, label: "Hierarchy", fn: stepHierarchy },
     { id: 12, label: "Counts", fn: stepCounts },
     { id: 13, label: "Optimize", fn: stepOptimize }
