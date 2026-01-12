@@ -97,7 +97,7 @@ Select a single number. The script runs that step and every step following it.
 *   **Warning:** Destructive. Wipes all data.
 
 ### Mode 2: Granular (Enrichment/Recovery)
-Enter a comma-separated list (e.g. `2, 5, 9, 10, 11, 13`). This executes **ONLY** the specified steps. 
+Enter a comma-separated list (e.g. `2, 5, 9, 10, 11, 12, 13`). This executes **ONLY** the specified steps. 
 *   **Use Case:** Adding Phylogenetic and Higher Rank (WFO) data to an existing WCVP baseline.
 *   **Use Case:** Resuming a failed build without re-streaming 1.4 million records.
 
@@ -155,6 +155,19 @@ If you populated records in chunks (e.g., A-S first, then T-Z), you must run a *
 
 ---
 
+## 9. Real-Time Progress Monitoring
+
+During long-running build operations (Steps 6-12), you can monitor the internal database state using the diagnostic tool:
+1.  Open the Supabase **SQL Editor**.
+2.  Paste and run the contents of `scripts/check_progress.sql.txt`.
+3.  **Query 10** provides a high-level build dashboard.
+4.  **Query 19 & 20** identify specific gaps and physical row counts.
+
+### Note on Missing Ranks in Gap Analysis
+If **Kingdom, Phylum, Class,** or **Order** do not appear in **Query 19 (Lineage Gap Analysis)**, this is normal. That query prioritizes records with a `parent_plant_name_id` (WCVP specific metadata). To verify these ranks physically exist, run **Query 20 (Taxonomic Census)**.
+
+---
+
 ## 🚀 WFO Enrichment (Backbone Only)
 
 If your WCVP data is already loaded and you only want to add the Phylogenetic and Higher Rank (Kingdom, Phylum, Class, Order) layer:
@@ -171,7 +184,7 @@ If your WCVP data is already loaded and you only want to add the Phylogenetic an
 
 ---
 
-## 9. Troubleshooting Common Errors
+## 10. Troubleshooting Common Errors
 
 ### A. Error: `connect EHOSTUNREACH [IPv6 Address]`
 *   **Fix:** Ensure your `.env` uses the IPv4 pooler host (`...pooler.supabase.com`) on port **6543**.

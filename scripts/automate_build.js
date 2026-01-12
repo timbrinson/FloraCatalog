@@ -1,8 +1,8 @@
 /**
- * AUTOMATED DATABASE BUILDER (CLI) v2.32.0
+ * AUTOMATED DATABASE BUILDER (CLI) v2.32.1
  * 
  * Orchestrates the transformation of raw WCVP and WFO data into the FloraCatalog database.
- * v2.32.0: Higher Rank Extension (Kingdom, Phylum, Class).
+ * v2.32.1: Robust Higher Rank Linking (Handle Unchecked/Synonym status).
  */
 
 import pg from 'pg';
@@ -41,7 +41,7 @@ const FILE_CLEAN_CSV = path.join(DIR_TEMP, 'wcvp_names_clean.csv');
 const FILE_WFO_IMPORT = path.join(DIR_TEMP, 'wfo_import.csv');
 const FILE_SCHEMA = 'scripts/wcvp_schema.sql.txt';
 const FILE_OPTIMIZE = 'scripts/optimize_indexes.sql.txt';
-const APP_VERSION = 'v2.32.0';
+const APP_VERSION = 'v2.32.1';
 
 // Absolute boundaries to ensure no symbols (+, ×) or hybrids are skipped
 const SEGMENTS = [
@@ -290,9 +290,10 @@ const stepWFOOrders = async () => {
     
     for (const rank of RANKS) {
         log(`  Creating physical ${rank} records...`);
+        // Note: We are rank-inclusive and status-inclusive to handle 'Unchecked' or 'Provisionally Accepted' backbone records.
         await robustQuery(`
             INSERT INTO app_taxa (taxon_name, taxon_rank, taxon_status, "${rank.toLowerCase()}", source_id, verification_level)
-            SELECT scientificName, '${rank}', taxonomicStatus, scientificName, 3, 'WFO Backbone Distill v2.32.0'
+            SELECT scientificName, '${rank}', taxonomicStatus, scientificName, 3, 'WFO Backbone Distill v2.32.1'
             FROM wfo_import
             WHERE LOWER(taxonRank) = '${rank.toLowerCase()}'
             ON CONFLICT DO NOTHING;
@@ -343,11 +344,11 @@ const stepWFOOrders = async () => {
     log("  Ensuring Backbone Families linked to Orders...");
     await robustQuery(`
         INSERT INTO app_data_sources (id, name, version, citation_text, trust_level)
-        VALUES (2, 'FloraCatalog System', 'v2.32.0 (Derived)', 'Internal system layer deriving backbone from attributes.', 5)
+        VALUES (2, 'FloraCatalog System', 'v2.32.1 (Derived)', 'Internal system layer deriving backbone from attributes.', 5)
         ON CONFLICT (id) DO NOTHING;
 
         INSERT INTO app_taxa (taxon_name, taxon_rank, taxon_status, family, source_id, verification_level)
-        SELECT DISTINCT family, 'Family', 'Derived', family, 2, 'FloraCatalog v2.32.0'
+        SELECT DISTINCT family, 'Family', 'Derived', family, 2, 'FloraCatalog v2.32.1'
         FROM app_taxa
         WHERE family IS NOT NULL
           AND NOT EXISTS (SELECT 1 FROM app_taxa a WHERE a.family = app_taxa.family AND a.taxon_rank = 'Family')
