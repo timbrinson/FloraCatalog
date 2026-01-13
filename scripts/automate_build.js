@@ -1,8 +1,8 @@
 /**
- * AUTOMATED DATABASE BUILDER (CLI) v2.33.3
+ * AUTOMATED DATABASE BUILDER (CLI) v2.33.4
  * 
  * Orchestrates the transformation of raw WCVP and WFO data into the FloraCatalog database.
- * v2.33.3: Anti-Lock Session Management & Backbone Heartbeats.
+ * v2.33.4: Restored Menu UI & Reset Feedback.
  */
 
 import pg from 'pg';
@@ -41,7 +41,7 @@ const FILE_CLEAN_CSV = path.join(DIR_TEMP, 'wcvp_names_clean.csv');
 const FILE_WFO_IMPORT = path.join(DIR_TEMP, 'wfo_import.csv');
 const FILE_SCHEMA = 'scripts/wcvp_schema.sql.txt';
 const FILE_OPTIMIZE = 'scripts/optimize_indexes.sql.txt';
-const APP_VERSION = 'v2.33.3';
+const APP_VERSION = 'v2.33.4';
 
 const SEGMENTS = [
     { label: "A (incl. symbols)", start: "\x01", end: "B" },
@@ -275,7 +275,7 @@ const stepWFOBackbone = async () => {
                 INITCAP(LOWER(taxonomicStatus)), 
                 scientificName, 
                 2, 
-                'WFO Backbone v2.33.3'
+                'WFO Backbone v2.33.4'
             FROM wfo_import 
             WHERE LOWER(taxonRank) = LOWER($1)
             ORDER BY scientificName, CASE WHEN taxonomicStatus = 'ACCEPTED' THEN 1 WHEN taxonomicStatus = 'SYNONYM' THEN 2 ELSE 3 END
@@ -390,35 +390,44 @@ const stepOptimize = async () => {
 };
 
 const STEPS = [
-    { id: 1, label: "Prepare WCVP", fn: stepPrepWCVP },
-    { id: 2, label: "Prepare WFO", fn: stepPrepWFO },
-    { id: 3, label: "Reset Database", fn: stepResetDB },
-    { id: 4, label: "Import WCVP", fn: stepImportWCVP },
-    { id: 5, label: "Import WFO", fn: stepImportWFO },
-    { id: 6, label: "Populate App", fn: stepPopulateApp },
-    { id: 7, label: "Build Indexes", fn: stepBuildIndexes },
-    { id: 8, label: "Link Parents", fn: stepLinkParents },
-    { id: 9, label: "WFO Higher Ranks", fn: stepWFOBackbone },
-    { id: 10, label: "Backbone Bridge", fn: stepBackboneBridge },
-    { id: 11, label: "Hierarchy", fn: stepHierarchy },
-    { id: 12, label: "Counts", fn: stepCounts },
-    { id: 13, label: "Optimize", fn: stepOptimize }
+    { id: 1, label: "Prepare WCVP (Cleaning)", fn: stepPrepWCVP },
+    { id: 2, label: "Prepare WFO (Distillation)", fn: stepPrepWFO },
+    { id: 3, label: "Reset Database (Schema WIPE)", fn: stepResetDB },
+    { id: 4, label: "Import WCVP (CSV Stream)", fn: stepImportWCVP },
+    { id: 5, label: "Import WFO (Darwin Core)", fn: stepImportWFO },
+    { id: 6, label: "Populate App (WCVP Data)", fn: stepPopulateApp },
+    { id: 7, label: "Build Indexes (Structural)", fn: stepBuildIndexes },
+    { id: 8, label: "Link Parents (WCVP Adjacency)", fn: stepLinkParents },
+    { id: 9, label: "WFO Higher Ranks (Backbone)", fn: stepWFOBackbone },
+    { id: 10, label: "Backbone Bridge (Grafting)", fn: stepBackboneBridge },
+    { id: 11, label: "Hierarchy (Ltree Paths)", fn: stepHierarchy },
+    { id: 12, label: "Counts (# Navigation)", fn: stepCounts },
+    { id: 13, label: "Optimize (Sort-Inclusive)", fn: stepOptimize }
 ];
 
 async function main() {
     console.log(`\n\x1b[32m🌿 FLORA CATALOG BUILDER ${APP_VERSION}\x1b[0m`);
-    const choice = await askQuestion("Select step to start: ");
+    console.log("----------------------------------------");
+    STEPS.forEach(s => console.log(`${s.id.toString().padStart(2)}. ${s.label}`));
+    console.log("----------------------------------------");
+
+    const choice = await askQuestion("Select step(s) to run (e.g. '9' or '9,10,11'): ");
     let sequence = [];
     if (choice.includes(',')) {
         sequence = choice.split(',').map(n => parseInt(n.trim()));
     } else {
         const startId = parseInt(choice);
+        if (isNaN(startId)) {
+            err("Invalid selection. Please enter a number.");
+            process.exit(1);
+        }
         sequence = STEPS.filter(s => s.id >= startId).map(s => s.id);
     }
 
     try {
         for (const id of sequence) {
             const step = STEPS.find(s => s.id === id);
+            if (!step) continue;
             log(`\x1b[35m[STEP ${id}]\x1b[0m ${step.label}...`);
             await step.fn();
         }
