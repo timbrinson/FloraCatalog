@@ -9,7 +9,11 @@ This document defines the logic and valid values for multi-select filters in the
 
 |	Filter Value	|	Type	|	WCVP Docs	|	WCVP Data	|	App Extension	|	Notes	|
 |	:---	|	:---	|	:---	|	:---	|	:---	|	:---	|
-|	Family	|	App Extension - Virtual	|		|		|	Family	|	Virtual Root in grid tree mode to organize Genus’s together under the Family.	|
+|	Kingdom	|	Phylogenetic Backbone	|		|		|	Kingdom	|	Root Rank from WFO	|
+|	Phylum	|	Phylogenetic Backbone	|		|		|	Phylum	|	Backbone Rank from WFO	|
+|	Class	|	Phylogenetic Backbone	|		|		|	Class	|	Backbone Rank from WFO	|
+|	Order	|	Phylogenetic Backbone	|		|		|	Order	|	Backbone Rank from WFO	|
+|	Family	|	Botanical Backbone	|	Family	|	Family	|		|	Bridge between phylogeny and nomenclature	|
 |	Genus	|	WCVP - Primary	|	Genus	|	Genus	|		|	Core for App	|
 |	Species	|	WCVP - Primary	|	Species	|	Species	|		|	Core for App	|
 |	Subspecies	|	WCVP - Primary	|	Subspecies	|	Subspecies	|		|	Core for App under Infraspecies	|
@@ -47,25 +51,24 @@ This document defines the logic and valid values for multi-select filters in the
 
 
 ## 2. Taxonomic Status (`taxonStatus`)
-**Strategy:** Opinion-based classification. List the three primary statuses first in logical orsder with 'Accepted' first as it is the most important and is the default view. The list the secondary statuses that are subtypes of Synonym. At the end include the app extension.
+**Strategy:** Authority-based classification. Status reflects the opinion of the specific registry (WCVP, WFO, or ICRA) for that taxonomic level.
+
 **Values:**
 
-|	Filter Value	|	Type	|	WCVP Docs	|	WCVP Data	|	App Extension	|	Notes	|
-|	:---	|	:---	|	:---	|	:---	|	:---	|	:---	|
-|	Accepted	|	WCVP - Primary	|	Accepted	|	Accepted	|		|	Placed first as this is the most important status from WCVP	|
-|	Synonym	|	WCVP - Primary	|	Synonym	|	Synonym	|		|		|
-|	Unplaced	|	WCVP - Primary	|	Unplaced	|	Unplaced	|		|		|
-|	Registered	|	App Extension	|		|		|	Registered	|	Used for Cultivars registered with an International Cultivar Registration Authority (ICRA).	|
-|	Provisional	|	App Extension	|		|		|	Provisional	|	Used for manually added plants or trade names awaiting registration.	|
-|	Derived	|	App Extension	|		|		|	Derived	|	Used for system-generated taxonomic backbone records (e.g. Family or Order) created from attributes.	|
-|	Artificial Hybrid	|	WCVP - Secondary	|	Artificial Hybrid	|	Artificial Hybrid	|		|	Subtype of Synonym	|
-|	Illegitimate	|	WCVP - Secondary	|	Illegitimate	|	Illegitimate	|		|	Subtype of Synonym	|
-|	Invalid	|	WCVP - Secondary	|	Invalid	|	Invalid	|		|	Subtype of Synonym	|
-|	Local Biotype	|	WCVP - Secondary	|	Local Biotype	|	Local Biotype	|		|	Subtype of Synonym	|
-|	Misapplied	|	WCVP - Secondary	|	Misapplied	|	Misapplied	|		|	Subtype of Synonym	|
-|	Orthographic	|	WCVP - Secondary	|	Orthographic	|	Orthographic	|		|	Subtype of Synonym	|
-|	Provisionally Accepted	|	WCVP - Obsolete	|	Provisionally Accepted	|		|		|	Mentioned in the docs but not found in WCVP data	|
-|	External to WCVP	|	App Extension	|		|		|	External to WCVP	|	For all plants added, that are not from WCVP and therefore do not have a WCVP status.	|
+|	Filter Value	|	Authority	|	Docs/Data	|	Notes	|
+|	:---	|	:---	|	:---	|	:---	|
+|	Accepted	|	Universal	|	Accepted	|	Accepted by the relevant authority (WCVP or WFO). Default view.	|
+|	Synonym	|	Universal	|	Synonym	|	A nomenclature alias for an Accepted name.	|
+|	Unplaced	|	WCVP	|	Unplaced	|	Name not yet assigned a definitive status by experts.	|
+|	Unchecked	|	WFO	|	Unchecked	|	Higher rank record present in WFO but not yet fully verified.	|
+|	Registered	|	ICRA	|	Registered	|	Cultivar registered with an International Cultivar Registration Authority.	|
+|	Provisional	|	Manual	|	Provisional	|	User-added record or trade name awaiting authority verification.	|
+|	Artificial Hybrid	|	WCVP	|	Artificial Hybrid	|	Subtype of Synonym	|
+|	Illegitimate	|	WCVP	|	Illegitimate	|	Subtype of Synonym	|
+|	Invalid	|	WCVP	|	Invalid	|	Subtype of Synonym	|
+|	Local Biotype	|	WCVP	|	Local Biotype	|	Subtype of Synonym	|
+|	Misapplied	|	WCVP	|	Misapplied	|	Subtype of Synonym	|
+|	Orthographic	|	WCVP	|	Orthographic	|	Subtype of Synonym	|
 
 ## 3. Infraspecific Rank (`infraspecificRank`)
 **Strategy:** List null first as many/most plant names are not at the infraspecies level. The WCVP Primary and Secondary infraspecific ranks are listed next in hierarchy-first ordering. Followed by obsolete WCVP infraspecific ranks.

@@ -18,7 +18,7 @@ import {
 } from 'lucide-react';
 
 
-// Implementation of Grid Display Spec v2.32.0 (Higher Rank Extension)
+// Implementation of Grid Display Spec v2.33.0 (Higher Rank Extension)
 // Comprehensive rank mapping including Kingdom, Phylum, Class.
 const RANK_LEVELS: Record<string, number> = {
     'kingdom': 1,
@@ -169,7 +169,7 @@ const COLUMN_GROUPS: ColumnGroup[] = [
                 tooltip: 'Taxonomic Status', 
                 defaultWidth: 110, 
                 filterType: 'multi-select', 
-                filterOptions: ['Accepted', 'Synonym', 'Unplaced', 'Registered', 'Provisional', 'Derived', 'Artificial Hybrid', 'Illegitimate', 'Invalid', 'Local Biotype', 'Misapplied', 'Orthographic', 'Provisionally Accepted', 'External to WCVP'], 
+                filterOptions: ['Accepted', 'Synonym', 'Unplaced', 'Unchecked', 'Registered', 'Provisional', 'Artificial Hybrid', 'Illegitimate', 'Invalid', 'Local Biotype', 'Misapplied', 'Orthographic', 'Provisionally Accepted'], 
                 defaultOn: false 
             },
             { id: 'kingdom', label: 'Kingdom', tooltip: 'Kingdom', defaultWidth: 100, filterType: 'text', defaultOn: false },

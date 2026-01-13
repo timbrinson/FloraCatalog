@@ -380,7 +380,7 @@ export const dataService = {
   async purgeNonWCVPTaxa(): Promise<void> {
       if (getIsOffline()) throw new Error("Cannot reset in offline mode");
       // Refined Purge Strategy (ADR-003): 
-      // Protect official WCVP (1) and System Derived (2) records. 
+      // Protect official WCVP (1) and WFO Backbone (2). 
       // Purge only manual user additions or unknown entries (3+).
       const { error } = await getSupabase()
           .from(DB_TABLE)
