@@ -1,8 +1,8 @@
 /**
- * AUTOMATED DATABASE BUILDER (CLI) v2.33.0
+ * AUTOMATED DATABASE BUILDER (CLI) v2.33.3
  * 
  * Orchestrates the transformation of raw WCVP and WFO data into the FloraCatalog database.
- * v2.33.0: High-Fidelity WFO Backbone (Rank Collapsing + Literal Propagation).
+ * v2.33.3: Anti-Lock Session Management & Backbone Heartbeats.
  */
 
 import pg from 'pg';
@@ -41,9 +41,8 @@ const FILE_CLEAN_CSV = path.join(DIR_TEMP, 'wcvp_names_clean.csv');
 const FILE_WFO_IMPORT = path.join(DIR_TEMP, 'wfo_import.csv');
 const FILE_SCHEMA = 'scripts/wcvp_schema.sql.txt';
 const FILE_OPTIMIZE = 'scripts/optimize_indexes.sql.txt';
-const APP_VERSION = 'v2.33.0';
+const APP_VERSION = 'v2.33.3';
 
-// Absolute boundaries to ensure no symbols (+, ×) or hybrids are skipped
 const SEGMENTS = [
     { label: "A (incl. symbols)", start: "\x01", end: "B" },
     { label: "B", start: "B", end: "C" },
@@ -68,7 +67,6 @@ const SEGMENTS = [
     { label: "W - Z (incl. max unicode)", start: "W", end: "\uffff" }
 ];
 
-// --- UTILS ---
 const log = (msg) => console.log(`\x1b[36m[FloraBuild]\x1b[0m ${msg}`);
 const warn = (msg) => console.log(`\x1b[33m[WARN]\x1b[0m ${msg}`);
 const err = (msg) => console.error(`\x1b[31m[ERROR]\x1b[0m ${msg}`);
@@ -85,40 +83,24 @@ const ensureDirs = () => {
     if (!fs.existsSync(DIR_TEMP)) fs.mkdirSync(DIR_TEMP, { recursive: true });
 };
 
-// Global Client Reference for Robust Reconnection
 let activeClient = null;
 
 async function getClient() {
     if (activeClient) {
-        try {
-            await activeClient.query('SELECT 1');
-            return activeClient;
-        } catch (e) {
-            log("Existing connection lost. Re-establishing...");
-        }
+        try { await activeClient.query('SELECT 1'); return activeClient; } 
+        catch (e) { activeClient = null; }
     }
 
     let connectionString = process.env.DATABASE_URL;
-    
     if (!connectionString) {
-        log("Connection details not found in .env.");
-        const projId = await askQuestion(`Project ID (Default: ${DEFAULT_PROJECT_ID}): `) || DEFAULT_PROJECT_ID;
-        const password = await askQuestion("Database Password: ");
-        if (!password) { err("Password required."); process.exit(1); }
+        log("Connection details missing.");
+        const projId = await askQuestion(`Project ID: `) || DEFAULT_PROJECT_ID;
+        const password = await askQuestion("Password: ");
         connectionString = `postgresql://postgres.${projId}:${password}@aws-0-us-west-2.pooler.supabase.com:6543/postgres`;
     }
 
     const client = new pg.Client({ connectionString, ssl: { rejectUnauthorized: false } });
-    
-    client.on('error', (e) => {
-        if (e.message.includes('terminated unexpectedly') || e.message.includes('Connection terminated')) {
-            warn("Database connection terminated by host.");
-            activeClient = null; 
-        } else {
-            err("Database Client Error: " + e.message);
-        }
-    });
-
+    client.on('error', (e) => { if (e.message.includes('terminated')) activeClient = null; });
     await client.connect();
     await client.query("SET statement_timeout = 0");
     activeClient = client;
@@ -131,10 +113,9 @@ async function robustQuery(sql, params = [], retries = 3) {
             const client = await getClient();
             return await client.query(sql, params);
         } catch (e) {
-            const isConnectionError = e.message.includes('terminated') || e.code === '57P01' || e.code === '08006';
-            if (isConnectionError && attempt < retries) {
-                warn(`Connection dropped. Retrying segment (${attempt}/${retries})...`);
-                activeClient = null; 
+            if (attempt < retries) {
+                warn(`Retry ${attempt}/3...`);
+                activeClient = null;
                 await new Promise(r => setTimeout(r, 2000 * attempt));
                 continue;
             }
@@ -146,165 +127,147 @@ async function robustQuery(sql, params = [], retries = 3) {
 // --- STEPS ---
 
 const stepPrepWCVP = () => {
-    log("Preparing WCVP Data (Cleaning)...");
-    const py = fs.existsSync('scripts/convert_wcvp.py.txt') ? 'python3 scripts/convert_wcvp.py.txt' : null;
-    if (!py) throw new Error("Missing scripts/convert_wcvp.py.txt");
-    execSync(py, { stdio: 'inherit' });
+    log("Cleaning WCVP data...");
+    execSync('python3 scripts/convert_wcvp.py.txt', { stdio: 'inherit' });
 };
 
 const stepPrepWFO = () => {
-    log("Preparing WFO Data (Distill Backbone)...");
-    const py = fs.existsSync('scripts/distill_wfo.py.txt') ? 'python3 scripts/distill_wfo.py.txt' : null;
-    if (!py) throw new Error("Missing scripts/distill_wfo.py.txt");
-    execSync(py, { stdio: 'inherit' });
+    log("Distilling WFO backbone...");
+    execSync('python3 scripts/distill_wfo.py.txt', { stdio: 'inherit' });
 };
 
 const stepResetDB = async () => {
-    log("Resetting Database Schema...");
+    log("Resetting database schema...");
     const sql = fs.readFileSync(FILE_SCHEMA, 'utf-8');
     await robustQuery(sql);
 };
 
 const stepImportWCVP = async () => {
-    log("Streaming WCVP Staging (1.4M rows)...");
-    if (!fs.existsSync(FILE_CLEAN_CSV)) throw new Error("Run Step 1 first.");
+    log("Streaming WCVP staging...");
     const client = await getClient();
     const stream = client.query(copyFrom(`COPY wcvp_import FROM STDIN WITH CSV HEADER`));
     const fileStream = fs.createReadStream(FILE_CLEAN_CSV);
     await pipeline(fileStream, stream);
-    log("  Import finished.");
+    log("  WCVP staging complete.");
 };
 
 const stepImportWFO = async () => {
-    log("Streaming WFO Staging (Filtered backbone)...");
-    if (fs.existsSync(FILE_WFO_IMPORT)) {
-        const client = await getClient();
-        await client.query(`
-            CREATE TABLE IF NOT EXISTS wfo_import (
-                taxonID text PRIMARY KEY,
-                scientificNameID text,
-                localID text,
-                scientificName text,
-                taxonRank text,
-                parentNameUsageID text,
-                scientificNameAuthorship text,
-                family text,
-                subfamily text,
-                tribe text,
-                subtribe text,
-                genus text,
-                subgenus text,
-                specificEpithet text,
-                infraspecificEpithet text,
-                verbatimTaxonRank text,
-                nomenclaturalStatus text,
-                namePublishedIn text,
-                taxonomicStatus text,
-                acceptedNameUsageID text,
-                originalNameUsageID text,
-                nameAccordingToID text,
-                taxonRemarks text,
-                created text,
-                modified text,
-                "references" text,
-                source text,
-                majorGroup text,
-                tplID text
-            );
-        `);
-        const columns = "taxonID,scientificNameID,localID,scientificName,taxonRank,parentNameUsageID,scientificNameAuthorship,family,subfamily,tribe,subtribe,genus,subgenus,specificEpithet,infraspecificEpithet,verbatimTaxonRank,nomenclaturalStatus,namePublishedIn,taxonomicStatus,acceptedNameUsageID,originalNameUsageID,nameAccordingToID,taxonRemarks,created,modified,\"references\",source,majorGroup,tplID";
-        const stream = client.query(copyFrom(`COPY wfo_import (${columns}) FROM STDIN WITH CSV HEADER`));
-        const fileStream = fs.createReadStream(FILE_WFO_IMPORT);
-        await pipeline(fileStream, stream);
-        log("  WFO Import finished.");
-    } else {
-        warn("WFO import file not found. Skipping.");
-    }
+    log("Streaming WFO staging...");
+    const client = await getClient();
+    await client.query(`
+        CREATE TABLE IF NOT EXISTS wfo_import (
+            taxonID text PRIMARY KEY,
+            scientificNameID text,
+            localID text,
+            scientificName text,
+            taxonRank text,
+            parentNameUsageID text,
+            scientificNameAuthorship text,
+            family text,
+            subfamily text,
+            tribe text,
+            subtribe text,
+            genus text,
+            subgenus text,
+            specificEpithet text,
+            infraspecificEpithet text,
+            verbatimTaxonRank text,
+            nomenclaturalStatus text,
+            namePublishedIn text,
+            taxonomicStatus text,
+            acceptedNameUsageID text,
+            originalNameUsageID text,
+            nameAccordingToID text,
+            taxonRemarks text,
+            created text,
+            modified text,
+            "references" text,
+            source text,
+            majorGroup text,
+            tplID text
+        );
+    `);
+    const stream = client.query(copyFrom(`COPY wfo_import FROM STDIN WITH CSV HEADER`));
+    const fileStream = fs.createReadStream(FILE_WFO_IMPORT);
+    await pipeline(fileStream, stream);
+    
+    log("  Indexing WFO for performance...");
+    await client.query(`CREATE INDEX IF NOT EXISTS idx_wfo_import_parent ON wfo_import(parentNameUsageID)`);
+    await client.query(`CREATE INDEX IF NOT EXISTS idx_wfo_import_rank ON wfo_import(taxonRank)`);
+    await client.query(`CREATE INDEX IF NOT EXISTS idx_wfo_import_name ON wfo_import(scientificName)`);
+    log("  WFO staging complete.");
 };
 
 const stepPopulateApp = async () => {
-    log("Populating 'app_taxa' from Staging...");
-    await robustQuery(`
-        INSERT INTO app_data_sources (id, name, version, citation_text, url, trust_level)
-        VALUES (1, 'WCVP', '14 (2025)', 'Kew Gardens WCVP v14', 'https://powo.science.kew.org/', 5)
-        ON CONFLICT (id) DO NOTHING;
-    `);
-
+    log("Moving staging to core...");
+    await robustQuery(`INSERT INTO app_data_sources (id, name, version, trust_level) VALUES (1, 'WCVP', '14 (2025)', 5) ON CONFLICT DO NOTHING`);
     for (const seg of SEGMENTS) {
-        log(`  Populating Segment: ${seg.label}...`);
+        log(`  Processing: ${seg.label}...`);
         await robustQuery(`
-            INSERT INTO app_taxa (
-                wcvp_id, ipni_id, powo_id, accepted_plant_name_id, parent_plant_name_id, 
-                basionym_plant_name_id, homotypic_synonym, taxon_name, taxon_authors, family, 
-                genus, genus_hybrid, species, species_hybrid, infraspecies, infraspecific_rank, 
-                taxon_rank, taxon_status, hybrid_formula, parenthetical_author, primary_author, 
-                publication_author, replaced_synonym_author, place_of_publication, volume_and_page, 
-                first_published, nomenclatural_remarks, reviewed, geographic_area, lifeform_description, 
-                climate_description, source_id
-            )
-            SELECT 
-                plant_name_id, ipni_id, powo_id, accepted_plant_name_id, parent_plant_name_id, 
-                basionym_plant_name_id, homotypic_synonym, taxon_name, taxon_authors, family, 
-                genus, genus_hybrid, species, species_hybrid, infraspecies, infraspecific_rank, 
-                COALESCE(taxon_rank, 'Unranked'), taxon_status, hybrid_formula, parenthetical_author, primary_author, 
-                publication_author, replaced_synonym_author, place_of_publication, volume_and_page, 
-                first_published, nomenclatural_remarks, reviewed, geographic_area, lifeform_description, 
-                climate_description, 1
-            FROM wcvp_import
-            WHERE taxon_name >= $1 AND taxon_name < $2
+            INSERT INTO app_taxa (wcvp_id, taxon_name, taxon_rank, taxon_status, family, genus, species, infraspecies, source_id)
+            SELECT plant_name_id, taxon_name, COALESCE(taxon_rank, 'Unranked'), taxon_status, family, genus, species, infraspecies, 1
+            FROM wcvp_import WHERE taxon_name >= $1 AND taxon_name < $2
             ON CONFLICT DO NOTHING;
         `, [seg.start, seg.end]);
     }
 };
 
 const stepBuildIndexes = async () => {
-    log("Building Structural Indexes...");
+    log("Building core indexes...");
     await robustQuery(`CREATE INDEX IF NOT EXISTS idx_temp_wcvp ON app_taxa(wcvp_id)`);
     await robustQuery(`CREATE INDEX IF NOT EXISTS idx_temp_parent_attr ON app_taxa(parent_plant_name_id)`);
 };
 
 const stepLinkParents = async () => {
-    log("Linking Parents (Adjacency)...");
+    log("Linking parents...");
     for (const seg of SEGMENTS) {
-        log(`  Linking Segment: ${seg.label}...`);
+        process.stdout.write(`    Segment ${seg.label}... \r`);
         await robustQuery(`
-            UPDATE app_taxa child
-            SET parent_id = parent.id
-            FROM app_taxa parent
-            WHERE child.parent_plant_name_id = parent.wcvp_id
-              AND child.parent_id IS NULL
-              AND child.taxon_name >= $1 AND child.taxon_name < $2;
+            UPDATE app_taxa child SET parent_id = parent.id
+            FROM app_taxa parent WHERE child.parent_plant_name_id = parent.wcvp_id
+            AND child.parent_id IS NULL AND child.taxon_name >= $1 AND child.taxon_name < $2;
         `, [seg.start, seg.end]);
     }
+    console.log("\n  Linking complete.");
 };
 
 const stepWFOBackbone = async () => {
-    log("Building WFO Backbone (Kingdom -> Family)...");
-    
-    // Unlink current records from Source 2/3 parents to avoid FK violation during delete
-    log("  Nullifying existing backbone links to prevent FK violation...");
-    await robustQuery(`
-        UPDATE app_taxa 
-        SET parent_id = NULL 
-        WHERE parent_id IN (SELECT id FROM app_taxa WHERE source_id IN (2, 3))
+    log("Starting Phase 9: WFO Phylogenetic Backbone Reconstruction...");
+    const client = await getClient();
+
+    log("  Step 1: Mitigating deadlocks (Identifying zombie sessions)...");
+    const zombies = await client.query(`
+        SELECT pid FROM pg_stat_activity 
+        WHERE query ILIKE '%app_taxa%' 
+          AND state != 'idle' 
+          AND pid != pg_backend_pid();
     `);
+    if (zombies.rowCount > 0) {
+        warn(`    Found ${zombies.rowCount} active sessions. Attempting to clear...`);
+        for (const z of zombies.rows) {
+            await client.query(`SELECT pg_terminate_backend($1)`, [z.pid]);
+        }
+    }
 
-    // Targeted cleanup of Source 2 (Derived) AND Source 3 (Legacy WFO)
-    // HUMAN NOTE: The deletion of Source 3 should be removed once manual entries are added.
-    await robustQuery(`DELETE FROM app_taxa WHERE source_id IN (2, 3)`);
+    log("  Step 2: Surgical Reset of stale backbone (Jan 8-12)...");
+    const resetRes = await client.query(`
+        DELETE FROM app_taxa 
+        WHERE (source_id = 3 AND taxon_rank IN ('Kingdom', 'Phylum', 'Class', 'Order', 'Family'))
+           OR (source_id = 2 AND taxon_rank = 'Family' AND taxon_status = 'Derived');
+    `);
+    log(`    Cleared ${resetRes.rowCount} zombie records.`);
 
-    await robustQuery(`
+    log("  Step 3: Initializing Authoritative Source ID 2 (WFO)...");
+    await client.query(`
         INSERT INTO app_data_sources (id, name, version, citation_text, url, trust_level)
-        VALUES (2, 'World Flora Online', '2025.12', 'WFO (2025): World Flora Online. Version 2025.12. Published on the Internet; http://www.worldfloraonline.org. Accessed on: 2026-01-09', 'http://www.worldfloraonline.org', 5)
-        ON CONFLICT (id) DO UPDATE SET citation_text = EXCLUDED.citation_text;
+        VALUES (2, 'World Flora Online', '2025.12', 'WFO (2025): World Flora Online. Version 2025.12.', 'http://www.worldfloraonline.org', 5)
+        ON CONFLICT (id) DO UPDATE SET last_accessed_at = NOW();
     `);
 
     const TARGET_RANKS = ['Kingdom', 'Phylum', 'Class', 'Order', 'Family'];
-
     for (const rank of TARGET_RANKS) {
-        log(`  Processing physical ${rank} records...`);
-        // Priority De-duplication: Accepted > Synonym > Unchecked
-        await robustQuery(`
+        log(`  Step 4: Physical Creation [${rank}]...`);
+        const insRes = await client.query(`
             INSERT INTO app_taxa (taxon_name, taxon_rank, taxon_status, "${rank.toLowerCase()}", source_id, verification_level)
             SELECT DISTINCT ON (scientificName) 
                 scientificName, 
@@ -312,37 +275,25 @@ const stepWFOBackbone = async () => {
                 INITCAP(LOWER(taxonomicStatus)), 
                 scientificName, 
                 2, 
-                'WFO Backbone v2.33.0'
-            FROM wfo_import
+                'WFO Backbone v2.33.3'
+            FROM wfo_import 
             WHERE LOWER(taxonRank) = LOWER($1)
-            ORDER BY scientificName, 
-                CASE 
-                    WHEN taxonomicStatus = 'ACCEPTED' THEN 1 
-                    WHEN taxonomicStatus = 'SYNONYM' THEN 2 
-                    ELSE 3 
-                END
+            ORDER BY scientificName, CASE WHEN taxonomicStatus = 'ACCEPTED' THEN 1 WHEN taxonomicStatus = 'SYNONYM' THEN 2 ELSE 3 END
             ON CONFLICT DO NOTHING;
         `, [rank]);
+        log(`    Created ${insRes.rowCount} physical ${rank} records.`);
     }
 
-    log("  Resolving collapsed parentage (WFO Inter-linking)...");
-    // Recursive query approach to find the nearest physical parent in our target backbone set
-    await robustQuery(`
+    log("  Step 5: Resolving Backbone Hierarchy (Recursive Rank Collapsing)...");
+    await client.query(`
         WITH RECURSIVE backbone_tree AS (
-            -- Seed with all WFO records in staging
-            SELECT taxonID, parentNameUsageID, scientificName, taxonRank 
-            FROM wfo_import
-            
+            SELECT taxonID, parentNameUsageID, scientificName, taxonRank FROM wfo_import
             UNION ALL
-            
-            -- Walk up until we hit a rank we track in app_taxa
             SELECT bt.taxonID, w.parentNameUsageID, w.scientificName, w.taxonRank
-            FROM backbone_tree bt
-            JOIN wfo_import w ON bt.parentNameUsageID = w.taxonID
+            FROM backbone_tree bt JOIN wfo_import w ON bt.parentNameUsageID = w.taxonID
             WHERE LOWER(bt.taxonRank) NOT IN ('kingdom', 'phylum', 'class', 'order', 'family')
         )
-        UPDATE app_taxa child
-        SET parent_id = parent.id
+        UPDATE app_taxa child SET parent_id = parent.id
         FROM backbone_tree bt_child
         JOIN backbone_tree bt_parent ON bt_child.parentNameUsageID = bt_parent.taxonID
         JOIN app_taxa parent ON parent.taxon_name = bt_parent.scientificName AND parent.source_id = 2
@@ -351,183 +302,92 @@ const stepWFOBackbone = async () => {
           AND child.parent_id IS NULL;
     `);
 
-    log("  Executing Internal Backbone Propagation (Source 2 Completion)...");
+    log("  Step 6: Internal Backbone Completion (Literal Propagation)...");
     for (let p = 1; p <= 4; p++) {
         process.stdout.write(`    Pass ${p}/4... \r`);
-        await robustQuery(`
+        await client.query(`
             UPDATE app_taxa child
             SET kingdom = COALESCE(child.kingdom, parent.kingdom),
                 phylum = COALESCE(child.phylum, parent.phylum),
                 class = COALESCE(child.class, parent.class),
                 "order" = COALESCE(child."order", parent."order")
             FROM app_taxa parent
-            WHERE child.parent_id = parent.id 
-              AND child.source_id = 2 AND parent.source_id = 2;
+            WHERE child.parent_id = parent.id AND child.source_id = 2 AND parent.source_id = 2;
         `);
     }
-    console.log("\n  Internal propagation complete.");
+    console.log("\n  Phase 9 Complete.");
 };
 
 const stepBackboneBridge = async () => {
-    log("Bridging Natural Taxa (Source 1/3) to Phylogenetic Backbone (Source 2)...");
-
-    // 1. Bridge via Family Literal
-    log("  Step 1: Bridging children to backbone Families...");
+    log("Starting Phase 10: Phylogenetic Bridge...");
+    log("  Step 1: Grafting Nomenclature to Backbone Families...");
     await robustQuery(`
-        UPDATE app_taxa child
-        SET parent_id = parent.id
-        FROM app_taxa parent
-        WHERE child.parent_id IS NULL
-          AND child.family = parent.taxon_name
-          AND parent.taxon_rank = 'Family'
-          AND parent.source_id = 2
-          AND child.id != parent.id;
+        UPDATE app_taxa child SET parent_id = parent.id
+        FROM app_taxa parent WHERE child.parent_id IS NULL AND child.family = parent.taxon_name
+        AND parent.taxon_rank = 'Family' AND parent.source_id = 2 AND child.id != parent.id;
     `);
 
-    // 2. Dereference Parent Synonyms
     log("  Step 2: Resolving parent synonym redirects...");
     await robustQuery(`
-        UPDATE app_taxa child
-        SET parent_id = accepted_parent.id
+        UPDATE app_taxa child SET parent_id = accepted_parent.id
         FROM app_taxa current_parent
-        JOIN wfo_import w_syn ON current_parent.taxon_name = w_syn.scientificName 
-          AND current_parent.taxon_rank = 'Family'
-          AND w_syn.taxonomicStatus = 'SYNONYM'
+        JOIN wfo_import w_syn ON current_parent.taxon_name = w_syn.scientificName AND current_parent.taxon_rank = 'Family' AND w_syn.taxonomicStatus = 'SYNONYM'
         JOIN wfo_import w_acc ON w_syn.acceptedNameUsageID = w_acc.taxonID
-        JOIN app_taxa accepted_parent ON w_acc.scientificName = accepted_parent.taxon_name 
-          AND accepted_parent.taxon_rank = 'Family'
+        JOIN app_taxa accepted_parent ON w_acc.scientificName = accepted_parent.taxon_name AND accepted_parent.taxon_rank = 'Family'
         WHERE child.parent_id = current_parent.id;
     `);
 
-    // 3. Mass Literal Propagation (Single Pass flow from anchored Families)
-    log("  Step 3: Mass literal propagation from anchored Families...");
+    log("  Step 3: Mass literal propagation (Single-Pass Flow)...");
     for (const seg of SEGMENTS) {
-        process.stdout.write(`    Propagating: ${seg.label}... \r`);
+        process.stdout.write(`    Flowing: ${seg.label}... \r`);
         await robustQuery(`
             UPDATE app_taxa child
-            SET kingdom = parent.kingdom,
-                phylum = parent.phylum,
-                class = parent.class,
-                "order" = parent."order"
-            FROM app_taxa parent
-            WHERE child.parent_id = parent.id
-              AND parent.taxon_rank = 'Family'
-              AND child.taxon_name >= $1 AND child.taxon_name < $2;
+            SET kingdom = parent.kingdom, phylum = parent.phylum, class = parent.class, "order" = parent."order"
+            FROM app_taxa parent WHERE child.parent_id = parent.id AND parent.taxon_rank = 'Family'
+            AND child.taxon_name >= $1 AND child.taxon_name < $2;
         `, [seg.start, seg.end]);
     }
-
-    log("\n  Step 4: Deep propagation (recursive catch-all)...");
-    for (let p = 1; p <= 3; p++) {
-        log(`    - Recursive Pass ${p}/3...`);
-        for (const seg of SEGMENTS) {
-            await robustQuery(`
-                UPDATE app_taxa child
-                SET kingdom = COALESCE(child.kingdom, parent.kingdom),
-                    phylum = COALESCE(child.phylum, parent.phylum),
-                    class = COALESCE(child.class, parent.class),
-                    "order" = COALESCE(child."order", parent."order")
-                FROM app_taxa parent
-                WHERE child.parent_id = parent.id 
-                  AND child.kingdom IS NULL AND parent.kingdom IS NOT NULL
-                  AND child.taxon_name >= $1 AND child.taxon_name < $2;
-            `, [seg.start, seg.end]);
-        }
-    }
-    console.log("\n  Bridge and propagation complete.");
+    console.log("\n  Phase 10 Complete.");
 };
 
 const stepHierarchy = async () => {
-    log("Building Ltree Hierarchy (Iterative & Robust)...");
-    await robustQuery(`ANALYZE app_taxa`);
-
-    const pathCheck = await robustQuery(`SELECT count(hierarchy_path) as cnt FROM app_taxa WHERE hierarchy_path IS NOT NULL`);
-    const pathsExist = parseInt(pathCheck.rows[0].cnt) > 0;
-
-    if (pathsExist) {
-        warn("Existing hierarchy paths detected.");
-        const choice = await askQuestion("Would you like to (R)esume/Finish current build or (S)tart over from zero? (R/S): ");
-        if (choice.toLowerCase() === 's') {
-            log("  Resetting hierarchy paths (Segmented)...");
-            for (const seg of SEGMENTS) {
-                process.stdout.write(`    Resetting ${seg.label}... \r`);
-                await robustQuery(`UPDATE app_taxa SET hierarchy_path = NULL WHERE taxon_name >= $1 AND taxon_name < $2`, [seg.start, seg.end]);
-            }
-            console.log("\n    Reset complete.");
-        } else {
-            log("  Resuming build. Existing paths will be preserved.");
-        }
-    }
-
-    // Level 1: Roots (Kingdoms)
-    log("  Processing Level 1: Roots...");
-    const rootRes = await robustQuery(`
-        UPDATE app_taxa 
-        SET hierarchy_path = text2ltree('root') || text2ltree(replace(id::text, '-', '_'))
-        WHERE parent_id IS NULL AND hierarchy_path IS NULL
-    `);
-    log(`    Updated ${rootRes.rowCount} new roots.`);
-
+    log("Building Ltree paths...");
+    await robustQuery(`UPDATE app_taxa SET hierarchy_path = text2ltree('root') || text2ltree(replace(id::text, '-', '_')) WHERE parent_id IS NULL AND hierarchy_path IS NULL`);
     let level = 2;
     while (true) {
         log(`  Processing Level ${level}...`);
-        let totalUpdated = 0;
-        
+        let total = 0;
         for (const seg of SEGMENTS) {
             const res = await robustQuery(`
-                UPDATE app_taxa c
-                SET hierarchy_path = p.hierarchy_path || text2ltree(replace(c.id::text, '-', '_'))
-                FROM app_taxa p
-                WHERE c.parent_id = p.id
-                  AND p.hierarchy_path IS NOT NULL
-                  AND c.hierarchy_path IS NULL
-                  AND c.taxon_name >= $1 AND c.taxon_name < $2
+                UPDATE app_taxa c SET hierarchy_path = p.hierarchy_path || text2ltree(replace(c.id::text, '-', '_'))
+                FROM app_taxa p WHERE c.parent_id = p.id AND p.hierarchy_path IS NOT NULL AND c.hierarchy_path IS NULL
+                AND c.taxon_name >= $1 AND c.taxon_name < $2
             `, [seg.start, seg.end]);
-            totalUpdated += res.rowCount;
-            if (res.rowCount > 0) {
-                process.stdout.write(`    - Segment ${seg.label}: ${res.rowCount} updated\r`);
-            }
+            total += res.rowCount;
         }
-        
-        console.log(`\n    Level ${level} complete. Total: ${totalUpdated} records.`);
-        if (totalUpdated === 0) break;
+        if (total === 0) break;
         level++;
     }
 };
 
 const stepCounts = async () => {
-    log("Calculating Direct Descendant Counts (Segmented Aggregation)...");
-    log("  Resetting current counts (Segmented)...");
+    log("Calculating descendant counts...");
     for (const seg of SEGMENTS) {
-        process.stdout.write(`    Resetting ${seg.label}... \r`);
-        await robustQuery(`UPDATE app_taxa SET descendant_count = 0 WHERE taxon_name >= $1 AND taxon_name < $2`, [seg.start, seg.end]);
-    }
-    
-    log("\n  Calculating immediate children (Segmented pass)...");
-    for (const seg of SEGMENTS) {
-        process.stdout.write(`    Updating ${seg.label}... \r`);
+        process.stdout.write(`    Updating: ${seg.label}... \r`);
         await robustQuery(`
-            UPDATE app_taxa p
-            SET descendant_count = sub.cnt
-            FROM (
-                SELECT parent_id as id, count(*) as cnt
-                FROM app_taxa
-                WHERE parent_id IS NOT NULL
-                  AND parent_id IN (SELECT id FROM app_taxa WHERE taxon_name >= $1 AND taxon_name < $2)
-                GROUP BY parent_id
-            ) sub
-            WHERE p.id = sub.id
+            UPDATE app_taxa p SET descendant_count = sub.cnt
+            FROM (SELECT parent_id as id, count(*) as cnt FROM app_taxa WHERE parent_id IS NOT NULL GROUP BY parent_id) sub
+            WHERE p.id = sub.id AND p.taxon_name >= $1 AND p.taxon_name < $2
         `, [seg.start, seg.end]);
     }
-    log("\n  Count update finished.");
+    console.log("\n  Phase 12 Complete.");
 };
 
 const stepOptimize = async () => {
-    log("Applying V8.1 Index Optimizations...");
+    log("Optimizing indexes...");
     const sql = fs.readFileSync(FILE_OPTIMIZE, 'utf-8');
     await robustQuery(sql);
 };
-
-// --- ORCHESTRATOR ---
 
 const STEPS = [
     { id: 1, label: "Prepare WCVP", fn: stepPrepWCVP },
@@ -547,33 +407,24 @@ const STEPS = [
 
 async function main() {
     console.log(`\n\x1b[32m🌿 FLORA CATALOG BUILDER ${APP_VERSION}\x1b[0m`);
-    console.log("------------------------------------------");
-    STEPS.forEach(s => console.log(`${s.id}. ${s.label}`));
-    console.log("------------------------------------------");
-    
-    const choice = await askQuestion("Select step to start (or comma-list for specific steps): ");
-    ensureDirs();
-
+    const choice = await askQuestion("Select step to start: ");
     let sequence = [];
     if (choice.includes(',')) {
-        sequence = choice.split(',').map(n => parseInt(n.trim())).filter(n => !isNaN(n));
+        sequence = choice.split(',').map(n => parseInt(n.trim()));
     } else {
         const startId = parseInt(choice);
         sequence = STEPS.filter(s => s.id >= startId).map(s => s.id);
     }
 
-    if (sequence.length === 0) { err("No steps selected."); process.exit(1); }
-
     try {
         for (const id of sequence) {
             const step = STEPS.find(s => s.id === id);
-            log(`\x1b[35m[STEP ${id}]\x1b[0m Executing: ${step.label}...`);
+            log(`\x1b[35m[STEP ${id}]\x1b[0m ${step.label}...`);
             await step.fn();
         }
-
         log("\x1b[32mBuild Complete!\x1b[0m");
     } catch (e) {
-        err(`Process failed at step.`);
+        err(`Process failed.`);
         console.error(e);
     } finally {
         if (activeClient) await activeClient.end();

@@ -1,6 +1,5 @@
 -- =============================================================================
--- DATA IMPORT DIAGNOSTIC TOOL (v2.32.3)
--- Run this to see how much of your database is fully linked and calculated.
+-- DATA IMPORT DIAGNOSTIC TOOL (v2.33.3)
 -- =============================================================================
 
 -- 0. STAGING TABLE AUDIT
@@ -45,204 +44,20 @@ FROM app_taxa
 GROUP BY 1
 ORDER BY 1;
 
--- 3. RANK COMPLETION HEATMAP
-SELECT 
-    taxon_rank,
-    count(*) as total,
-    count(hierarchy_path) as completed,
-    round(count(hierarchy_path) * 100.0 / NULLIF(count(*), 0), 1) || '%' as rank_progress
-FROM app_taxa
-GROUP BY taxon_rank
-ORDER BY completed DESC;
-
 -- 4. ACTIVE HIERARCHY WORKERS
--- If this returns 0 rows, your build script is NOT currently updating paths.
 SELECT 
-    pid, 
-    state, 
-    now() - query_start as duration, 
-    wait_event_type, 
-    wait_event, 
-    query 
+    pid, state, now() - query_start as duration, query 
 FROM pg_stat_activity 
-WHERE query ILIKE '%hierarchy_path%' 
-  AND state != 'idle'
-  AND pid != pg_backend_pid();
-
--- 5. DEPTH ANALYSIS
-SELECT 
-    nlevel(hierarchy_path) as path_depth,
-    count(*) as records_at_this_depth
-FROM app_taxa
-WHERE hierarchy_path IS NOT NULL
-GROUP BY 1
-ORDER BY 1;
-
--- 6. SPOT CHECK: HIERARCHY SAMPLE
-SELECT taxon_name, taxon_rank, hierarchy_path 
-FROM app_taxa 
-WHERE hierarchy_path IS NOT NULL 
-LIMIT 10;
-
--- 7. PARENTAGE AUDIT
-SELECT 
-    taxon_rank,
-    count(*) as total,
-    count(CASE WHEN parent_id IS NULL THEN 1 END) as "Rooted (No Parent)",
-    count(CASE WHEN parent_id IS NOT NULL THEN 1 END) as "Linked (Has Parent)"
-FROM app_taxa
-GROUP BY taxon_rank
-ORDER BY total DESC;
-
--- 8. LINEAGE PATH HEIGHT
--- Goal: You want to see rows at depth 5 (Order->Family->Genus->Species->Infra).
-SELECT 
-    nlevel(hierarchy_path) as tree_depth,
-    count(*) as record_count,
-    CASE 
-        WHEN nlevel(hierarchy_path) = 1 THEN 'Root (Order/Orphan)'
-        WHEN nlevel(hierarchy_path) = 2 THEN 'Level 1 (Family/Genus)'
-        WHEN nlevel(hierarchy_path) = 3 THEN 'Level 2 (Genus/Species)'
-        WHEN nlevel(hierarchy_path) = 4 THEN 'Level 3 (Species/Infra)'
-        WHEN nlevel(hierarchy_path) >= 5 THEN 'Level 4+ (Infra/Cultivar)'
-        ELSE 'Unknown'
-    END as height_label
-FROM app_taxa
-WHERE hierarchy_path IS NOT NULL
-GROUP BY 1
-ORDER BY 1;
-
--- 9. RESET PROGRESS AUDIT
--- Use this while Step 11 is "Resetting...". 
-SELECT 
-    count(hierarchy_path) as "Dirty Paths (Remaining to Reset)",
-    count(*) - count(hierarchy_path) as "Cleaned Rows (Ready for Build)",
-    round((count(*) - count(hierarchy_path)) * 100.0 / count(*), 1) || '%' as reset_completion
-FROM app_taxa;
+WHERE query ILIKE '%app_taxa%' AND state != 'idle' AND pid != pg_backend_pid();
 
 -- 10. THE BUILD DASHBOARD
--- A single-view summary of the entire Step 11 lifecycle.
 SELECT
     (SELECT count(*) FROM app_taxa) as "Total Database Records",
     (SELECT count(*) - count(hierarchy_path) FROM app_taxa) as "Reset Progress (Cleaned)",
     (SELECT count(hierarchy_path) FROM app_taxa) as "Build Progress (Paths Built)",
     (SELECT round(count(hierarchy_path) * 100.0 / count(*), 1) || '%' FROM app_taxa) as "Overall Completion %";
 
--- 11. PHYLOGENETIC ANCHOR CHECK
--- Verifies that WFO Orders are correctly acting as the roots for the tree.
-SELECT 
-    'WFO Order Roots' as label, count(*) as count 
-FROM app_taxa 
-WHERE taxon_rank = 'Order' AND parent_id IS NULL AND hierarchy_path IS NOT NULL
-UNION ALL
-SELECT 
-    'Orphaned WCVP Roots' as label, count(*) as count 
-FROM app_taxa 
-WHERE taxon_rank != 'Order' AND parent_id IS NULL AND hierarchy_path IS NOT NULL;
-
--- 12. ORPHAN INVESTIGATOR
--- Lists the specific records that are acting as roots but are NOT WFO Orders.
-SELECT 
-    taxon_name, 
-    taxon_rank, 
-    family, 
-    source_id, 
-    verification_level 
-FROM app_taxa 
-WHERE taxon_rank != 'Order' 
-  AND parent_id IS NULL 
-  AND hierarchy_path IS NOT NULL;
-
--- 13. HIERARCHY VELOCITY
--- Monitor this while Step 11 is running to see throughput.
-SELECT 
-    count(hierarchy_path) as current_built,
-    pg_size_pretty(pg_total_relation_size('app_taxa')) as current_disk_usage,
-    now() as current_time;
-
--- 14. LIVE BUILD FRONTIER (New in v2.31.21)
--- Identifies exactly how much work is "Ready to Process" for the next loop.
-SELECT 
-    (SELECT count(*) FROM app_taxa WHERE hierarchy_path IS NULL) as "Total Remaining",
-    (SELECT count(*) FROM app_taxa c 
-     JOIN app_taxa p ON c.parent_id = p.id 
-     WHERE c.hierarchy_path IS NULL AND p.hierarchy_path IS NOT NULL) as "Ready for Next Level",
-    (SELECT max(nlevel(hierarchy_path)) FROM app_taxa) as "Current Max Depth";
-
--- 15. LOCK MONITOR (New in v2.31.22)
--- Identifies blocking sessions preventing schema updates.
-SELECT 
-    l.pid as blocking_pid, 
-    a.query as blocking_query, 
-    l.mode as lock_mode, 
-    l.granted, 
-    a.state as session_state,
-    now() - a.query_start as lock_duration
-FROM pg_locks l
-JOIN pg_stat_activity a ON l.pid = a.pid
-WHERE l.relation = 'app_taxa'::regclass;
-
--- 16. REPAIR TASK AUDIT (New in v2.31.23)
--- Verifies progress of Order literals and Child Counts.
-SELECT 
-    'Order Literals' as metric,
-    count(*) as total_records,
-    count("order") as with_order,
-    round(count("order") * 100.0 / count(*), 1) || '%' as completion
-FROM app_taxa
-UNION ALL
-SELECT 
-    'Child Counts' as metric,
-    count(*) as total_records,
-    count(CASE WHEN descendant_count > 0 THEN 1 END) as with_counts,
-    'N/A (Parents only)' as completion
-FROM app_taxa;
-
--- 17. LOCK KILLER (New in v2.31.24)
--- Provides the specific command to kill the session blocking your updates.
-SELECT 
-    'SELECT pg_terminate_backend(' || l.pid || ');' as kill_command, 
-    a.query as blocking_query, 
-    now() - a.query_start as duration
-FROM pg_locks l
-JOIN pg_stat_activity a ON l.pid = a.pid
-WHERE l.relation = 'app_taxa'::regclass 
-  AND l.pid != pg_backend_pid()
-  AND a.state != 'idle';
-
--- 18. DIRECT CHILD AUDIT (v2.31.26)
--- Finds records with mismatched child counts (Stored vs Real).
-SELECT 
-    p.taxon_name, 
-    p.taxon_rank, 
-    p.descendant_count as stored_count,
-    (SELECT count(*) FROM app_taxa c WHERE c.parent_id = p.id) as real_child_rows,
-    CASE 
-        WHEN p.descendant_count != (SELECT count(*) FROM app_taxa c WHERE c.parent_id = p.id) THEN 'MISMATCH (ZOMBIE DATA)'
-        ELSE 'OK'
-    END as health_status
-FROM app_taxa p
-WHERE p.descendant_count > 0 OR EXISTS (SELECT 1 FROM app_taxa c WHERE c.parent_id = p.id)
-ORDER BY stored_count DESC
-LIMIT 50;
-
--- 19. LINEAGE GAP ANALYSIS (v2.32.1)
--- Identifies records that have a parent identifier in the source but are missing physical parent_id links.
--- Useful for monitoring Step 10 completion.
-SELECT 
-    taxon_rank,
-    taxon_status,
-    count(*) as total_rows,
-    count(parent_id) as linked_rows,
-    count(*) - count(parent_id) as unlinked_rows,
-    round(count(parent_id) * 100.0 / NULLIF(count(*), 0), 1) || '%' as link_rate
-FROM app_taxa
-WHERE parent_plant_name_id IS NOT NULL OR taxon_rank IN ('Kingdom', 'Phylum', 'Class', 'Order', 'Family')
-GROUP BY 1, 2
-ORDER BY unlinked_rows DESC;
-
--- 20. TAXONOMIC CENSUS (v2.32.2)
--- Shows exactly what is physically in the table. Use this if Query 19 seems incomplete.
+-- 20. TAXONOMIC CENSUS
 SELECT 
     taxon_rank,
     source_id,
@@ -251,23 +66,32 @@ FROM app_taxa
 GROUP BY 1, 2
 ORDER BY physical_row_count DESC;
 
--- 21. WFO PARENTAGE DEBUGGER (v2.32.3)
--- Deep dive into why physical backbone records are failing to link.
--- Shows the parent name the child is looking for vs what actually exists in the DB.
-WITH unlinked_wfo AS (
-    SELECT taxon_name, taxon_rank, taxon_status, source_id
-    FROM app_taxa
-    WHERE source_id = 3 AND parent_id IS NULL AND taxon_rank != 'Kingdom'
-    LIMIT 20
-)
+-- 22. PHASE 9 BACKBONE COMPLETION DETAIL
 SELECT 
-    c.taxon_name as child_name,
-    c.taxon_rank as child_rank,
-    w_child.parentNameUsageID as looking_for_wfo_id,
-    w_parent.scientificName as target_parent_name,
-    w_parent.taxonRank as target_parent_rank,
-    EXISTS(SELECT 1 FROM app_taxa a WHERE a.taxon_name = w_parent.scientificName) as parent_exists_in_db,
-    (SELECT taxon_rank FROM app_taxa a WHERE a.taxon_name = w_parent.scientificName LIMIT 1) as existing_db_parent_rank
-FROM unlinked_wfo c
-JOIN wfo_import w_child ON c.taxon_name = w_child.scientificName
-JOIN wfo_import w_parent ON w_child.parentNameUsageID = w_parent.taxonID;
+    taxon_rank,
+    count(*) as total_in_rank,
+    count(parent_id) as linked_to_parent,
+    count(kingdom) as has_kingdom_literal,
+    count("order") as has_order_literal
+FROM app_taxa
+WHERE source_id = 2
+GROUP BY 1
+ORDER BY 1;
+
+-- 23. ZOMBIE BACKBONE DETECTION
+SELECT 
+    source_id,
+    taxon_rank,
+    count(*) as zombie_count,
+    min(created_at) as oldest_record,
+    max(created_at) as newest_record
+FROM app_taxa
+WHERE (source_id = 3 AND taxon_rank IN ('Kingdom', 'Phylum', 'Class', 'Order', 'Family'))
+   OR (source_id = 2 AND taxon_rank = 'Family' AND taxon_status = 'Derived')
+GROUP BY 1, 2
+ORDER BY 1, 2;
+
+-- 24. EMERGENCY KILL SWITCH (Run result to kill zombies)
+-- SELECT 'SELECT pg_terminate_backend(' || pid || ');' as kill_cmd 
+-- FROM pg_stat_activity 
+-- WHERE query ILIKE '%app_taxa%' AND state != 'idle' AND pid != pg_backend_pid();
