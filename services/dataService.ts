@@ -86,6 +86,7 @@ const mapToDB = (taxon: Taxon) => {
     hybrid_formula: clean(taxon.hybrid_formula),
     taxon_authors: clean(taxon.taxon_authors),
     primary_author: clean(taxon.primary_author),
+    parenthetical_author: clean(taxon.parenthetical_author),
     publication_author: clean(taxon.publication_author),
     replaced_synonym_author: clean(taxon.replaced_synonym_author),
     place_of_publication: clean(taxon.place_of_publication),

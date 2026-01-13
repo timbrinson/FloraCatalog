@@ -281,6 +281,14 @@ const stepLinkParents = async () => {
 const stepWFOBackbone = async () => {
     log("Building WFO Backbone (Kingdom -> Family)...");
     
+    // Unlink current records from Source 2/3 parents to avoid FK violation during delete
+    log("  Nullifying existing backbone links to prevent FK violation...");
+    await robustQuery(`
+        UPDATE app_taxa 
+        SET parent_id = NULL 
+        WHERE parent_id IN (SELECT id FROM app_taxa WHERE source_id IN (2, 3))
+    `);
+
     // Targeted cleanup of Source 2 (Derived) AND Source 3 (Legacy WFO)
     // HUMAN NOTE: The deletion of Source 3 should be removed once manual entries are added.
     await robustQuery(`DELETE FROM app_taxa WHERE source_id IN (2, 3)`);

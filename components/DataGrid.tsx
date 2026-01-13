@@ -493,7 +493,7 @@ export const DataGrid: React.FC<DataGridProps> = ({
           const segments = row.hierarchy_path.split('.');
           for (let i = 1; i < segments.length; i++) {
               const id = segments[i].replace(/_/g, '-');
-              const auth = authorityRegistry.get(id) || allTaxaPool.find(t => t.id === id);
+                  const auth = authorityRegistry.get(id) || allTaxaPool.find(t => t.id === id);
               if (auth && isRankMatch(auth.taxon_rank || '', r_target)) return id;
           }
       }
