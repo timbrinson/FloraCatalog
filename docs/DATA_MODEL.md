@@ -35,6 +35,18 @@ The `source_id` column maps to the following authoritative tiers:
 
 ---
 
+## 4. Data Post-Processing & Normalization
+While nomenclature from WCVP is generally treated as immutable, the application performs specific normalization during the "Bridge" phase to ensure hierarchy integrity.
+
+### 4.1 Family Synonym Dereferencing
+To prevent a fragmented hierarchy, the application aligns all child records (Genera, Species) with the **Accepted** family name recognized by World Flora Online (Source 2).
+
+- **The Rule:** If a WCVP record references a family that WFO classifies as a `SYNONYM`, the build process grafts that record to the **Accepted** Family parent.
+- **Literal Modification:** In these specific cases, the `family` literal column in the `app_taxa` record is updated to match the name of the Accepted parent.
+- **Rationale:** This ensures that all members of a lineage (e.g., *Relictithismia*) appear under the correct phylogenetic group in the UI (e.g., *Burmanniaceae*), even if the source WCVP data uses a synonym name (e.g., *Thismiaceae*).
+
+---
+
 ## Entity-Relationship Diagram (Conceptual)
 
 ### 1. Staging Layer (`wcvp_import` / `wfo_import`)

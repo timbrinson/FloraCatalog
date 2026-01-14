@@ -226,7 +226,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, preferen
 
                             <div className="space-y-1.5">
                                 <div className="flex justify-between text-[9px] font-bold uppercase text-slate-400">
-                                    <span>Build Phase (Query 10)</span>
+                                    <span>Build Phase (Query 13)</span>
                                     <span>{buildData.build_completion}%</span>
                                 </div>
                                 <div className="h-2 w-full bg-slate-800 rounded-full overflow-hidden border border-slate-700">

@@ -1,8 +1,21 @@
 # Version History
 
+## v2.33.7 - Bridge Resumption & Literal Sovereignty
+**Date:** January 12, 2026
+**Status:** Current Release
+
+### Data Integrity & Normalization
+- **Bridge Refactor:** Divided Phase 10 into three granular steps (10: Grafting, 11: Synonym Redirects, 12: Literal Flow) to allow precise resumption after session timeouts.
+- **Literal Normalization Rule:** Codified the rule in `docs/DATA_MODEL.md` that child records (Genera/Species) have their `family` literal updated to match the **Accepted** family name when the original source references a synonym family. This ensures grid grouping stability.
+- **Redirect Hardening:** Improved Step 11 logic to use case-insensitive status matching and explicit Source ID protection to ensure high-fidelity phylogenetic grafting.
+
+### Infrastructure
+- **Build CLI UI:** Restored the interactive step menu in `automate_build.js` for better operator visibility.
+- **Diagnostic Alignment:** Synchronized the Settings Dashboard health indicators with the new 15-step build process.
+
 ## v2.31.4 - Baseline Verification & Atomic Repair
 **Date:** January 11, 2026
-**Status:** Current Release
+**Status:** (Historical)
 
 ### Data Integrity & Verification
 - **Population Audit:** Verified that high-volume population counts (e.g., Asteraceae: 86k, Poaceae: 60k) are accurate representations of the WCVP dataset, confirming the system's ability to handle massive direct-child navigation nodes.
@@ -69,7 +82,7 @@
 ### Performance & Stability
 - **PostgREST Injection Fix:** Hardened `dataService.ts` to strictly quote string literals in `or()` and `in()` filters. This resolves 500 "No apikey found" errors caused by multi-word values (e.g., 'Artificial Hybrid') mangling the request URL structure.
 - **V8.1 Performance Overhaul:** Formally transitioned to sort-inclusive composite indexes. Reclaimed ~100MB of storage by removing redundant/shadowed indexes confirmed by size audit.
-- **Sparse Rank Optimization:** Resolved 4s timeouts on sparse ranks (Form, f.) by providing pre-sorted data to the database planner, reducing latency to <1s.
+- **Sparse Rank Optimization:** Resolved 4s timeouts on sparse ranks (Form, f.) by providing pre-sorted data to the database planner, reducing latency to less than 1s.
 
 ## v2.30.0 - Grid Customization & UX Polish
 **Date:** July 06, 2025

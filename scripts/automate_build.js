@@ -1,8 +1,8 @@
 /**
- * AUTOMATED DATABASE BUILDER (CLI) v2.33.4
+ * AUTOMATED DATABASE BUILDER (CLI) v2.33.7
  * 
  * Orchestrates the transformation of raw WCVP and WFO data into the FloraCatalog database.
- * v2.33.4: Restored Menu UI & Reset Feedback.
+ * v2.33.7: Granular Bridge Split & Synonym Dereferencing Fix.
  */
 
 import pg from 'pg';
@@ -41,7 +41,7 @@ const FILE_CLEAN_CSV = path.join(DIR_TEMP, 'wcvp_names_clean.csv');
 const FILE_WFO_IMPORT = path.join(DIR_TEMP, 'wfo_import.csv');
 const FILE_SCHEMA = 'scripts/wcvp_schema.sql.txt';
 const FILE_OPTIMIZE = 'scripts/optimize_indexes.sql.txt';
-const APP_VERSION = 'v2.33.4';
+const APP_VERSION = 'v2.33.7';
 
 const SEGMENTS = [
     { label: "A (incl. symbols)", start: "\x01", end: "B" },
@@ -275,7 +275,7 @@ const stepWFOBackbone = async () => {
                 INITCAP(LOWER(taxonomicStatus)), 
                 scientificName, 
                 2, 
-                'WFO Backbone v2.33.4'
+                'WFO Backbone v2.33.7'
             FROM wfo_import 
             WHERE LOWER(taxonRank) = LOWER($1)
             ORDER BY scientificName, CASE WHEN taxonomicStatus = 'ACCEPTED' THEN 1 WHEN taxonomicStatus = 'SYNONYM' THEN 2 ELSE 3 END
@@ -318,36 +318,64 @@ const stepWFOBackbone = async () => {
     console.log("\n  Phase 9 Complete.");
 };
 
-const stepBackboneBridge = async () => {
-    log("Starting Phase 10: Phylogenetic Bridge...");
-    log("  Step 1: Grafting Nomenclature to Backbone Families...");
-    await robustQuery(`
-        UPDATE app_taxa child SET parent_id = parent.id
-        FROM app_taxa parent WHERE child.parent_id IS NULL AND child.family = parent.taxon_name
-        AND parent.taxon_rank = 'Family' AND parent.source_id = 2 AND child.id != parent.id;
-    `);
-
-    log("  Step 2: Resolving parent synonym redirects...");
-    await robustQuery(`
-        UPDATE app_taxa child SET parent_id = accepted_parent.id
-        FROM app_taxa current_parent
-        JOIN wfo_import w_syn ON current_parent.taxon_name = w_syn.scientificName AND current_parent.taxon_rank = 'Family' AND w_syn.taxonomicStatus = 'SYNONYM'
-        JOIN wfo_import w_acc ON w_syn.acceptedNameUsageID = w_acc.taxonID
-        JOIN app_taxa accepted_parent ON w_acc.scientificName = accepted_parent.taxon_name AND accepted_parent.taxon_rank = 'Family'
-        WHERE child.parent_id = current_parent.id;
-    `);
-
-    log("  Step 3: Mass literal propagation (Single-Pass Flow)...");
+const stepBridgeGrafting = async () => {
+    log("Starting Phase 10: Phylogenetic Bridge (Family Grafting)...");
     for (const seg of SEGMENTS) {
-        process.stdout.write(`    Flowing: ${seg.label}... \r`);
+        process.stdout.write(`    Grafting Segment ${seg.label}... \r`);
         await robustQuery(`
-            UPDATE app_taxa child
-            SET kingdom = parent.kingdom, phylum = parent.phylum, class = parent.class, "order" = parent."order"
-            FROM app_taxa parent WHERE child.parent_id = parent.id AND parent.taxon_rank = 'Family'
-            AND child.taxon_name >= $1 AND child.taxon_name < $2;
+            UPDATE app_taxa child SET parent_id = parent.id
+            FROM app_taxa parent 
+            WHERE child.parent_id IS NULL 
+              AND child.family = parent.taxon_name
+              AND parent.taxon_rank = 'Family' 
+              AND parent.source_id = 2 
+              AND child.id != parent.id
+              AND child.taxon_name >= $1 AND child.taxon_name < $2;
         `, [seg.start, seg.end]);
     }
-    console.log("\n  Phase 10 Complete.");
+    console.log("\n    Grafting complete.");
+};
+
+const stepBridgeSynonyms = async () => {
+    log("Starting Phase 11: Synonym Redirects (Dereferencing Family Synonyms)...");
+    log("  Identifying and dereferencing Family-level synonyms in WFO...");
+    
+    const synRes = await robustQuery(`
+        UPDATE app_taxa child 
+        SET parent_id = accepted_parent.id,
+            family = accepted_parent.taxon_name
+        FROM app_taxa current_parent
+        JOIN wfo_import w_syn ON LOWER(current_parent.taxon_name) = LOWER(w_syn.scientificName) 
+          AND current_parent.taxon_rank = 'Family' 
+          AND current_parent.source_id = 2
+          AND UPPER(w_syn.taxonomicStatus) = 'SYNONYM'
+        JOIN wfo_import w_acc ON w_syn.acceptedNameUsageID = w_acc.taxonID
+        JOIN app_taxa accepted_parent ON LOWER(w_acc.scientificName) = LOWER(accepted_parent.taxon_name) 
+          AND accepted_parent.taxon_rank = 'Family'
+          AND accepted_parent.source_id = 2
+        WHERE child.parent_id = current_parent.id;
+    `);
+    log(`    Redirected ${synRes.rowCount} children to Accepted Family parents (e.g. Relictithismia -> Burmanniaceae).`);
+};
+
+const stepBridgeFlow = async () => {
+    log("Starting Phase 12: Literal Flow (Mass Phylogenetic Inheritance)...");
+    for (const seg of SEGMENTS) {
+        process.stdout.write(`    Flowing Segment ${seg.label}... \r`);
+        await robustQuery(`
+            UPDATE app_taxa child
+            SET kingdom = parent.kingdom, 
+                phylum = parent.phylum, 
+                class = parent.class, 
+                "order" = parent."order"
+            FROM app_taxa parent 
+            WHERE child.parent_id = parent.id 
+              AND parent.taxon_rank = 'Family'
+              AND parent.source_id = 2
+              AND child.taxon_name >= $1 AND child.taxon_name < $2;
+        `, [seg.start, seg.end]);
+    }
+    console.log("\n  Phase 12 Complete.");
 };
 
 const stepHierarchy = async () => {
@@ -380,7 +408,7 @@ const stepCounts = async () => {
             WHERE p.id = sub.id AND p.taxon_name >= $1 AND p.taxon_name < $2
         `, [seg.start, seg.end]);
     }
-    console.log("\n  Phase 12 Complete.");
+    console.log("\n  Phase 14 Complete.");
 };
 
 const stepOptimize = async () => {
@@ -399,10 +427,12 @@ const STEPS = [
     { id: 7, label: "Build Indexes (Structural)", fn: stepBuildIndexes },
     { id: 8, label: "Link Parents (WCVP Adjacency)", fn: stepLinkParents },
     { id: 9, label: "WFO Higher Ranks (Backbone)", fn: stepWFOBackbone },
-    { id: 10, label: "Backbone Bridge (Grafting)", fn: stepBackboneBridge },
-    { id: 11, label: "Hierarchy (Ltree Paths)", fn: stepHierarchy },
-    { id: 12, label: "Counts (# Navigation)", fn: stepCounts },
-    { id: 13, label: "Optimize (Sort-Inclusive)", fn: stepOptimize }
+    { id: 10, label: "Bridge: Family Grafting", fn: stepBridgeGrafting },
+    { id: 11, label: "Bridge: Synonym Redirects", fn: stepBridgeSynonyms },
+    { id: 12, label: "Bridge: Literal Flow", fn: stepBridgeFlow },
+    { id: 13, label: "Hierarchy (Ltree Paths)", fn: stepHierarchy },
+    { id: 14, label: "Counts (# Navigation)", fn: stepCounts },
+    { id: 15, label: "Optimize (Sort-Inclusive)", fn: stepOptimize }
 ];
 
 async function main() {
@@ -411,7 +441,7 @@ async function main() {
     STEPS.forEach(s => console.log(`${s.id.toString().padStart(2)}. ${s.label}`));
     console.log("----------------------------------------");
 
-    const choice = await askQuestion("Select step(s) to run (e.g. '9' or '9,10,11'): ");
+    const choice = await askQuestion("Select step(s) to run (e.g. '11' or '11,12,13'): ");
     let sequence = [];
     if (choice.includes(',')) {
         sequence = choice.split(',').map(n => parseInt(n.trim()));
