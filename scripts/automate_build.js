@@ -1,8 +1,8 @@
 /**
- * AUTOMATED DATABASE BUILDER (CLI) v2.33.12
+ * AUTOMATED DATABASE BUILDER (CLI) v2.33.13
  * 
  * Orchestrates the transformation of raw WCVP and WFO data into the FloraCatalog database.
- * v2.33.12: Foreign Key Constraint Mitigation (Pre-reset Un-grafting).
+ * v2.33.13: Staging Wipes (WFO Duplicate Key Mitigation).
  */
 
 import pg from 'pg';
@@ -41,7 +41,7 @@ const FILE_CLEAN_CSV = path.join(DIR_TEMP, 'wcvp_names_clean.csv');
 const FILE_WFO_IMPORT = path.join(DIR_TEMP, 'wfo_import.csv');
 const FILE_SCHEMA = 'scripts/wcvp_schema.sql.txt';
 const FILE_OPTIMIZE = 'scripts/optimize_indexes.sql.txt';
-const APP_VERSION = 'v2.33.12';
+const APP_VERSION = 'v2.33.13';
 
 const SEGMENTS = [
     { label: "A (incl. symbols)", start: "\x01", end: "B" },
@@ -145,6 +145,8 @@ const stepResetDB = async () => {
 const stepImportWCVP = async () => {
     log("Streaming WCVP staging...");
     const client = await getClient();
+    // V2.33.13: Ensure clean slate for WCVP staging
+    await client.query(`TRUNCATE TABLE wcvp_import`);
     const stream = client.query(copyFrom(`COPY wcvp_import FROM STDIN WITH CSV HEADER`));
     const fileStream = fs.createReadStream(FILE_CLEAN_CSV);
     await pipeline(fileStream, stream);
@@ -187,6 +189,12 @@ const stepImportWFO = async () => {
             tplID text
         );
     `);
+
+    // V2.33.13: WFO Duplicate Key Mitigation.
+    // If we distilled a new file, we must wipe the existing staging records first.
+    log("  Truncating wfo_import for fresh load...");
+    await client.query(`TRUNCATE TABLE wfo_import`);
+
     const stream = client.query(copyFrom(`COPY wfo_import FROM STDIN WITH CSV HEADER`));
     const fileStream = fs.createReadStream(FILE_WFO_IMPORT);
     await pipeline(fileStream, stream);
@@ -251,8 +259,6 @@ const stepWFOBackbone = async () => {
 
     log("  Step 2: Resetting Source ID 2 (WFO backbone slate)...");
     // V2.33.12: Mitigation for Foreign Key violations.
-    // If we are re-running this step, WCVP records may already point to WFO parents.
-    // We must un-graft them before deleting the parents to avoid 'violates foreign key constraint' errors.
     log("    Un-grafting existing bridges to backbone...");
     await client.query(`
         UPDATE app_taxa SET parent_id = NULL 
@@ -287,7 +293,7 @@ const stepWFOBackbone = async () => {
                 INITCAP(LOWER(taxonomicStatus)), 
                 scientificName, 
                 2, 
-                'WFO Backbone v2.33.12'
+                'WFO Backbone v2.33.13'
             FROM wfo_import 
             WHERE LOWER(taxonRank) = LOWER($1)
             ORDER BY scientificName, CASE WHEN taxonomicStatus = 'ACCEPTED' THEN 1 WHEN taxonomicStatus = 'SYNONYM' THEN 2 ELSE 3 END

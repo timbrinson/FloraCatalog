@@ -1,8 +1,17 @@
 # Version History
 
-## v2.33.12 - Foreign Key Constraint Mitigation
+## v2.33.13 - Staging Duplicate Mitigation
 **Date:** January 12, 2026
 **Status:** Current Release
+
+### Infrastructure & Operations
+- **WFO Staging Wipes:** Updated Phase 5 (`stepImportWFO`) in the build script to explicitly truncate the `wfo_import` table before streaming data. This resolves `duplicate key value violates unique constraint "wfo_import_pkey"` errors occurring when re-running the distillation and import cycle.
+- **WCVP Staging Alignment:** Applied the same explicit `TRUNCATE` logic to Step 4 (`stepImportWCVP`) for consistency.
+- **Lineage Verification:** Updated `verification_level` literals to v2.33.13.
+
+## v2.33.12 - Foreign Key Constraint Mitigation
+**Date:** January 12, 2026
+**Status:** (Historical)
 
 ### Infrastructure & Operations
 - **Pre-Reset Un-grafting:** Added a critical update step in Phase 9 Step 2 of the build script. The system now nullifies `parent_id` pointers on all records that reference a Source ID 2 (WFO backbone) parent before attempting to delete those parents. This resolves the `violates foreign key constraint "app_taxa_parent_id_fkey"` error occurring during granular backbone rebuilds.
