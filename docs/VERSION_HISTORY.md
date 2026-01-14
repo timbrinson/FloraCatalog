@@ -1,17 +1,22 @@
 # Version History
 
-## v2.33.10 - Infrastructure Standardization & WFO Refinement
+## v2.33.11 - Source Metadata Synchronization & Reset Hardening
 **Date:** January 12, 2026
 **Status:** Current Release
+
+### Infrastructure & Operations
+- **Source Metadata Force-Update:** Refactored Phase 9 Step 3 to use a robust `ON CONFLICT (id) DO UPDATE` pattern for WFO (Source ID 2). This ensures citation text, URLs, and versioning are synchronized character-for-character even if the row already existed in the database.
+- **WFO Backbone Reset Hardening:** Updated Phase 9 Step 2 to perform a total wipe of Source ID 2 (`DELETE FROM app_taxa WHERE source_id = 2`) before the build. This eliminates redundant rank/status filtering during the reset phase, ensuring a definitive clean slate for the phylogenetic backbone.
+- **Lineage Verification:** Updated `verification_level` literals to v2.33.11 for improved auditability of the current build cycle.
+
+## v2.33.10 - Infrastructure Standardization & WFO Refinement
+**Date:** January 12, 2026
+**Status:** (Historical)
 
 ### Infrastructure & Operations
 - **Pro Plan Standardization:** Formally transitioned all documentation to require the **Supabase Pro Plan**. Audit confirmed that WCVP and WFO staging footprints (2GB+) far exceed free-tier logical storage capabilities.
 - **WFO Distillation Optimization:** Updated `distill_wfo.py` to strictly filter for records where the `genus` column is empty. This effectively extracts the 100% phylogenetic backbone (Kingdom down to Family, including Superorders/Clades) while discarding the massive volume of lower-level records already sourced from WCVP.
 - **Scientific Gap Documentation:** Formally documented that the missing "Class" metadata for Angiosperms is a property of the APG IV phylogeny and is handled by the application's virtual row engine.
-
-### Implementation
-- **Build CLI UI:** sanitized terminology to remove references to the now-obsolete "free tier."
-- **Diagnostic Alignment:** Verified that the "Authority-Seeking" recursion in Phase 9 remains fully functional with the distilled WFO dataset.
 
 ## v2.33.8 - WFO Phylogenetic Lineage Gap Closure
 **Date:** January 12, 2026

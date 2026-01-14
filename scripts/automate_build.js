@@ -1,8 +1,8 @@
 /**
- * AUTOMATED DATABASE BUILDER (CLI) v2.33.10
+ * AUTOMATED DATABASE BUILDER (CLI) v2.33.11
  * 
  * Orchestrates the transformation of raw WCVP and WFO data into the FloraCatalog database.
- * v2.33.10: Pro Plan Standardization (Genus-Filter for optimized storage).
+ * v2.33.11: Source Metadata Synchronization & Reset Hardening.
  */
 
 import pg from 'pg';
@@ -41,7 +41,7 @@ const FILE_CLEAN_CSV = path.join(DIR_TEMP, 'wcvp_names_clean.csv');
 const FILE_WFO_IMPORT = path.join(DIR_TEMP, 'wfo_import.csv');
 const FILE_SCHEMA = 'scripts/wcvp_schema.sql.txt';
 const FILE_OPTIMIZE = 'scripts/optimize_indexes.sql.txt';
-const APP_VERSION = 'v2.33.10';
+const APP_VERSION = 'v2.33.11';
 
 const SEGMENTS = [
     { label: "A (incl. symbols)", start: "\x01", end: "B" },
@@ -249,19 +249,23 @@ const stepWFOBackbone = async () => {
         }
     }
 
-    log("  Step 2: Surgical Reset of stale backbone (Jan 8-12)...");
-    const resetRes = await client.query(`
-        DELETE FROM app_taxa 
-        WHERE (source_id = 3 AND taxon_rank IN ('Kingdom', 'Phylum', 'Class', 'Order', 'Family'))
-           OR (source_id = 2 AND taxon_rank = 'Family' AND taxon_status = 'Derived');
-    `);
-    log(`    Cleared ${resetRes.rowCount} zombie records.`);
+    log("  Step 2: Resetting Source ID 2 (WFO backbone slate)...");
+    // V2.33.11: Simplified reset. Wipes all Source 2 records to ensure clean rebuild.
+    const resetRes = await client.query(`DELETE FROM app_taxa WHERE source_id = 2`);
+    log(`    Cleared ${resetRes.rowCount} stale backbone records.`);
 
-    log("  Step 3: Initializing Authoritative Source ID 2 (WFO)...");
+    log("  Step 3: Synchronizing Authoritative Source ID 2 (WFO Metadata)...");
+    // V2.33.11: Forced update of metadata columns to resolve stagnant source content.
     await client.query(`
         INSERT INTO app_data_sources (id, name, version, citation_text, url, trust_level)
-        VALUES (2, 'World Flora Online', '2025.12', 'WFO (2025): World Flora Online. Version 2025.12.', 'http://www.worldfloraonline.org', 5)
-        ON CONFLICT (id) DO UPDATE SET last_accessed_at = NOW();
+        VALUES (2, 'World Flora Online', '2025.12', 'WFO (2025): World Flora Online. Version 2025.12. Published on the Internet; http://www.worldfloraonline.org. Accessed on: 2026-01-12', 'http://www.worldfloraonline.org', 5)
+        ON CONFLICT (id) DO UPDATE SET 
+            name = EXCLUDED.name,
+            version = EXCLUDED.version,
+            citation_text = EXCLUDED.citation_text,
+            url = EXCLUDED.url,
+            trust_level = EXCLUDED.trust_level,
+            last_accessed_at = NOW();
     `);
 
     const TARGET_RANKS = ['Kingdom', 'Phylum', 'Class', 'Order', 'Family'];
@@ -275,7 +279,7 @@ const stepWFOBackbone = async () => {
                 INITCAP(LOWER(taxonomicStatus)), 
                 scientificName, 
                 2, 
-                'WFO Backbone v2.33.10'
+                'WFO Backbone v2.33.11'
             FROM wfo_import 
             WHERE LOWER(taxonRank) = LOWER($1)
             ORDER BY scientificName, CASE WHEN taxonomicStatus = 'ACCEPTED' THEN 1 WHEN taxonomicStatus = 'SYNONYM' THEN 2 ELSE 3 END
@@ -285,8 +289,6 @@ const stepWFOBackbone = async () => {
     }
 
     log("  Step 5: Resolving Backbone Hierarchy (Authority-Seeking Recursion)...");
-    // V2.33.10: Authority-Seeking recursion walks up until we find ANY parent in Source 2.
-    // This correctly bridges Clades, Superorders, and intermediate ranks filtered during distillation.
     await client.query(`
         WITH RECURSIVE backbone_tree AS (
             -- Start with every physical record we just created
