@@ -1,8 +1,16 @@
 # Version History
 
-## v2.33.11 - Source Metadata Synchronization & Reset Hardening
+## v2.33.12 - Foreign Key Constraint Mitigation
 **Date:** January 12, 2026
 **Status:** Current Release
+
+### Infrastructure & Operations
+- **Pre-Reset Un-grafting:** Added a critical update step in Phase 9 Step 2 of the build script. The system now nullifies `parent_id` pointers on all records that reference a Source ID 2 (WFO backbone) parent before attempting to delete those parents. This resolves the `violates foreign key constraint "app_taxa_parent_id_fkey"` error occurring during granular backbone rebuilds.
+- **Lineage Verification:** Updated `verification_level` literals to v2.33.12.
+
+## v2.33.11 - Source Metadata Synchronization & Reset Hardening
+**Date:** January 12, 2026
+**Status:** (Historical)
 
 ### Infrastructure & Operations
 - **Source Metadata Force-Update:** Refactored Phase 9 Step 3 to use a robust `ON CONFLICT (id) DO UPDATE` pattern for WFO (Source ID 2). This ensures citation text, URLs, and versioning are synchronized character-for-character even if the row already existed in the database.

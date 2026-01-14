@@ -1,8 +1,8 @@
 /**
- * AUTOMATED DATABASE BUILDER (CLI) v2.33.11
+ * AUTOMATED DATABASE BUILDER (CLI) v2.33.12
  * 
  * Orchestrates the transformation of raw WCVP and WFO data into the FloraCatalog database.
- * v2.33.11: Source Metadata Synchronization & Reset Hardening.
+ * v2.33.12: Foreign Key Constraint Mitigation (Pre-reset Un-grafting).
  */
 
 import pg from 'pg';
@@ -41,7 +41,7 @@ const FILE_CLEAN_CSV = path.join(DIR_TEMP, 'wcvp_names_clean.csv');
 const FILE_WFO_IMPORT = path.join(DIR_TEMP, 'wfo_import.csv');
 const FILE_SCHEMA = 'scripts/wcvp_schema.sql.txt';
 const FILE_OPTIMIZE = 'scripts/optimize_indexes.sql.txt';
-const APP_VERSION = 'v2.33.11';
+const APP_VERSION = 'v2.33.12';
 
 const SEGMENTS = [
     { label: "A (incl. symbols)", start: "\x01", end: "B" },
@@ -250,7 +250,15 @@ const stepWFOBackbone = async () => {
     }
 
     log("  Step 2: Resetting Source ID 2 (WFO backbone slate)...");
-    // V2.33.11: Simplified reset. Wipes all Source 2 records to ensure clean rebuild.
+    // V2.33.12: Mitigation for Foreign Key violations.
+    // If we are re-running this step, WCVP records may already point to WFO parents.
+    // We must un-graft them before deleting the parents to avoid 'violates foreign key constraint' errors.
+    log("    Un-grafting existing bridges to backbone...");
+    await client.query(`
+        UPDATE app_taxa SET parent_id = NULL 
+        WHERE parent_id IN (SELECT id FROM app_taxa WHERE source_id = 2)
+    `);
+
     const resetRes = await client.query(`DELETE FROM app_taxa WHERE source_id = 2`);
     log(`    Cleared ${resetRes.rowCount} stale backbone records.`);
 
@@ -279,7 +287,7 @@ const stepWFOBackbone = async () => {
                 INITCAP(LOWER(taxonomicStatus)), 
                 scientificName, 
                 2, 
-                'WFO Backbone v2.33.11'
+                'WFO Backbone v2.33.12'
             FROM wfo_import 
             WHERE LOWER(taxonRank) = LOWER($1)
             ORDER BY scientificName, CASE WHEN taxonomicStatus = 'ACCEPTED' THEN 1 WHEN taxonomicStatus = 'SYNONYM' THEN 2 ELSE 3 END
