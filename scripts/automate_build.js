@@ -1,8 +1,8 @@
 /**
- * AUTOMATED DATABASE BUILDER (CLI) v2.33.7
+ * AUTOMATED DATABASE BUILDER (CLI) v2.33.10
  * 
  * Orchestrates the transformation of raw WCVP and WFO data into the FloraCatalog database.
- * v2.33.7: Granular Bridge Split & Synonym Dereferencing Fix.
+ * v2.33.10: Pro Plan Standardization (Genus-Filter for optimized storage).
  */
 
 import pg from 'pg';
@@ -41,7 +41,7 @@ const FILE_CLEAN_CSV = path.join(DIR_TEMP, 'wcvp_names_clean.csv');
 const FILE_WFO_IMPORT = path.join(DIR_TEMP, 'wfo_import.csv');
 const FILE_SCHEMA = 'scripts/wcvp_schema.sql.txt';
 const FILE_OPTIMIZE = 'scripts/optimize_indexes.sql.txt';
-const APP_VERSION = 'v2.33.7';
+const APP_VERSION = 'v2.33.10';
 
 const SEGMENTS = [
     { label: "A (incl. symbols)", start: "\x01", end: "B" },
@@ -275,7 +275,7 @@ const stepWFOBackbone = async () => {
                 INITCAP(LOWER(taxonomicStatus)), 
                 scientificName, 
                 2, 
-                'WFO Backbone v2.33.7'
+                'WFO Backbone v2.33.10'
             FROM wfo_import 
             WHERE LOWER(taxonRank) = LOWER($1)
             ORDER BY scientificName, CASE WHEN taxonomicStatus = 'ACCEPTED' THEN 1 WHEN taxonomicStatus = 'SYNONYM' THEN 2 ELSE 3 END
@@ -284,33 +284,45 @@ const stepWFOBackbone = async () => {
         log(`    Created ${insRes.rowCount} physical ${rank} records.`);
     }
 
-    log("  Step 5: Resolving Backbone Hierarchy (Recursive Rank Collapsing)...");
+    log("  Step 5: Resolving Backbone Hierarchy (Authority-Seeking Recursion)...");
+    // V2.33.10: Authority-Seeking recursion walks up until we find ANY parent in Source 2.
+    // This correctly bridges Clades, Superorders, and intermediate ranks filtered during distillation.
     await client.query(`
         WITH RECURSIVE backbone_tree AS (
-            SELECT taxonID, parentNameUsageID, scientificName, taxonRank FROM wfo_import
+            -- Start with every physical record we just created
+            SELECT t.id as physical_id, w.parentNameUsageID, w.taxonRank
+            FROM app_taxa t
+            JOIN wfo_import w ON t.taxon_name = w.scientificName AND t.source_id = 2
+            
             UNION ALL
-            SELECT bt.taxonID, w.parentNameUsageID, w.scientificName, w.taxonRank
-            FROM backbone_tree bt JOIN wfo_import w ON bt.parentNameUsageID = w.taxonID
-            WHERE LOWER(bt.taxonRank) NOT IN ('kingdom', 'phylum', 'class', 'order', 'family')
+            
+            -- Walk up the wfo_import classification
+            SELECT bt.physical_id, w.parentNameUsageID, w.taxonRank
+            FROM backbone_tree bt
+            JOIN wfo_import w ON bt.parentNameUsageID = w.taxonID
+            -- Stop condition: We found a parent that exists in app_taxa
+            WHERE NOT EXISTS (
+                SELECT 1 FROM app_taxa p 
+                WHERE p.taxon_name = w.scientificName AND p.source_id = 2
+            )
         )
         UPDATE app_taxa child SET parent_id = parent.id
-        FROM backbone_tree bt_child
-        JOIN backbone_tree bt_parent ON bt_child.parentNameUsageID = bt_parent.taxonID
-        JOIN app_taxa parent ON parent.taxon_name = bt_parent.scientificName AND parent.source_id = 2
-        WHERE child.taxon_name = bt_child.scientificName AND child.source_id = 2
-          AND LOWER(bt_parent.taxonRank) IN ('kingdom', 'phylum', 'class', 'order', 'family')
-          AND child.parent_id IS NULL;
+        FROM backbone_tree bt
+        JOIN wfo_import w_parent ON bt.parentNameUsageID = w_parent.taxonID
+        JOIN app_taxa parent ON parent.taxon_name = w_parent.scientificName AND parent.source_id = 2
+        WHERE child.id = bt.physical_id AND child.parent_id IS NULL AND child.id != parent.id;
     `);
 
     log("  Step 6: Internal Backbone Completion (Literal Propagation)...");
-    for (let p = 1; p <= 4; p++) {
-        process.stdout.write(`    Pass ${p}/4... \r`);
+    for (let p = 1; p <= 5; p++) {
+        process.stdout.write(`    Pass ${p}/5... \r`);
         await client.query(`
             UPDATE app_taxa child
             SET kingdom = COALESCE(child.kingdom, parent.kingdom),
                 phylum = COALESCE(child.phylum, parent.phylum),
                 class = COALESCE(child.class, parent.class),
-                "order" = COALESCE(child."order", parent."order")
+                "order" = COALESCE(child."order", parent."order"),
+                family = COALESCE(child.family, parent.family)
             FROM app_taxa parent
             WHERE child.parent_id = parent.id AND child.source_id = 2 AND parent.source_id = 2;
         `);

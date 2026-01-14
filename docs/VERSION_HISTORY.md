@@ -1,17 +1,35 @@
 # Version History
 
-## v2.33.7 - Bridge Resumption & Literal Sovereignty
+## v2.33.10 - Infrastructure Standardization & WFO Refinement
 **Date:** January 12, 2026
 **Status:** Current Release
+
+### Infrastructure & Operations
+- **Pro Plan Standardization:** Formally transitioned all documentation to require the **Supabase Pro Plan**. Audit confirmed that WCVP and WFO staging footprints (2GB+) far exceed free-tier logical storage capabilities.
+- **WFO Distillation Optimization:** Updated `distill_wfo.py` to strictly filter for records where the `genus` column is empty. This effectively extracts the 100% phylogenetic backbone (Kingdom down to Family, including Superorders/Clades) while discarding the massive volume of lower-level records already sourced from WCVP.
+- **Scientific Gap Documentation:** Formally documented that the missing "Class" metadata for Angiosperms is a property of the APG IV phylogeny and is handled by the application's virtual row engine.
+
+### Implementation
+- **Build CLI UI:** sanitized terminology to remove references to the now-obsolete "free tier."
+- **Diagnostic Alignment:** Verified that the "Authority-Seeking" recursion in Phase 9 remains fully functional with the distilled WFO dataset.
+
+## v2.33.8 - WFO Phylogenetic Lineage Gap Closure
+**Date:** January 12, 2026
+**Status:** (Historical)
+
+### Data Integrity & Phylogeny
+- **Full WFO Distillation:** Updated `distill_wfo.py` to extract every rank from the WFO classification tree. This staging data is now used to bridge taxonomic gaps where the official classification skips standard ranks (e.g., Angiosperms skipping Class, Mosses using Superorders).
+- **Authority-Seeking Recursion:** Refactored Phase 9 Step 5 in the build script to use an "Authority-Seeking" recursive CTE. The process now walks up the full WFO lineage tree until it finds a physical Phylum/Kingdom/Order record already created in the app, ensuring 100% hierarchy connectivity.
+- **Literal Persistence Fix:** Improved backbone literal propagation to handle 5-column sets (K/P/C/O/F) simultaneously. This prevents literal loss in branches where intermediate ranks are scientifically absent.
+
+## v2.33.7 - Bridge Resumption & Literal Sovereignty
+**Date:** January 12, 2026
+**Status:** (Historical)
 
 ### Data Integrity & Normalization
 - **Bridge Refactor:** Divided Phase 10 into three granular steps (10: Grafting, 11: Synonym Redirects, 12: Literal Flow) to allow precise resumption after session timeouts.
 - **Literal Normalization Rule:** Codified the rule in `docs/DATA_MODEL.md` that child records (Genera/Species) have their `family` literal updated to match the **Accepted** family name when the original source references a synonym family. This ensures grid grouping stability.
 - **Redirect Hardening:** Improved Step 11 logic to use case-insensitive status matching and explicit Source ID protection to ensure high-fidelity phylogenetic grafting.
-
-### Infrastructure
-- **Build CLI UI:** Restored the interactive step menu in `automate_build.js` for better operator visibility.
-- **Diagnostic Alignment:** Synchronized the Settings Dashboard health indicators with the new 15-step build process.
 
 ## v2.31.4 - Baseline Verification & Atomic Repair
 **Date:** January 11, 2026
@@ -82,7 +100,7 @@
 ### Performance & Stability
 - **PostgREST Injection Fix:** Hardened `dataService.ts` to strictly quote string literals in `or()` and `in()` filters. This resolves 500 "No apikey found" errors caused by multi-word values (e.g., 'Artificial Hybrid') mangling the request URL structure.
 - **V8.1 Performance Overhaul:** Formally transitioned to sort-inclusive composite indexes. Reclaimed ~100MB of storage by removing redundant/shadowed indexes confirmed by size audit.
-- **Sparse Rank Optimization:** Resolved 4s timeouts on sparse ranks (Form, f.) by providing pre-sorted data to the database planner, reducing latency to less than 1s.
+- **Sparse Rank Optimization:** Resolved 4s timeouts on sparse ranks (Form, f.) by providing pre-sorted data to the database planner, reducing latency to <1s.
 
 ## v2.30.0 - Grid Customization & UX Polish
 **Date:** July 06, 2025

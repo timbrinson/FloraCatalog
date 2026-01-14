@@ -27,13 +27,6 @@ def distill_wfo():
         'modified', 'references', 'source', 'majorGroup', 'tplID'
     ]
 
-    # Higher ranks to extract for analysis
-    TARGET_RANKS = {
-        'kingdom', 'subkingdom', 'phylum', 'subphylum', 
-        'class', 'subclass', 'order', 'suborder', 
-        'family', 'subfamily', 'tribe', 'subtribe'
-    }
-
     # 1. Locate source
     source_path = None
     zip_path = None
@@ -57,7 +50,7 @@ def distill_wfo():
         print(f"Error: Could not find '{target_csv}' in {INPUT_DIR}")
         sys.exit(1)
 
-    print(f"Distilling WFO Backbone (Extraction: Family and above)...")
+    print(f"Distilling WFO Backbone (Filter: Higher Ranks only for Storage Efficiency)...")
     
     def process_stream(f):
         csv.field_size_limit(sys.maxsize)
@@ -77,18 +70,20 @@ def distill_wfo():
 
             for row in reader:
                 row_count += 1
-                rank = (row.get('taxonRank') or '').lower()
                 
-                # Capture any record at family level or higher
-                if rank in TARGET_RANKS:
+                # V2.33.10: This application requires the Supabase Pro Plan.
+                # To optimize Pro Plan storage utilization, we exclude Genus and below.
+                # All ranks above Genus in WFO have an empty 'genus' literal column.
+                # This preserves Superorders, Clades, and intermediate ranks needed for gap closure.
+                if not row.get('genus'):
                     writer.writerow(row)
                     extracted_count += 1
                 
                 if row_count % 100000 == 0:
-                    print(f"  Analyzed {row_count:,} records... (Extracted {extracted_count:,} backbone rows)")
+                    print(f"  Processed {row_count:,} records...")
 
         print(f"Success!")
-        print(f"  Generated filtered staging file: {OUTPUT_FILE}")
+        print(f"  Generated filtered backbone staging file: {OUTPUT_FILE} ({extracted_count:,} rows)")
 
     if zip_path:
         with zipfile.ZipFile(zip_path, 'r') as z:

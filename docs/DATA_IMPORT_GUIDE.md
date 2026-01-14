@@ -1,4 +1,3 @@
-
 # WCVP Data Import Guide
 
 > **NEW:** A fully automated CLI tool is now available to handle these steps. See [**Automation Plan**](./AUTOMATION_PLAN.md) or run `npm run db:build` (`node scripts/automate_build.js`).
@@ -113,7 +112,21 @@ Calculates full paths (e.g. `root.family_id.genus_id.species_id`).
 ### Step 4: Final Counts
 1.  **Run `scripts/wcvp_step4_counts.sql.txt`**
 
-## Phase 6: Verify
+## Phase 6: WFO Backbone Integration & Infrastructure
+
+The World Flora Online (WFO) backbone contains phylogenetic data (Kingdom through Family) that enriches the WCVP nomenclature.
+
+### 🛑 Mandatory Infrastructure: Supabase Pro Plan
+This application requires the **Supabase Pro Plan** ($25/mo) at a minimum. The combined footprint of the WCVP and WFO staging tables (1.4M+ records each) and the physical application tables far exceeds the 500MB free-tier logical storage limit. Using the free tier will result in database locks and write failures during Phase 4 and 5.
+
+### Storage Efficiency & Distillation
+The raw WFO `classification.csv` contains millions of records. Most of these are Genus or Species records already covered by WCVP.
+
+1.  **The Filter Rule:** The `scripts/distill_wfo.py.txt` script is configured to only extract rows where the **genus** column is empty. 
+2.  **Effect:** This captures all authoritative records at the Family rank and above—including Orders, Phyla, and phylogenetic bridge nodes like **Superorders** or **Clades**—while discarding the heavy, redundant lower-level records.
+3.  **Phylogenetic Gap (Class):** Note that for many groups (e.g., Angiosperms), the "Class" level is not formally defined in standard phylogenies like APG IV. In these scientific cases, the "Class" metadata will be empty in the database, and the grid handles the gap using virtual rows.
+
+## Phase 7: Verify
 
 1.  Go back to your FloraCatalog App.
 2.  The Data Grid should now be populated with real data!

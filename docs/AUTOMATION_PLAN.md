@@ -17,7 +17,7 @@ The project is organized to separate application code from raw data and build to
   │   ├── DATA_MODEL.md
   │   └── ...guides
   ├── scripts/              # Build & Database Scripts
-  │   ├── automate_build.js # The Master Controller (v2.31.8)
+  │   ├── automate_build.js # The Master Controller (v2.33.10)
   │   ├── convert_wcvp.py   # Data cleaner
   │   ├── distill_wfo.py    # WFO filtered exporter
   │   ├── wcvp_schema.sql.txt     # Core table definitions
@@ -87,7 +87,7 @@ If the script fails to connect with "Authentication failed," or `password authen
 
 ---
 
-## 6. The Build Workflow (v2.33.0)
+## 6. The Build Workflow (v2.33.10)
 
 The `scripts/automate_build.js` is an interactive CLI with two execution modes:
 
@@ -97,7 +97,7 @@ Select a single number. The script runs that step and every step following it.
 *   **Warning:** Destructive. Wipes all data.
 
 ### Mode 2: Granular (Enrichment/Recovery)
-Enter a comma-separated list (e.g. `2, 5, 9, 10, 11, 12, 13`). This executes **ONLY** the specified steps. 
+Enter a comma-separated list (e.g. `2, 5, 9, 10, 11, 12, 13, 14, 15`). This executes **ONLY** the specified steps. 
 *   **Use Case:** Adding Phylogenetic and Higher Rank (WFO) data to an existing WCVP baseline.
 *   **Use Case:** Resuming a failed build without re-streaming 1.4 million records.
 
@@ -113,11 +113,13 @@ Enter a comma-separated list (e.g. `2, 5, 9, 10, 11, 12, 13`). This executes **O
 | **6** | **Populate App** | Auto | SQL | Moves data from `wcvp_import` to the core `app_taxa` table in segments. |
 | **7** | **Build Indexes** | Auto | SQL | Creates structural indexes required for high-speed linking. |
 | **8** | **Link Parents** | Auto | SQL | Updates `parent_id` UUIDs based on scientific lineage in segments. |
-| **9** | **WFO Higher Ranks** | Auto | SQL | Creates Kingdom, Phylum, Class, Order, and Family records (Source 2). Collapses intermediate ranks. Implements internal literal propagation. |
-| **10** | **Backbone Bridge**| Auto | SQL | Bridges nomenclature (Source 1/3) to Backbone (Source 2) via `family` literal match. Dereferences parent synonyms. Propagates literals to all children. |
-| **11** | **Hierarchy** | Auto | SQL | Recursively calculates Ltree paths (`root.kingdom.phylum.class.order.family...`) in segments. |
-| **12** | **Counts** | Auto | SQL | Calculates descendant counts for the UI Grid # column in segments. |
-| **13** | **Optimize** | Auto | SQL | Runs `optimize_indexes.sql.txt` for V8.1 production performance. |
+| **9** | **WFO Higher Ranks** | Auto | SQL | Creates Kingdom, Phylum, Class, Order, and Family records (Source 2). |
+| **10** | **Bridge: Grafting** | Auto | SQL | Initial graft of children to WFO families via string matching. |
+| **11** | **Bridge: Synonyms**| Auto | SQL | Redirects children of synonym families to Accepted parents. |
+| **12** | **Bridge: Literal Flow**| Auto | SQL | Propagates backbone literals (K/P/C/O/F) to the entire dataset. |
+| **13** | **Hierarchy** | Auto | SQL | Recursively calculates Ltree paths in segments. |
+| **14** | **Counts** | Auto | SQL | Calculates direct child counts for the UI Grid # column. |
+| **15** | **Optimize** | Auto | SQL | Runs `optimize_indexes.sql.txt` for production performance. |
 
 ---
 
@@ -127,15 +129,14 @@ Enter a comma-separated list (e.g. `2, 5, 9, 10, 11, 12, 13`). This executes **O
 Because the 1.4 million record table is massive, the build process is "Segmented" alphabetically.
 1.  **Iterative Linking:** Step 8 (Link Parents) runs in segments (A, B, C...).
 2.  **Recovery:** If the script crashes during Segment 'M', you can restart at Step 8 (Link Parents) and select 'M' as your starting range to finish the job.
-3.  **Ltree Hierarchy (Step 11):** This is the most computationally expensive part. It walks the tree level-by-level to build the `hierarchy_path`.
+3.  **Ltree Hierarchy (Step 13):** This is the most computationally expensive part. It walks the tree level-by-level to build the `hierarchy_path`.
 
 ### Protocol for Gap Closure
 If you populated records in chunks (e.g., A-S first, then T-Z), you must run a **Gap Closure** pass:
 1.  **Why:** Children in the A-S range couldn't find parents in the T-Z range during the first pass.
 2.  **Protocol:** 
     *   Run **Step 8 (Link Parents)** for **'All'** ranges.
-    *   Run **Step 11 (Hierarchy)** for **'All'** ranges.
-3.  **False Root Recovery:** Step 11 now automatically identifies and resets "False Roots"—records that were temporarily marked as roots because their parents were missing. This ensures they are correctly grafted into the tree once the parent is present.
+    *   Run **Step 13 (Hierarchy)** for **'All'** ranges.
 
 ---
 
@@ -157,11 +158,10 @@ If you populated records in chunks (e.g., A-S first, then T-Z), you must run a *
 
 ## 9. Real-Time Progress Monitoring
 
-During long-running build operations (Steps 6-12), you can monitor the internal database state using the diagnostic tool:
+During long-running build operations (Steps 6-14), you can monitor the internal database state using the diagnostic tool:
 1.  Open the Supabase **SQL Editor**.
 2.  Paste and run the contents of `scripts/check_progress.sql.txt`.
 3.  **Query 10** provides a high-level build dashboard.
-4.  **Query 19 & 20** identify specific gaps and physical row counts.
 
 ---
 
@@ -170,14 +170,13 @@ During long-running build operations (Steps 6-12), you can monitor the internal 
 If your WCVP data is already loaded and you only want to add the Phylogenetic and Higher Rank (Kingdom, Phylum, Class, Order) layer:
 1.  **Download WFO Backbone** (`_DwC_backbone_R.zip`) to `data/input/`.
 2.  Run `npm run db:build`.
-3.  Enter: `2, 5, 9, 10, 11, 12, 13`.
+3.  Enter: `2, 5, 9, 10, 11, 12, 13, 14, 15`.
     *   **2:** Distills the 950MB WFO zip locally into a filtered `wfo_import.csv` file.
     *   **5:** Streams the filtered table into the `wfo_import` staging table.
-    *   **9:** Creates physical backbone records (Source 2) and links the hierarchy using recursive rank collapsing and internal propagation.
-    *   **10:** Links nomenclature to backbone Families via string literals and performs mass literal propagation.
-    *   **11:** Recalculates Hierarchy Paths (Select 'All' segments to shift the entire tree down).
-    *   **12:** Recalculates Counts (Updates Grid # for the new higher rank records).
-    *   **13:** Re-optimizes indexes for high-speed filtering.
+    *   **9-12:** Reconstructs the Backbone and performs literal propagation.
+    *   **13:** Recalculates Hierarchy Paths (Select 'All' segments to shift the entire tree down).
+    *   **14:** Recalculates Counts.
+    *   **15:** Re-optimizes indexes for high-speed filtering.
 
 ---
 
@@ -188,7 +187,7 @@ If your WCVP data is already loaded and you only want to add the Phylogenetic an
 
 ### B. Error: `Terminated due to timeout` (57014)
 *   **Fix:** Use the **"Transaction"** mode pooler. The script sets `statement_timeout = 0`.
-*   **Fix:** Run Step 13 (Optimize) to build composite indexes that handle sorting.
+*   **Fix:** Run Step 15 (Optimize) to build composite indexes that handle sorting.
 
 ### C. Python Error
 *   **Fix:** Ensure `python` or `python3` is in your system PATH. The script tries both.
