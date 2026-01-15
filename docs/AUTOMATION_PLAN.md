@@ -81,16 +81,19 @@ The script needs to know where your database is and how to log in.
 
 ## 6. The Build Workflow (v2.33.16)
 
-The `scripts/automate_build.js` is an interactive CLI with two execution modes:
+The `scripts/automate_build.js` is an interactive CLI with three execution modes:
 
-### Mode 1: Sequential (Full Rebuild)
-Select a single number. The script runs that step and every step following it. 
-*   **Use Case:** Initial setup or major schema updates.
-*   **Warning:** Destructive. Wipes all data.
+### Mode 1: Single Step
+Enter a single number (e.g. `7`). The script runs **ONLY** that step. 
+*   **Use Case:** Authority population or re-running a specific synchronization pass.
 
-### Mode 2: Granular (Enrichment/Recovery)
-Enter a comma-separated list (e.g. `12, 13`). This executes **ONLY** the specified steps. 
-*   **Use Case:** Adding Phylogenetic data to an existing WCVP baseline.
+### Mode 2: Specific Sequence
+Enter a comma-separated list (e.g. `7, 12`). This executes the specified steps in the given order.
+*   **Use Case:** One-time repairs or metadata synchronization.
+
+### Mode 3: Range
+Enter a range (e.g. `7-10`). This executes every step from the start to the end of the range.
+*   **Use Case:** Building specific modules (e.g., the entire Phylogenetic Bridge).
 
 ### Step-by-Step Flow
 
@@ -102,7 +105,7 @@ Enter a comma-separated list (e.g. `12, 13`). This executes **ONLY** the specifi
 | **4** | **Import WCVP** | Auto | `COPY` | Streams WCVP staging table. |
 | **5** | **Import WFO** | Auto | `COPY` | Streams WFO staging table (29 cols). |
 | **6** | **Populate WCVP** | Auto | SQL | Moves WCVP staging to core table (Source 1). |
-| **7** | **Populate WFO** | Auto | SQL | Moves Distilled WFO to core table (Source 2). |
+| **7** | **Populate WFO** | Auto | SQL | Creates WFO Authority records (Source 2). |
 | **8** | **Build Indexes** | Auto | SQL | Structural indexes for linking. |
 | **9** | **Link Parents** | Auto | SQL | WCVP internal Adjacency List. |
 | **10**| **Resolve WFO** | Auto | SQL | WFO internal Adjacency List (Backbone). |
@@ -120,7 +123,8 @@ To ensure long-term project viability, the build process adheres to the followin
 
 1. **"Ground Zero" Requirement:** The build script (`scripts/automate_build.js`) and core schema (`scripts/wcvp_schema.sql.txt`) must always remain in a state where a complete database can be constructed from raw source files without manual SQL intervention.
 2. **Idempotency:** Every step in the build process should be safe to run multiple times. Use `ON CONFLICT DO NOTHING` or explicit existence checks.
-3. **One-Time Repair vs. Core Evolution:**
-    - **One-Time Fixes:** If a schema change is needed for an active database, a separate repair process (e.g., `repair_data.js`) should be used to upgrade the existing structure.
+3. **Flexible Execution**: The builder must support granular execution (single steps, ranges, or lists) to allow for surgical maintenance without destructive wipes.
+4. **One-Time Repair vs. Core Evolution:**
+    - **One-Time Fixes:** If a schema change is needed for an active database, a separate repair process should be used to upgrade the existing structure.
     - **Script Alignment:** Simultaneously, the change **must** be integrated into the relevant step of the master build script to ensure future fresh builds inherit the new design automatically.
-4. **Separation of Concerns:** Populate steps for different authorities (WCVP vs WFO) must remain distinct to allow granular troubleshooting and re-runs of specific authority layers.
+5. **Separation of Concerns:** Populate steps for different authorities (WCVP vs WFO) must remain distinct to allow granular troubleshooting and re-runs of specific authority layers.

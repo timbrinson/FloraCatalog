@@ -2,7 +2,7 @@
  * AUTOMATED DATABASE BUILDER (CLI) v2.33.16
  * 
  * Orchestrates the transformation of raw WCVP and WFO data into the FloraCatalog database.
- * v2.33.16: Separated Populations & Deterministic Bridging.
+ * v2.33.16: Flexible Execution & Deterministic Bridging.
  */
 
 import pg from 'pg';
@@ -178,16 +178,19 @@ const stepPopulateWCVP = async () => {
 };
 
 const stepPopulateWFO = async () => {
-    log("Moving distilled WFO backbone to core table...");
+    log("Moving distilled WFO backbone to core table (Authority Creation)...");
     await robustQuery(`
         INSERT INTO app_data_sources (id, name, version, citation_text, url, trust_level)
         VALUES (2, 'World Flora Online', '2025.12', 'WFO (2025): World Flora Online. Version 2025.12.', 'http://www.worldfloraonline.org', 5)
         ON CONFLICT (id) DO UPDATE SET last_accessed_at = NOW();
     `);
 
-    // Load distilled ranks (Kingdom through Family)
+    // Load distilled ranks (Kingdom through Family) with full metadata set
     const res = await robustQuery(`
-        INSERT INTO app_taxa (wfo_id, wfo_parent_id, wfo_accepted_id, wfo_scientific_name_id, wfo_original_id, taxon_name, taxon_rank, taxon_status, family, source_id, verification_level)
+        INSERT INTO app_taxa (
+            wfo_id, wfo_parent_id, wfo_accepted_id, wfo_scientific_name_id, wfo_original_id, 
+            taxon_name, taxon_rank, taxon_status, family, source_id, verification_level
+        )
         SELECT DISTINCT ON (scientificName, taxonRank) 
             taxonID, parentNameUsageID, acceptedNameUsageID, scientificNameID, originalNameUsageID, 
             scientificName, INITCAP(LOWER(taxonRank)), INITCAP(LOWER(taxonomicStatus)), family, 2, 'WFO Backbone v2.33.16'
@@ -195,7 +198,7 @@ const stepPopulateWFO = async () => {
         ORDER BY scientificName, taxonRank, CASE WHEN taxonomicStatus = 'ACCEPTED' THEN 1 ELSE 2 END
         ON CONFLICT DO NOTHING;
     `);
-    log(`  Created ${res.rowCount} WFO backbone records.`);
+    log(`  Created ${res.rowCount} WFO backbone authority records.`);
 };
 
 const stepBuildIndexes = async () => {
@@ -218,7 +221,7 @@ const stepLinkParents = async () => {
     console.log("\n  WCVP linking complete.");
 };
 
-const stepWFOBackbone = async () => {
+const stepResolveWFO = async () => {
     log("Resolving internal WFO hierarchy (Phylogenetic adjacency)...");
     await robustQuery(`
         UPDATE app_taxa child SET parent_id = parent.id
@@ -259,7 +262,7 @@ const stepBridgeGrafting = async () => {
 };
 
 const stepBridgeSynonyms = async () => {
-    log("Dereferencing Synonym Families (Deterministic redirect)...");
+    log("Dereferencing Synonym Families (Deterministic ID redirect)...");
     // Implementation: If a child is grafted to a Family SYNONYM, point it to the ACCEPTED Family
     const synRes = await robustQuery(`
         UPDATE app_taxa child 
@@ -339,10 +342,10 @@ const STEPS = [
     { id: 4, label: "Import WCVP (CSV Stream)", fn: stepImportWCVP },
     { id: 5, label: "Import WFO (Darwin Core)", fn: stepImportWFO },
     { id: 6, label: "Populate WCVP (Nomenclature)", fn: stepPopulateWCVP },
-    { id: 7, label: "Populate WFO (Phylogeny)", fn: stepPopulateWFO },
+    { id: 7, label: "Populate WFO (Authority Tier)", fn: stepPopulateWFO },
     { id: 8, label: "Build Indexes (Structural)", fn: stepBuildIndexes },
     { id: 9, label: "Link Parents (WCVP Adjacency)", fn: stepLinkParents },
-    { id: 10, label: "Resolve Backbone (WFO Hierarchy)", fn: stepWFOBackbone },
+    { id: 10, label: "Resolve Backbone (WFO Hierarchy)", fn: stepResolveWFO },
     { id: 11, label: "Bridge: Grafting (Genus to Family)", fn: stepBridgeGrafting },
     { id: 12, label: "Bridge: Synonyms (Dereferencing)", fn: stepBridgeSynonyms },
     { id: 13, label: "Bridge: Literal Flow (Inheritance)", fn: stepBridgeFlow },
@@ -357,17 +360,26 @@ async function main() {
     STEPS.forEach(s => console.log(`${s.id.toString().padStart(2)}. ${s.label}`));
     console.log("----------------------------------------");
 
-    const choice = await askQuestion("Select step(s) to run: ");
+    const choice = await askQuestion("Select step(s) to run (e.g. '7' for single, '7,12' for specific, '7-12' for range): ");
     let sequence = [];
-    if (choice.includes(',')) {
-        sequence = choice.split(',').map(n => parseInt(n.trim()));
-    } else {
-        const startId = parseInt(choice);
-        if (isNaN(startId)) {
-            err("Invalid selection.");
-            process.exit(1);
+    
+    if (choice.includes('-')) {
+        const [start, end] = choice.split('-').map(n => parseInt(n.trim()));
+        if (!isNaN(start) && !isNaN(end)) {
+            sequence = STEPS.filter(s => s.id >= start && s.id <= end).map(s => s.id);
         }
-        sequence = STEPS.filter(s => s.id >= startId).map(s => s.id);
+    } else if (choice.includes(',')) {
+        sequence = choice.split(',').map(n => parseInt(n.trim())).filter(n => !isNaN(n));
+    } else {
+        const id = parseInt(choice.trim());
+        if (!isNaN(id)) {
+            sequence = [id];
+        }
+    }
+
+    if (sequence.length === 0) {
+        err("Invalid selection.");
+        process.exit(1);
     }
 
     try {
@@ -377,7 +389,7 @@ async function main() {
             log(`\x1b[35m[STEP ${id}]\x1b[0m ${step.label}...`);
             await step.fn();
         }
-        log("\x1b[32mBuild Complete!\x1b[0m");
+        log("\x1b[32mBuild Sequence Complete!\x1b[0m");
     } catch (e) {
         err(`Process failed.`);
         console.error(e);
