@@ -1,8 +1,22 @@
 # Version History
 
+## v2.33.16 - Phylogenetic Milestone & Build Hardening
+**Date:** January 13, 2026
+**Status:** Current Release
+
+### Phylogeny & Data Integrity
+- **WFO Backbone Integration:** Successfully integrated the World Flora Online (WFO) v2025.12 phylogenetic backbone. The application now physically stores and renders Kingdom, Phylum, Class, and Order records anchored to Source ID 2.
+- **Deterministic Redirection:** Implemented ADR-010. Synonym Families are now dereferenced using physical WFO authority IDs (`wfo_accepted_id` -> `wfo_id`) rather than name-string matching, resolving ambiguity in complex lineages like *Relictithismia*.
+- **Literal Consistency Enforcement:** Codified the requirement for internal joins to use literal columns (e.g., `family`) to prevent regressions caused by display-centric name formatting.
+
+### Infrastructure & Orchestration
+- **Flexible Build CLI:** Overhauled `automate_build.js` to support single-step, range, and list execution modes. This allows for surgical maintenance (e.g., re-running only metadata sync) without full schema wipes.
+- **Schema Extension:** Added the WFO Metadata Tier to `app_taxa` (5 columns) to support absolute authority linking.
+- **Source Registry Expansion:** Established Source ID 3 as the definitive tier for Manual User Entries, fixing the foreign key constraint issue in the Add Plant module.
+
 ## v2.33.13 - Staging Duplicate Mitigation
 **Date:** January 12, 2026
-**Status:** Current Release
+**Status:** (Historical)
 
 ### Infrastructure & Operations
 - **WFO Staging Wipes:** Updated Phase 5 (`stepImportWFO`) in the build script to explicitly truncate the `wfo_import` table before streaming data. This resolves `duplicate key value violates unique constraint "wfo_import_pkey"` errors occurring when re-running the distillation and import cycle.
