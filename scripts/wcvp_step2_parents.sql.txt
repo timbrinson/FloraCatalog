@@ -1,9 +1,0 @@
-
--- =============================================================================
--- DEPRECATED
--- =============================================================================
--- This script has been split to avoid timeouts.
--- Please use:
--- 1. wcvp_step2_indexes.sql.txt (CRITICAL: Run this first)
--- 2. wcvp_step2_part1.sql.txt
--- 3. wcvp_step2_part2.sql.txt

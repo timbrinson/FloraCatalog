@@ -45,6 +45,13 @@ To prevent a fragmented hierarchy, the application aligns all child records (Gen
 - **Literal Modification:** In these specific cases, the `family` literal column in the `app_taxa` record is updated to match the name of the Accepted parent.
 - **Rationale:** This ensures that all members of a lineage (e.g., *Relictithismia*) appear under the correct phylogenetic group in the UI (e.g., *Burmanniaceae*), even if the source WCVP data uses a synonym name (e.g., *Thismiaceae*).
 
+### 4.2 Handling Phylogenetic Gaps (The Angiosperm Case)
+In accordance with global botanical standards (APG IV, PPG I), certain taxonomic groups do not utilize every rank in the Kingdom-to-Species chain.
+
+- **The Standard:** For major groups like **Angiosperms** (Flowering Plants), the rank of "Class" is scientifically omitted in modern phylogenies. Instead, "Order" links directly to the "Phylum" (or unranked Clades not represented as physical records).
+- **The Protocol:** These gaps are **intentional** and scientifically accurate. The application database stores these ranks as NULL. 
+- **UI Handling:** The Data Grid engine identifies these gaps and either displays a `(none)` placeholder or allows the tree to skip the rank entirely. Developers must not attempt to "fix" these gaps by creating artificial or obsolete class names (e.g., "Magnoliopsida") when the authoritative source (WFO/Source 2) leaves them blank.
+
 ---
 
 ## Entity-Relationship Diagram (Conceptual)

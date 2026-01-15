@@ -7,6 +7,13 @@ In the world today, there is no single authoritative source for comprehensive pl
 - **Name Collisions:** Different sites frequently use different names for the same plant, or the same name for different plants, with no universal catalog to resolve the ambiguity.
 - **The Context Gap:** Information is currently fragmented across specialized plant communities, specialist nurseries, universities, scientific organizations, online catalogs, and commercial sales sites. Users lack a unified record that integrates nomenclature with the rich heritage, performance, and descriptive depth found across the horticultural spectrum.
 
+### 1.1 Scientific Reality vs. Data Integrity
+A core tenet of the FloraCatalog mission is **Nomenclature Sovereignty**. We do not "fix" authoritative data to fit technical templates. 
+
+- **Handling Scientific Gaps:** Modern phylogenies (such as APG IV for Angiosperms) intentionally omit certain ranks that were common in historical Linnaean systems. For example, most flowering plants skip the rank of **Class**. 
+- **Intentional Omissions:** When a database record shows a Phylum linking directly to an Order, this is considered a successful representation of scientific truth, not a missing data point. 
+- **UI Logic:** Our interface is designed to gracefully handle these "jumped" levels without forcing artificial data into the database. This ensures the catalog remains a high-fidelity mirror of real-world botanical consensus.
+
 ## Three Levels of Botanical Reality
 Plant information exists at three distinct layers, yet no universal system exists to tie them together holistically:
 1.  **Higher Level Classification:** Categories above Genus (Families, Orders).

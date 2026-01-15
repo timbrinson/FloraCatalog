@@ -1,3 +1,0 @@
-
--- DEPRECATED
--- Please use wcvp_step3_batch1.sql.txt through wcvp_step3_batch6.sql.txt
