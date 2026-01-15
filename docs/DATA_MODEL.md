@@ -52,6 +52,13 @@ In accordance with global botanical standards (APG IV, PPG I), certain taxonomic
 - **The Protocol:** These gaps are **intentional** and scientifically accurate. The application database stores these ranks as NULL. 
 - **UI Handling:** The Data Grid engine identifies these gaps and either displays a `(none)` placeholder or allows the tree to skip the rank entirely. Developers must not attempt to "fix" these gaps by creating artificial or obsolete class names (e.g., "Magnoliopsida") when the authoritative source (WFO/Source 2) leaves them blank.
 
+### 4.3 Literal Consistency Rule (Literal-to-Literal Joins)
+To ensure the integrity of the data build process and prevent regressions caused by display-centric updates, internal database operations must adhere to the **Literal Consistency Rule**.
+
+- **The Protocol:** All internal relational joins (e.g., grafting a Species to a Family) and data propagation tasks (e.g., flowing Kingdom names to children) must be performed using literal data columns (e.g., `family`, `genus`, `order`) rather than the `taxon_name` column.
+- **Rationale:** The `taxon_name` column is designated as a **display field**. It is subject to algorithmic formatting rules (e.g., italics, hybrid symbol placement, or user preferences) which may change over time. Using display-centric fields for relational logic creates high risk for "broken links" in the hierarchy.
+- **Implementation:** The build script must join `child.family = parent.family` and `child.parent_id = parent.id` to ensure character-perfect matches against authoritative literal baselines.
+
 ---
 
 ## Entity-Relationship Diagram (Conceptual)

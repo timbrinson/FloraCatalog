@@ -2,7 +2,7 @@
 
 This document tracks planned features and technical improvements to ensure continuity across development sessions.
 ## Work on Now
-
+- [ ] **Fix stepBridgeFlow:** It appears this did not work. Genus has Kingdom (and assume Phyllum) but Species, Subspecies, Variety and Form do not. I think they all have Order as it was set during a previous task.
 
 ## High Priority
 - [ ] **Implement Ingestion Engine:** Rewrite the Add Plant functionality by following the Ingestion Engine design to implement the 5-stage validation pipeline and continuing to adhere to other decisions.

@@ -419,7 +419,10 @@ export const DataGrid: React.FC<DataGridProps> = ({
   const getRowValue = (row: Taxon, colId: string) => {
        const tr = row as TreeRow;
        if (colId === 'descendant_count') { 
-         return tr.is_tree_header ? (tr as any).child_count : (tr.descendant_count || 0); 
+         // ADR-002 Strategy: Show authoritative direct child count. 
+         // emphasizing virtual rows by returning blank.
+         if (tr.is_virtual) return '';
+         return tr.descendant_count ?? 0;
        }
        const isIndicator = ['genus_hybrid', 'species_hybrid', 'infraspecific_rank'].includes(colId);
        const rawVal = row[colId as keyof Taxon];
@@ -574,7 +577,6 @@ export const DataGrid: React.FC<DataGridProps> = ({
           } as any;
           headerRow.is_tree_header = true;
           headerRow.tree_expanded = !collapsedGroups.has(path);
-          (headerRow as any).child_count = Math.max(headerTaxon?.descendant_count || 0, groupItems.length);
           headerRow.depth = depth; headerRow.tree_path = path;
           outputRows.push(headerRow);
           if (headerRow.tree_expanded && (filteredRecurseItems.length > 0 || isHolder)) {
@@ -850,7 +852,9 @@ export const DataGrid: React.FC<DataGridProps> = ({
                                         {tr.is_tree_header && <span className={`transform transition-transform inline-block ${tr.tree_expanded ? 'rotate-90' : ''}`}><ChevronRightIcon size={14} /></span>}
                                    </div>
                                </td>;
-                               if (col.id === 'descendant_count') return <td key={col.id} className="p-2 text-xs text-center text-slate-400 font-mono">{val}</td>;
+                               // DO NOT render complex types directly as React children.
+                               // Use String() conversion to ensure TypeScript compatibility with ReactNode.
+                               if (col.id === 'descendant_count') return <td key={col.id} className="p-2 text-xs text-center text-slate-400 font-mono">{String(val ?? '')}</td>;
                                if (col.id === 'actions') return (
                                  <td key={col.id} className="p-2 border-r border-slate-200 text-center">
                                    <div className="flex items-center justify-center gap-1">
@@ -868,9 +872,25 @@ export const DataGrid: React.FC<DataGridProps> = ({
                                    </div>
                                  </td>
                                );
+
+                               // Fix: Safely handle potentially complex types for React rendering
+                               // Using explicit type narrowing to prevent TS errors with the Taxon union type
                                let displayVal: React.ReactNode = '';
-                               if (typeof val === 'string' || typeof val === 'number') { displayVal = val; } else if (typeof val === 'boolean') { displayVal = val ? 'Yes' : 'No'; }
-                               if ((col.id === 'genus_hybrid' || col.id === 'species_hybrid') && (val === 'x' || val === 'X' || val === '×')) displayVal = '×';
+                               if (typeof val === 'string') { 
+                                   displayVal = val; 
+                                   // Special handling for hybrid markers that might be strings
+                                   if ((col.id === 'genus_hybrid' || col.id === 'species_hybrid') && (val === 'x' || val === 'X' || val === '×')) {
+                                       displayVal = '×';
+                                   }
+                               } else if (typeof val === 'number') { 
+                                   displayVal = val; 
+                               } else if (typeof val === 'boolean') { 
+                                   displayVal = val ? 'Yes' : 'No'; 
+                               } else if (val && typeof val === 'object') {
+                                   // For object types (like morphology, ecology), stringify to avoid React errors
+                                   displayVal = JSON.stringify(val);
+                               }
+
                                let isBold = false;
                                let placeholderStyle = "";
                                const isIndicatorCol = ['genus_hybrid', 'species_hybrid', 'infraspecific_rank'].includes(col.id);
@@ -895,7 +915,7 @@ export const DataGrid: React.FC<DataGridProps> = ({
                                  );
                                }
                                else if (col.id === 'taxon_status') { 
-                                 displayVal = <span className="text-[11px] text-slate-500 font-normal normal-case">{tr.is_virtual ? '' : (displayVal || '-')}</span>; 
+                                 displayVal = <span className="text-[11px] text-slate-500 font-normal normal-case">{tr.is_virtual ? '' : (String(displayVal) || '-')}</span>; 
                                }
                                const baseTextClass = isBold ? `font-bold text-${color}-${p?.text_weight || 900}` : "font-normal text-slate-600";
                                const isSystemCol = ['tree_control', 'descendant_count'].includes(col.id);

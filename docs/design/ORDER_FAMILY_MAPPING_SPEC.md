@@ -40,3 +40,23 @@ The script `scripts/distill_wfo.py.txt` must be used locally:
 2. Filter for all rows where `taxonRank` is one of: Kingdom, Subkingdom, Phylum, Class, Order, Suborder, Family, Tribe, etc.
 3. Output a filtered `wfo_import.csv`.
 4. Only upload this filtered staging file to Supabase.
+
+---
+
+## 5. The "Gold Standard" References (Verification Guidelines)
+If you need to verify specific relationships or build the mapping manually to ensure 100% fidelity to the original authors, use these specific digital versions of the publications:
+
+### 5.1 Angiosperms (APG IV)
+**Authority:** The APWeb (Angiosperm Phylogeny Website) hosted by the Missouri Botanical Garden (Peter Stevens).
+- **Access:** [APWeb Search](http://www.mobot.org/MOBOT/research/APweb/)
+- **Why:** It is the "living" version of APG IV. You can see every Order and click into it to see a definitive list of Families.
+
+### 5.2 Gymnosperms (Christenhusz 2011)
+**Authority:** The Kew POWO (Plants of the World Online) browser.
+- **Access:** [POWO Browser](https://powo.science.kew.org/)
+- **Why:** Since you are using WCVP data (which is the engine behind POWO), looking up a Gymnosperm family in POWO will show you the Order Kew has assigned to it. Kew's curation team has aligned their Gymnosperm hierarchy with the Christenhusz sequence.
+
+### 5.3 Pteridophytes (PPG I)
+**Authority:** The World Ferns database (Michael Hassler).
+- **Access:** [World Ferns (Checklist)](https://www.worldplants.de/world-ferns/ferns-and-lycophytes-list)
+- **Why:** Michael Hassler is a primary contributor to PPG I. His digital checklist is the most up-to-date representation of the PPG I hierarchy in a searchable format.

@@ -1,8 +1,8 @@
 /**
- * AUTOMATED DATABASE BUILDER (CLI) v2.33.13
+ * AUTOMATED DATABASE BUILDER (CLI) v2.33.14
  * 
  * Orchestrates the transformation of raw WCVP and WFO data into the FloraCatalog database.
- * v2.33.13: Staging Wipes (WFO Duplicate Key Mitigation).
+ * v2.33.14: Build Accelerator Lifecycle (Step 7/15).
  */
 
 import pg from 'pg';
@@ -41,7 +41,7 @@ const FILE_CLEAN_CSV = path.join(DIR_TEMP, 'wcvp_names_clean.csv');
 const FILE_WFO_IMPORT = path.join(DIR_TEMP, 'wfo_import.csv');
 const FILE_SCHEMA = 'scripts/wcvp_schema.sql.txt';
 const FILE_OPTIMIZE = 'scripts/optimize_indexes.sql.txt';
-const APP_VERSION = 'v2.33.13';
+const APP_VERSION = 'v2.33.14';
 
 const SEGMENTS = [
     { label: "A (incl. symbols)", start: "\x01", end: "B" },
@@ -145,7 +145,6 @@ const stepResetDB = async () => {
 const stepImportWCVP = async () => {
     log("Streaming WCVP staging...");
     const client = await getClient();
-    // V2.33.13: Ensure clean slate for WCVP staging
     await client.query(`TRUNCATE TABLE wcvp_import`);
     const stream = client.query(copyFrom(`COPY wcvp_import FROM STDIN WITH CSV HEADER`));
     const fileStream = fs.createReadStream(FILE_CLEAN_CSV);
@@ -190,8 +189,6 @@ const stepImportWFO = async () => {
         );
     `);
 
-    // V2.33.13: WFO Duplicate Key Mitigation.
-    // If we distilled a new file, we must wipe the existing staging records first.
     log("  Truncating wfo_import for fresh load...");
     await client.query(`TRUNCATE TABLE wfo_import`);
 
@@ -224,6 +221,12 @@ const stepBuildIndexes = async () => {
     log("Building core indexes...");
     await robustQuery(`CREATE INDEX IF NOT EXISTS idx_temp_wcvp ON app_taxa(wcvp_id)`);
     await robustQuery(`CREATE INDEX IF NOT EXISTS idx_temp_parent_attr ON app_taxa(parent_plant_name_id)`);
+    
+    // V2.33.14: Build Accelerator Index (Temporary)
+    // Ensures Step 12 literal flow can find 1.4M parent records instantly.
+    // Updated: Now indexes 'family' literal column for Literal Consistency rule.
+    log("  Creating bridge accelerator...");
+    await robustQuery(`CREATE INDEX IF NOT EXISTS idx_bridge_family_lookup ON app_taxa (family COLLATE "C") WHERE taxon_rank = 'Family' AND source_id = 2`);
 };
 
 const stepLinkParents = async () => {
@@ -258,7 +261,6 @@ const stepWFOBackbone = async () => {
     }
 
     log("  Step 2: Resetting Source ID 2 (WFO backbone slate)...");
-    // V2.33.12: Mitigation for Foreign Key violations.
     log("    Un-grafting existing bridges to backbone...");
     await client.query(`
         UPDATE app_taxa SET parent_id = NULL 
@@ -269,7 +271,6 @@ const stepWFOBackbone = async () => {
     log(`    Cleared ${resetRes.rowCount} stale backbone records.`);
 
     log("  Step 3: Synchronizing Authoritative Source ID 2 (WFO Metadata)...");
-    // V2.33.11: Forced update of metadata columns to resolve stagnant source content.
     await client.query(`
         INSERT INTO app_data_sources (id, name, version, citation_text, url, trust_level)
         VALUES (2, 'World Flora Online', '2025.12', 'WFO (2025): World Flora Online. Version 2025.12. Published on the Internet; http://www.worldfloraonline.org. Accessed on: 2026-01-12', 'http://www.worldfloraonline.org', 5)
@@ -293,7 +294,7 @@ const stepWFOBackbone = async () => {
                 INITCAP(LOWER(taxonomicStatus)), 
                 scientificName, 
                 2, 
-                'WFO Backbone v2.33.13'
+                'WFO Backbone v2.33.14'
             FROM wfo_import 
             WHERE LOWER(taxonRank) = LOWER($1)
             ORDER BY scientificName, CASE WHEN taxonomicStatus = 'ACCEPTED' THEN 1 WHEN taxonomicStatus = 'SYNONYM' THEN 2 ELSE 3 END
@@ -305,18 +306,13 @@ const stepWFOBackbone = async () => {
     log("  Step 5: Resolving Backbone Hierarchy (Authority-Seeking Recursion)...");
     await client.query(`
         WITH RECURSIVE backbone_tree AS (
-            -- Start with every physical record we just created
             SELECT t.id as physical_id, w.parentNameUsageID, w.taxonRank
             FROM app_taxa t
             JOIN wfo_import w ON t.taxon_name = w.scientificName AND t.source_id = 2
-            
             UNION ALL
-            
-            -- Walk up the wfo_import classification
             SELECT bt.physical_id, w.parentNameUsageID, w.taxonRank
             FROM backbone_tree bt
             JOIN wfo_import w ON bt.parentNameUsageID = w.taxonID
-            -- Stop condition: We found a parent that exists in app_taxa
             WHERE NOT EXISTS (
                 SELECT 1 FROM app_taxa p 
                 WHERE p.taxon_name = w.scientificName AND p.source_id = 2
@@ -354,7 +350,7 @@ const stepBridgeGrafting = async () => {
             UPDATE app_taxa child SET parent_id = parent.id
             FROM app_taxa parent 
             WHERE child.parent_id IS NULL 
-              AND child.family = parent.taxon_name
+              AND child.family = parent.family
               AND parent.taxon_rank = 'Family' 
               AND parent.source_id = 2 
               AND child.id != parent.id
@@ -366,24 +362,22 @@ const stepBridgeGrafting = async () => {
 
 const stepBridgeSynonyms = async () => {
     log("Starting Phase 11: Synonym Redirects (Dereferencing Family Synonyms)...");
-    log("  Identifying and dereferencing Family-level synonyms in WFO...");
-    
     const synRes = await robustQuery(`
         UPDATE app_taxa child 
         SET parent_id = accepted_parent.id,
-            family = accepted_parent.taxon_name
+            family = accepted_parent.family
         FROM app_taxa current_parent
-        JOIN wfo_import w_syn ON LOWER(current_parent.taxon_name) = LOWER(w_syn.scientificName) 
+        JOIN wfo_import w_syn ON LOWER(current_parent.family) = LOWER(w_syn.scientificName) 
           AND current_parent.taxon_rank = 'Family' 
           AND current_parent.source_id = 2
           AND UPPER(w_syn.taxonomicStatus) = 'SYNONYM'
         JOIN wfo_import w_acc ON w_syn.acceptedNameUsageID = w_acc.taxonID
-        JOIN app_taxa accepted_parent ON LOWER(w_acc.scientificName) = LOWER(accepted_parent.taxon_name) 
+        JOIN app_taxa accepted_parent ON LOWER(w_acc.scientificName) = LOWER(accepted_parent.family) 
           AND accepted_parent.taxon_rank = 'Family'
           AND accepted_parent.source_id = 2
         WHERE child.parent_id = current_parent.id;
     `);
-    log(`    Redirected ${synRes.rowCount} children to Accepted Family parents (e.g. Relictithismia -> Burmanniaceae).`);
+    log(`    Redirected ${synRes.rowCount} children to Accepted Family parents.`);
 };
 
 const stepBridgeFlow = async () => {
@@ -397,9 +391,10 @@ const stepBridgeFlow = async () => {
                 class = parent.class, 
                 "order" = parent."order"
             FROM app_taxa parent 
-            WHERE child.parent_id = parent.id 
+            WHERE child.family = parent.family 
               AND parent.taxon_rank = 'Family'
               AND parent.source_id = 2
+              AND child.source_id IN (1, 3)
               AND child.taxon_name >= $1 AND child.taxon_name < $2;
         `, [seg.start, seg.end]);
     }
@@ -443,6 +438,10 @@ const stepOptimize = async () => {
     log("Optimizing indexes...");
     const sql = fs.readFileSync(FILE_OPTIMIZE, 'utf-8');
     await robustQuery(sql);
+    
+    // V2.33.14: Clean up build accelerator index
+    log("  Cleaning up bridge accelerator...");
+    await robustQuery(`DROP INDEX IF EXISTS idx_bridge_family_lookup`);
 };
 
 const STEPS = [
