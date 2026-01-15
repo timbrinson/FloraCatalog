@@ -17,21 +17,13 @@ The `source_id` column maps to the following authoritative tiers:
 - **ID 2: World Flora Online (WFO).** The phylogenetic backbone (Kingdom, Phylum, Class, Order, Family).
 - **ID 3: User Manual Entry / ICRA.** Records added via the UI or registered cultivars not yet in WCVP.
 
-**Transition Notes (Jan 2026):**
-- **Legacy Cleanup:** Legacy "Derived" family records (previously Source 2) and previous experimental WFO attempts (previously Source 3) are being purged. 
-- **Backbone Shift:** Higher ranks (Order, Family, etc.) are now physical records sourced from WFO (ID 2), rather than attributes derived from WCVP.
-- **Manual Alignment:** Manual entries are preserved and standardizing on ID 3 going forward.
-
-**Context Requirements:**
-1.  **Source:** Where did this exist originally? (e.g., "WCVP 2025 Download", "WFO 2025.12 DwC", "Gemini AI v2.5")
-2.  **Process:** How was it put here? (e.g., "Bulk Import Script", "FloraCatalog UI v2.18.0", "Manual Correction")
-3.  **Application Context:**
-    *   **Application Name:** (e.g., "FloraCatalog")
-    *   **Application Version:** (e.g., "v2.18.0")
-4.  **User Identity:**
-    *   If triggered by a User Command: Capture the User ID (currently placeholders as 'UI_USER').
-    *   If System Background Task: Leave User ID null or mark as 'SYSTEM'.
-5.  **Timestamp:** When was it captured in our DB?
+### 2. Authority Metadata Tier
+To ensure deterministic linking across authorities, the `app_taxa` table stores physical authority IDs alongside names:
+- **`wfo_id`**: The absolute key in the World Flora Online registry.
+- **`wfo_parent_id`**: Reference for internal WFO backbone hierarchy.
+- **`wfo_accepted_id`**: The definitive pointer used for automatic synonym redirection.
+- **`wfo_scientific_name_id`**: Used to anchor WCVP records to WFO even if spellings differ (contains IPNI/WCVP keys).
+- **`wfo_original_id`**: Pointer to the original name record (Basionym).
 
 ---
 
@@ -56,8 +48,9 @@ In accordance with global botanical standards (APG IV, PPG I), certain taxonomic
 To ensure the integrity of the data build process and prevent regressions caused by display-centric updates, internal database operations must adhere to the **Literal Consistency Rule**.
 
 - **The Protocol:** All internal relational joins (e.g., grafting a Species to a Family) and data propagation tasks (e.g., flowing Kingdom names to children) must be performed using literal data columns (e.g., `family`, `genus`, `order`) rather than the `taxon_name` column.
+- **Example Join:** `child.family = parent.family`.
 - **Rationale:** The `taxon_name` column is designated as a **display field**. It is subject to algorithmic formatting rules (e.g., italics, hybrid symbol placement, or user preferences) which may change over time. Using display-centric fields for relational logic creates high risk for "broken links" in the hierarchy.
-- **Implementation:** The build script must join `child.family = parent.family` and `child.parent_id = parent.id` to ensure character-perfect matches against authoritative literal baselines.
+- **Implementation:** The build script must join literal columns to ensure character-perfect matches against authoritative literal baselines.
 
 ---
 

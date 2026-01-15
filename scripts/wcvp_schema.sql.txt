@@ -137,6 +137,13 @@ CREATE TABLE app_taxa (
     basionym_plant_name_id text,
     homotypic_synonym text,
 
+    -- WFO Metadata Tier (Deterministic Linking)
+    wfo_id text,
+    wfo_parent_id text,
+    wfo_accepted_id text,
+    wfo_scientific_name_id text,
+    wfo_original_id text,
+
     taxon_rank text COLLATE "C",
     taxon_name text NOT NULL COLLATE "C",
     taxon_status text COLLATE "C",
@@ -241,6 +248,11 @@ CREATE INDEX IF NOT EXISTS idx_app_taxa_family ON app_taxa(family);
 CREATE INDEX IF NOT EXISTS idx_app_taxa_rank ON app_taxa(taxon_rank);
 CREATE INDEX IF NOT EXISTS idx_app_taxa_status ON app_taxa(taxon_status);
 CREATE INDEX IF NOT EXISTS idx_app_taxa_wcvp ON app_taxa(wcvp_id);
+
+-- WFO Authority Indexes
+CREATE INDEX IF NOT EXISTS idx_app_taxa_wfo_id ON app_taxa(wfo_id);
+CREATE INDEX IF NOT EXISTS idx_app_taxa_wfo_accepted ON app_taxa(wfo_accepted_id);
+CREATE INDEX IF NOT EXISTS idx_app_taxa_wfo_sci_name ON app_taxa(wfo_scientific_name_id);
 
 INSERT INTO app_settings_global (id, settings) VALUES ('default_config', '{}') ON CONFLICT DO NOTHING;
 

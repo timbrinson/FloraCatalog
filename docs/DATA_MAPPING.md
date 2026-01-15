@@ -34,14 +34,13 @@ Per **ADR-004 (Universal Naming Standardization)**, this document serves as the 
 | | infraspecific_rank | Multi-select | selected | (none) | I Rank | Infraspecific Rank | infraspecific_rank | infraspecific_rank | infraspecific_rank | subsp., var... | chr | Rank of infraspecies | |
 | | infraspecies | Text | selected | (none) | Infraspecies | Infraspecific Designation | infraspecies | infraspecies | infraspecies | | chr | Infraspecific epithet | |
 | | cultivar | Text | selected | (none) | Cultivar | Cultivar Name | cultivar | cultivar | (ICNCP) | | chr | Cultivated variety | |
-| **Descriptive** | common_name | Text | unselected | (none) | Common Name | Common Name | common_name | common_name | — | — | — | — | — |
-| | description_text | Text | unselected | (none) | Description | Description | description_text | description_text | — | — | — | — | — |
-| | geographic_area | Text | unselected | (none) | Geography | Geographic Area | geographic_area | geographic_area | geographic_area | 0 | chr | Geographic distribution of the taxon. | |
-| | lifeform_description| Text | unselected | (none) | Lifeform | Lifeform Description | lifeform_description | lifeform_description | lifeform_description| 0 | chr | Lifeform (or lifeforms) of the taxon. | Raunkiær system |
-| | climate_description | Multi-select | unselected | (none) | Climate | Climate Description | climate_description | climate_description | climate_description | desert or dry shrubland, montane tropical, etc. | chr | Habitat type of the taxon. | |
 | **Standard Identifiers**| wcvp_id | Text | unselected | (none) | WCVP ID | WCVP Plant Name ID | wcvp_id | wcvp_id | plant_name_id | | chr | World Checklist of Vascular Plants identifier | |
 | | ipni_id | Text | unselected | (none) | IPNI ID | IPNI ID | ipni_id | ipni_id | ipni_id | | chr | International Plant Name Index identifier | |
 | | powo_id | Text | unselected | (none) | POWO ID | POWO ID | powo_id | powo_id | powo_id | | chr | POWO lookup identifier | |
+| | wfo_id | Text | unselected | (none) | WFO ID | World Flora Online ID | wfo_id | wfo_id | taxonID | | chr | WFO Identifier | |
+| | wfo_accepted_id | Text | unselected | (none) | WFO Acc. ID | WFO Accepted Name ID | wfo_accepted_id | wfo_accepted_id | acceptedNameUsageID | | chr | Synonym Redirection Anchor | |
+| | wfo_scientific_name_id | Text | unselected | (none) | WFO Sci. ID | WFO Scientific ID | wfo_scientific_name_id | wfo_scientific_name_id | scientificNameID | | chr | IPNI Anchor in WFO | |
+| | wfo_original_id | Text | unselected | (none) | WFO Orig. ID | WFO Original ID | wfo_original_id | wfo_original_id | originalNameUsageID | | chr | Basionym ID | |
 | **Publication** | taxon_authors | Text | unselected | (none) | Authorship | Taxon Authors | taxon_authors | taxon_authors | taxon_authors | | chr | Concatenation of authors. | |
 | | primary_author | Text | unselected | (none) | Prim. Author | Primary Author | primary_author | primary_author | primary_author | | chr | Author who published the scientific name. | |
 | | publication_author | Text | unselected | (none) | Pub. Author | Publication Author | publication_author | publication_author | publication_author | | chr | Book author if different. | |
@@ -83,4 +82,4 @@ These fields are stored in the `app_taxon_details` table and are used to enrich 
 
 ### Climate Literals
 **Values:** `desert or dry shrubland, montane tropical, seasonally dry tropical, subalpine or subarctic, subtropical, subtropical or tropical, temperate, temperate, subtropical or tropical, wet tropical.`
-*Note: These are strictly lowercase in the database.*
+*Note: These are strictly lowercase in the database. Individual terms within the CSV are also preserved character-for-character to maintain baseline integrity.*

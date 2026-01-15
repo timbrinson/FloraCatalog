@@ -17,7 +17,7 @@ The project is organized to separate application code from raw data and build to
   │   ├── DATA_MODEL.md
   │   └── ...guides
   ├── scripts/              # Build & Database Scripts
-  │   ├── automate_build.js # The Master Controller (v2.33.10)
+  │   ├── automate_build.js # The Master Controller (v2.33.16)
   │   ├── convert_wcvp.py   # Data cleaner
   │   ├── distill_wfo.py    # WFO filtered exporter
   │   ├── wcvp_schema.sql.txt     # Core table definitions
@@ -77,17 +77,9 @@ The script needs to know where your database is and how to log in.
     ```
 3.  If you only provide the URL without the password, the script will interactively prompt you for the password.
 
-### Authentication Issues?
-If the script fails to connect with "Authentication failed," or `password authentication failed` error:
-- Your database password does not contain special characters that require URL encoding (like `@` or `:`).
-- If it does, you must URL-encode them (e.g., `@` becomes `%40`).
--   **The Database Password** is NOT your Supabase login password. It is the one you set when you first created the project.
--   If you forgot it, go to **Settings -> Database -> Reset Database Password** in the Supabase Dashboard.
-   Wait 60 seconds after resetting for the pooler to sync.
-
 ---
 
-## 6. The Build Workflow (v2.33.10)
+## 6. The Build Workflow (v2.33.16)
 
 The `scripts/automate_build.js` is an interactive CLI with two execution modes:
 
@@ -97,98 +89,38 @@ Select a single number. The script runs that step and every step following it.
 *   **Warning:** Destructive. Wipes all data.
 
 ### Mode 2: Granular (Enrichment/Recovery)
-Enter a comma-separated list (e.g. `2, 5, 9, 10, 11, 12, 13, 14, 15`). This executes **ONLY** the specified steps. 
-*   **Use Case:** Adding Phylogenetic and Higher Rank (WFO) data to an existing WCVP baseline.
-*   **Use Case:** Resuming a failed build without re-streaming 1.4 million records.
+Enter a comma-separated list (e.g. `12, 13`). This executes **ONLY** the specified steps. 
+*   **Use Case:** Adding Phylogenetic data to an existing WCVP baseline.
 
 ### Step-by-Step Flow
 
 | # | Action | Automated? | Method | Description |
 | :--- | :--- | :--- | :--- | :--- |
-| **1** | **Prepare WCVP** | Auto | Python | Runs `convert_wcvp.py.txt` to clean pipe-delimited data. |
-| **2** | **Prepare WFO** | Auto | Python | Runs `distill_wfo.py.txt` to export backbone ranks (Kingdom down to Family). |
-| **3** | **Reset Database** | Auto | SQL | Wipes schema and recreates empty tables (`wcvp_schema.sql.txt`). |
-| **4** | **Import WCVP** | Auto | `COPY` | Streams cleaned WCVP CSV into the `wcvp_import` staging table. |
-| **5** | **Import WFO** | Auto | `COPY` | Streams the filtered WFO Darwin Core into the `wfo_import` table. |
-| **6** | **Populate App** | Auto | SQL | Moves data from `wcvp_import` to the core `app_taxa` table in segments. |
-| **7** | **Build Indexes** | Auto | SQL | Creates structural indexes required for high-speed linking. |
-| **8** | **Link Parents** | Auto | SQL | Updates `parent_id` UUIDs based on scientific lineage in segments. |
-| **9** | **WFO Higher Ranks** | Auto | SQL | Creates Kingdom, Phylum, Class, Order, and Family records (Source 2). |
-| **10** | **Bridge: Grafting** | Auto | SQL | Initial graft of children to WFO families via string matching. |
-| **11** | **Bridge: Synonyms**| Auto | SQL | Redirects children of synonym families to Accepted parents. |
-| **12** | **Bridge: Literal Flow**| Auto | SQL | Propagates backbone literals (K/P/C/O/F) to the entire dataset. |
-| **13** | **Hierarchy** | Auto | SQL | Recursively calculates Ltree paths in segments. |
-| **14** | **Counts** | Auto | SQL | Calculates direct child counts for the UI Grid # column. |
-| **15** | **Optimize** | Auto | SQL | Runs `optimize_indexes.sql.txt` for production performance. |
+| **1** | **Prepare WCVP** | Auto | Python | Runs `convert_wcvp.py.txt` to clean data. |
+| **2** | **Prepare WFO** | Auto | Python | Runs `distill_wfo.py.txt` for backbone. |
+| **3** | **Reset DB** | Auto | SQL | Wipes schema and recreates tables. |
+| **4** | **Import WCVP** | Auto | `COPY` | Streams WCVP staging table. |
+| **5** | **Import WFO** | Auto | `COPY` | Streams WFO staging table (29 cols). |
+| **6** | **Populate WCVP** | Auto | SQL | Moves WCVP staging to core table (Source 1). |
+| **7** | **Populate WFO** | Auto | SQL | Moves Distilled WFO to core table (Source 2). |
+| **8** | **Build Indexes** | Auto | SQL | Structural indexes for linking. |
+| **9** | **Link Parents** | Auto | SQL | WCVP internal Adjacency List. |
+| **10**| **Resolve WFO** | Auto | SQL | WFO internal Adjacency List (Backbone). |
+| **11**| **Bridge: Graft** | Auto | SQL | Joins Genus roots to Families via literal join. |
+| **12**| **Bridge: Synonyms**| Auto | SQL | **Deterministic** synonym dereference via WFO IDs. |
+| **13**| **Bridge: Flow** | Auto | SQL | Propagates K/P/C/O literals via family literal. |
+| **14**| **Hierarchy** | Auto | SQL | Calculates Ltree paths. |
+| **15**| **Counts** | Auto | SQL | Recalculates direct child counts. |
+| **16**| **Optimize** | Auto | SQL | Final production indexing. |
 
 ---
 
-## 7. Segmented Recovery & Gap Closure
+## 11. The Build Integrity & Evolution Principle
+To ensure long-term project viability, the build process adheres to the following sovereign rule:
 
-### Alphabetical Recovery
-Because the 1.4 million record table is massive, the build process is "Segmented" alphabetically.
-1.  **Iterative Linking:** Step 8 (Link Parents) runs in segments (A, B, C...).
-2.  **Recovery:** If the script crashes during Segment 'M', you can restart at Step 8 (Link Parents) and select 'M' as your starting range to finish the job.
-3.  **Ltree Hierarchy (Step 13):** This is the most computationally expensive part. It walks the tree level-by-level to build the `hierarchy_path`.
-
-### Protocol for Gap Closure
-If you populated records in chunks (e.g., A-S first, then T-Z), you must run a **Gap Closure** pass:
-1.  **Why:** Children in the A-S range couldn't find parents in the T-Z range during the first pass.
-2.  **Protocol:** 
-    *   Run **Step 8 (Link Parents)** for **'All'** ranges.
-    *   Run **Step 13 (Hierarchy)** for **'All'** ranges.
-
----
-
-## 8. Execution
-
-1.  **Open your terminal** and ensure you are in the `FloraCatalog` root directory.
-2.  **Start the Process:**
-    ```bash
-    # Option 1: Using the direct node command
-    node scripts/automate_build.js
-
-    # Option 2: Using the NPM shortcut
-    npm run db:build
-    ```
-3.  **Granular Resume Menu:**
-    The script offers granular control. If a step fails, fix the issue and choose the specific step number from the menu to resume.
-
----
-
-## 9. Real-Time Progress Monitoring
-
-During long-running build operations (Steps 6-14), you can monitor the internal database state using the diagnostic tool:
-1.  Open the Supabase **SQL Editor**.
-2.  Paste and run the contents of `scripts/check_progress.sql.txt`.
-3.  **Query 10** provides a high-level build dashboard.
-
----
-
-## 🚀 WFO Enrichment (Backbone Only)
-
-If your WCVP data is already loaded and you only want to add the Phylogenetic and Higher Rank (Kingdom, Phylum, Class, Order) layer:
-1.  **Download WFO Backbone** (`_DwC_backbone_R.zip`) to `data/input/`.
-2.  Run `npm run db:build`.
-3.  Enter: `2, 5, 9, 10, 11, 12, 13, 14, 15`.
-    *   **2:** Distills the 950MB WFO zip locally into a filtered `wfo_import.csv` file.
-    *   **5:** Streams the filtered table into the `wfo_import` staging table.
-    *   **9-12:** Reconstructs the Backbone and performs literal propagation.
-    *   **13:** Recalculates Hierarchy Paths (Select 'All' segments to shift the entire tree down).
-    *   **14:** Recalculates Counts.
-    *   **15:** Re-optimizes indexes for high-speed filtering.
-
----
-
-## 10. Troubleshooting Common Errors
-
-### A. Error: `connect EHOSTUNREACH [IPv6 Address]`
-*   **Fix:** Ensure your `.env` uses the IPv4 pooler host (`...pooler.supabase.com`) on port **6543**.
-
-### B. Error: `Terminated due to timeout` (57014)
-*   **Fix:** Use the **"Transaction"** mode pooler. The script sets `statement_timeout = 0`.
-*   **Fix:** Run Step 15 (Optimize) to build composite indexes that handle sorting.
-
-### C. Python Error
-*   **Fix:** Ensure `python` or `python3` is in your system PATH. The script tries both.
-*   **macOS Fix:** If you get "Operation not permitted," grant your Terminal "Full Disk Access" in System Settings.
+1. **"Ground Zero" Requirement:** The build script (`scripts/automate_build.js`) and core schema (`scripts/wcvp_schema.sql.txt`) must always remain in a state where a complete database can be constructed from raw source files without manual SQL intervention.
+2. **Idempotency:** Every step in the build process should be safe to run multiple times. Use `ON CONFLICT DO NOTHING` or explicit existence checks.
+3. **One-Time Repair vs. Core Evolution:**
+    - **One-Time Fixes:** If a schema change is needed for an active database, a separate repair process (e.g., `repair_data.js`) should be used to upgrade the existing structure.
+    - **Script Alignment:** Simultaneously, the change **must** be integrated into the relevant step of the master build script to ensure future fresh builds inherit the new design automatically.
+4. **Separation of Concerns:** Populate steps for different authorities (WCVP vs WFO) must remain distinct to allow granular troubleshooting and re-runs of specific authority layers.
