@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
     X, Settings, Layout, Zap, Palette, Database, Save, Search as SearchIcon, 
     Cpu, AlertTriangle, RefreshCw, Loader2, Trash2, Bug, RotateCcw, 
     Download, Droplets, Type, Square, Grid2X2, Activity, ShieldCheck, 
-    ServerCrash, CheckCircle2, TrendingUp
+    ServerCrash, CheckCircle2, TrendingUp, MonitorCheck
 } from 'lucide-react';
 import { UserPreferences, RankPallet, PalletLevel, BuildDashboardData } from '../types';
 import { reloadClient, MANUAL_URL, MANUAL_KEY, getIsOffline } from '../services/supabaseClient';
@@ -46,6 +46,8 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, preferen
   const [buildData, setBuildData] = useState<BuildDashboardData | null>(null);
   const [isLoadingBuild, setIsLoadingBuild] = useState(false);
 
+  const keyInputRef = useRef<HTMLInputElement>(null);
+
   useEffect(() => {
       if (!isOpen || getIsOffline()) return;
 
@@ -59,6 +61,13 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, preferen
       refresh();
       const interval = setInterval(refresh, 5000); // 5s auto-refresh
       return () => clearInterval(interval);
+  }, [isOpen]);
+
+  // v2.34.1: Auto-focus Anon Key on open
+  useEffect(() => {
+      if (isOpen) {
+          setTimeout(() => keyInputRef.current?.focus(), 100);
+      }
   }, [isOpen]);
 
   if (!isOpen) return null;
@@ -137,8 +146,8 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, preferen
         <div className="flex items-center justify-between">
           <span className="text-[11px] font-bold text-slate-800 uppercase">{label}</span>
           <div className="flex gap-1">
-             <div className={`w-20 h-5 rounded flex items-center justify-center text-[9px] font-bold bg-${p.base_color}-${p.badge_bg_weight} text-${p.base_color}-${p.text_weight} border border-${p.base_color}-${p.badge_border_weight}`}>Badge</div>
-             <div className={`w-20 h-5 rounded flex items-center justify-center text-[9px] font-bold bg-${p.base_color}-${p.cell_bg_weight} text-${p.base_color}-${p.text_weight}`}>Cell BG</div>
+             <div className={`w-20 h-5 rounded flex items-center justify-center text-[9px] font-bold bg-${p.base_color}-${p.badge_bg_weight} text-${p.text_weight ? `${p.base_color}-${p.text_weight}` : 'slate-600'} border border-${p.base_color}-${p.badge_border_weight}`}>Badge</div>
+             <div className={`w-20 h-5 rounded flex items-center justify-center text-[9px] font-bold bg-${p.base_color}-${p.cell_bg_weight} text-${p.text_weight ? `${p.base_color}-${p.text_weight}` : 'slate-600'}`}>Cell BG</div>
           </div>
         </div>
         <div className="grid grid-cols-5 gap-2">
@@ -178,7 +187,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, preferen
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 z-[60] flex items-center justify-center p-4 animate-in fade-in duration-200">
+    <div className="fixed inset-0 bg-black/60 z-[100] flex items-center justify-center p-4 animate-in fade-in duration-200">
       <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg p-6 relative max-h-[90vh] overflow-y-auto">
         <button onClick={onClose} className="absolute top-4 right-4 text-slate-400 hover:text-slate-600"><X size={20} /></button>
         <div className="flex items-center gap-2 mb-6"><Settings className="text-slate-700" size={24} /><h3 className="text-xl font-bold text-slate-800">Settings</h3></div>
@@ -265,6 +274,26 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, preferen
 
             <div>
                 <div className="flex justify-between items-center mb-3">
+                    <h4 className="text-sm font-bold text-slate-700 uppercase tracking-wide flex items-center gap-2"><MonitorCheck size={14}/> Background Monitoring</h4>
+                </div>
+                <div className="bg-slate-50 p-4 rounded-lg border border-slate-200 space-y-4">
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <span className="text-xs font-bold text-slate-700 block">Auto-Open Activity Hub</span>
+                            <span className="text-[10px] text-slate-500">Launch panel automatically when a task starts.</span>
+                        </div>
+                        <button 
+                            onClick={() => onUpdate({ ...preferences, auto_open_activity_on_task: !preferences.auto_open_activity_on_task })}
+                            className={`w-10 h-5 rounded-full transition-colors relative ${preferences.auto_open_activity_on_task ? 'bg-leaf-600' : 'bg-slate-300'}`}
+                        >
+                            <div className={`absolute top-1 w-3 h-3 bg-white rounded-full transition-all ${preferences.auto_open_activity_on_task ? 'left-6' : 'left-1'}`}></div>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div>
+                <div className="flex justify-between items-center mb-3">
                     <h4 className="text-sm font-bold text-slate-700 uppercase tracking-wide flex items-center gap-2"><Layout size={14}/> Persistence</h4>
                 </div>
                 <div className="bg-slate-50 p-4 rounded-lg border border-slate-200 space-y-3">
@@ -290,8 +319,8 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, preferen
                 <h4 className="text-sm font-bold text-slate-700 uppercase tracking-wide mb-3 flex items-center gap-2"><Database size={14}/> Database Connection</h4>
                 <div className="bg-slate-50 p-4 rounded-lg border border-slate-200 space-y-3">
                     <div><label className="block text-xs font-bold text-slate-600 mb-1">Project URL</label><input type="text" className="w-full text-xs p-2 border border-slate-300 rounded outline-none font-mono" value={dbUrl} onChange={(e) => setDbUrl(e.target.value)} /></div>
-                    <div><label className="block text-xs font-bold text-slate-600 mb-1">Anon Key</label><input type="password" className="w-full text-xs p-2 border border-slate-300 rounded outline-none font-mono" value={dbKey} onChange={(e) => setDbKey(e.target.value)} /></div>
-                    <button onClick={saveConnection} className="w-full flex items-center justify-center gap-2 py-2 bg-leaf-600 text-white rounded hover:bg-leaf-700 text-xs font-bold"><Save size={14} /> Update Connection</button>
+                    <div><label className="block text-xs font-bold text-slate-600 mb-1">Anon Key</label><input ref={keyInputRef} type="password" className="w-full text-xs p-2 border border-slate-300 rounded outline-none font-mono focus:ring-2 focus:ring-leaf-200" value={dbKey} onChange={(e) => setDbKey(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && saveConnection()} /></div>
+                    <button onClick={saveConnection} className="w-full flex items-center justify-center gap-2 py-2 bg-leaf-600 text-white rounded hover:bg-leaf-700 text-xs font-bold transition-all"><Save size={14} /> Update Connection</button>
                 </div>
             </div>
             <div>

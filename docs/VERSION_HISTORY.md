@@ -1,8 +1,52 @@
 # Version History
 
-## v2.33.16 - Phylogenetic Milestone & Build Hardening
+## v2.34.3 - Process Conclusion & Outcome Auditing
 **Date:** January 13, 2026
 **Status:** Current Release
+
+### Activity Hub
+- **Outcome Summaries:** Introduced a high-visibility "Final Outcome" block at the bottom of activity cards. Completed tasks now explicitly summarize their results (e.g., "Found 4 authoritative links", "Successfully cataloged record") for faster post-mortem review.
+- **Improved Instrumentation:** Updated AI Enrichment, Web Mining, and Plant Ingestion workflows to provide clear conclusional data in the persistent ledger.
+
+## v2.34.2 - Interactive Window Management & Push Layout
+**Date:** January 13, 2026
+**Status:** (Historical)
+
+### UX & Workspace Orchestration
+- **Draggable Windows:** Implemented drag-and-drop capabilities for the **Add Plant** window and the **Operations Hub** (Floating Mode). Users can now move these components to any screen coordinate to unblock underlying grid data.
+- **Flex-Push Side Panel:** Updated the primary layout to support "Content Pushing." In Side Drawer mode, the Operations Hub now shifts the Data Grid to the left rather than overlaying it, ensuring full visibility of both controls.
+- **Z-Index Layering:** Refined the z-index hierarchy (`Settings: 100`, `Hub: 50`, `Add Plant: 40`, `Grid: 30`). This prevents sticky grid headers from obscuring draggable panels.
+- **Persistence Hardening:** Added an explicit `useEffect` trigger to synchronize the Activity Ledger to `localStorage` immediately upon change, mitigating potential session data loss in sandboxed environments.
+
+## v2.34.1 - Authentication UX & Multi-Panel Coexistence
+**Date:** January 13, 2026
+**Status:** (Historical)
+
+### UX & Productivity
+- **Rapid Auth:** Added auto-focus to the Anon Key field in Settings. Integrated "Enter" key submission for the connection update, enabling a "Paste -> Enter" flow.
+- **Multi-Panel Layout:** Transformed the Add Plant modal into a non-blocking left-side drawer. This allows users to search and add plants while simultaneously monitoring background tasks in the Operations Hub or browsing the grid.
+- **Z-Index Hardening:** Re-architected z-indices (`Hub: 100`, `Settings: 80`, `Add Plant: 60`). The Operations Hub now correctly overlays all panels, ensuring process visibility during active management.
+
+## v2.34.0 - Operations Hub & Process Traceability
+**Date:** January 13, 2026
+**Status:** (Historical)
+
+### Activity & Monitoring
+- **Evolved Operations Hub:** Transformed the Activity Panel into a professional-grade monitoring suite with three display modes (Side Drawer, Floating Hub, Full Screen).
+- **Process Persistence:** Implemented `localStorage` synchronization for the activity ledger. Task history now survives browser reloads, enabling post-mortem analysis of complex operations.
+- **Granular Step Ledger:** Introduced the "Process Ledger" view. Background tasks now emit detailed micro-steps, allowing users to inspect raw AI tokens, normalization outputs, and database reconciliation hits.
+- **Auto-Open Preference:** Added a user setting to automatically launch the Activity Hub when a background task begins, optimized for debugging intensive workflows like the upcoming Ingestion Engine.
+
+### Instrumentation
+- **Add Plant Instrumentation:** Deeply instrumented the Add Plant pipeline. The hub now tracks:
+  1. Intent Extraction (Raw AI JSON)
+  2. Algorithmic Normalization
+  3. Database Discovery (Matches found vs. New)
+  4. Final Transactional Commit
+
+## v2.33.16 - Phylogenetic Milestone & Build Hardening
+**Date:** January 13, 2026
+**Status:** (Historical)
 
 ### Phylogeny & Data Integrity
 - **WFO Backbone Integration:** Successfully integrated the World Flora Online (WFO) v2025.12 phylogenetic backbone. The application now physically stores and renders Kingdom, Phylum, Class, and Order records anchored to Source ID 2.

@@ -44,7 +44,8 @@ export const assembleScientificName = (p: Partial<Taxon>): string => {
   return parts.join(' ').trim();
 };
 
-export const formatScientificName = (taxon: Taxon, prefs: UserPreferences = { hybrid_spacing: 'space', auto_enrichment: false, search_mode: 'prefix' }): string => {
+// Fix: Added missing required property 'auto_open_activity_on_task' to the default UserPreferences object to resolve TypeScript error.
+export const formatScientificName = (taxon: Taxon, prefs: UserPreferences = { hybrid_spacing: 'space', auto_enrichment: false, auto_open_activity_on_task: false, search_mode: 'prefix' }): string => {
   let name = taxon.name || ''; 
   
   const cleanName = name.replace(/^[×]\s?/i, '');

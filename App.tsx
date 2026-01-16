@@ -37,6 +37,7 @@ export default function App() {
   const [errorDetails, setErrorDetails] = useState<string | null>(null);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [showActivityPanel, setShowActivityPanel] = useState(false);
+  const [activityPanelMode, setActivityPanelMode] = useState<'side' | 'floating' | 'full'>('side');
   const [showAddModal, setShowAddModal] = useState(false);
   
   // Data State
@@ -60,6 +61,7 @@ export default function App() {
   const [preferences, setPreferences] = useState<UserPreferences>({ 
       hybrid_spacing: 'space',
       auto_enrichment: false,
+      auto_open_activity_on_task: false,
       auto_fit_max_width: 400,
       fit_screen_max_ratio: 4.0,
       grid_pallet: DEFAULT_PALLET,
@@ -67,7 +69,19 @@ export default function App() {
       debug_mode: false
   });
 
-  const [activities, setActivities] = useState<ActivityItem[]>([]);
+  // Activity Persistence Layer
+  const [activities, setActivities] = useState<ActivityItem[]>(() => {
+      try {
+          const saved = localStorage.getItem('flora_activity_history');
+          return saved ? JSON.parse(saved) : [];
+      } catch (e) { return []; }
+  });
+
+  // v2.34.2: Explicit storage write on change
+  useEffect(() => {
+      localStorage.setItem('flora_activity_history', JSON.stringify(activities));
+  }, [activities]);
+
   const cancelledActivityIds = useRef<Set<string>>(new Set());
   const [confirmState, setConfirmState] = useState<{
     isOpen: boolean; title: string; message: string; confirmLabel?: string; isDestructive?: boolean; onConfirm: () => void;
@@ -356,15 +370,21 @@ export default function App() {
           type: action === 'mine' ? 'mining' : 'enrichment',
           status: 'running',
           message: 'Connecting to botanical AI...',
-          timestamp: Date.now()
+          timestamp: Date.now(),
+          inputs: { taxon_id: taxon.id, taxon_name: taxon.taxon_name },
+          steps: [{ label: 'Initialize AI curator', status: 'running', timestamp: Date.now() }]
       };
       
       setActivities(prev => [newActivity, ...prev]);
-      setShowActivityPanel(true);
+      if (preferences.auto_open_activity_on_task) setShowActivityPanel(true);
 
       try {
           if (action === 'enrich') {
-              setActivities(prev => prev.map(a => a.id === id ? { ...a, message: 'Consulting primary authorities...' } : a));
+              setActivities(prev => prev.map(a => a.id === id ? { 
+                ...a, 
+                message: 'Consulting primary authorities...',
+                steps: [...a.steps, { label: 'Query primary authorities', status: 'running', timestamp: Date.now() }]
+              } : a));
               const findings = await enrichTaxon(taxon);
               
               if (cancelledActivityIds.current.has(id)) return;
@@ -375,10 +395,16 @@ export default function App() {
                   ...a, 
                   status: 'completed', 
                   message: 'Horticultural record enriched.',
-                  details: findings
+                  details: findings,
+                  outcome: `Enriched botanical record with ${Object.keys(findings).length} high-fidelity data points.`,
+                  steps: a.steps.map(s => ({...s, status: 'completed' as ActivityStatus}))
               } : a));
           } else {
-              setActivities(prev => prev.map(a => a.id === id ? { ...a, message: 'Searching herbaria and web records...' } : a));
+              setActivities(prev => prev.map(a => a.id === id ? { 
+                ...a, 
+                message: 'Searching herbaria and web records...',
+                steps: [...a.steps, { label: 'Web herbaria search', status: 'running', timestamp: Date.now() }]
+              } : a));
               const currentLinks = taxon.reference_links || [];
               const findings = await findAdditionalLinks(taxon.taxon_name, currentLinks);
               
@@ -390,13 +416,17 @@ export default function App() {
                       ...a, 
                       status: 'completed', 
                       message: `Found ${findings.length} authoritative links.`,
-                      details: findings
+                      details: findings,
+                      outcome: `Successfully mapped ${findings.length} new unique reference authorities to the plant record.`,
+                      steps: a.steps.map(s => ({...s, status: 'completed' as ActivityStatus}))
                   } : a));
               } else {
                   setActivities(prev => prev.map(a => a.id === id ? { 
                       ...a, 
                       status: 'completed', 
-                      message: 'No new unique references discovered.' 
+                      message: 'No new unique references discovered.',
+                      outcome: 'Search complete. No new unique references were discovered beyond existing documentation.',
+                      steps: a.steps.map(s => ({...s, status: 'completed' as ActivityStatus}))
                   } : a));
               }
           }
@@ -405,7 +435,9 @@ export default function App() {
           setActivities(prev => prev.map(a => a.id === id ? { 
               ...a, 
               status: 'error', 
-              message: e.message || 'AI service unavailable.' 
+              message: e.message || 'AI service unavailable.',
+              outcome: `Process failed due to an upstream service error: ${e.message}`,
+              steps: a.steps.map(s => s.status === 'running' ? {...s, status: 'error' as ActivityStatus, error: e.message} : s)
           } : a));
       }
   };
@@ -416,60 +448,80 @@ export default function App() {
           if (exists) return prev.map(a => a.id === activity.id ? activity : a);
           return [activity, ...prev];
       });
+      if (preferences.auto_open_activity_on_task) setShowActivityPanel(true);
   };
 
-  const handleAddSuccess = () => { setShowAddModal(false); fetchBatch(0, true); };
+  const handleAddSuccess = () => { /* we keep it open for multi-add v2.34.1 */ };
   const handleMaintenanceComplete = () => { setTaxa([]); setOffset(0); fetchBatch(0, true); };
 
   const isHardError = (isOffline || (loadingState === LoadingState.ERROR && !isInitialized));
   const isActuallyEmpty = taxa.length === 0 && !isFiltering && loadingState === LoadingState.SUCCESS && totalRecords === 0 && isInitialized;
 
-  return (
-    <div className="h-screen bg-slate-50 flex flex-col overflow-hidden">
-      <header className="p-4 bg-white border-b flex justify-between items-center shadow-sm z-30">
-        <div className="flex items-center gap-2 text-leaf-700 font-serif text-xl font-bold"><Leaf className="text-leaf-600" /> FloraCatalog</div>
-        <div className="flex items-center gap-3">
-          <button onClick={() => setShowAddModal(true)} className="flex items-center gap-2 px-4 py-1.5 bg-leaf-600 text-white text-xs font-bold rounded-full hover:bg-leaf-700 transition-colors shadow-sm"><Plus size={16} /> Add Plant</button>
-          <div className="relative">
-            <button onClick={() => setShowActivityPanel(!showActivityPanel)} className={`p-2 rounded-full transition-colors ${showActivityPanel ? 'bg-leaf-100 text-leaf-700' : 'text-slate-500 hover:bg-slate-100'}`}>
-              <Activity size={20} />
-              {activities.filter(a => a.status === 'running' || a.status === 'needs_input').length > 0 && (<span className="absolute top-1 right-1 w-2 h-2 bg-amber-500 rounded-full border-2 border-white"></span>)}
-            </button>
-            {showActivityPanel && (<ActivityPanel activities={activities} isOpen={showActivityPanel} onClose={() => setShowActivityPanel(false)} onCancel={(id) => { cancelledActivityIds.current.add(id); setActivities(prev => prev.map(a => a.id === id ? { ...a, status: 'error', message: 'Cancelled.' } : a)); }} onRetry={(item) => {}} onDismiss={(id) => setActivities(prev => prev.filter(a => a.id !== id))} />)}
-          </div>
-          <button onClick={() => setShowSettingsModal(true)} className="p-2 text-slate-500 hover:bg-slate-100 rounded-full transition-colors"><Settings size={20} /></button>
-        </div>
-      </header>
+  // v2.34.2: side mode causes a layout shift (push)
+  const isSidePush = showActivityPanel && activityPanelMode === 'side';
 
-      <main className="flex-1 overflow-hidden p-4 relative">
-        {(!isInitialized || initialLayout === null) ? (
-          <div className="h-full flex items-center justify-center"><Loader2 className="animate-spin text-leaf-600" size={48} /></div>
-        ) : isHardError || isActuallyEmpty ? (
-          <EmptyState isOffline={isOffline} loadingState={loadingState} errorDetails={errorDetails} onOpenSettings={() => setShowSettingsModal(true)} onRetry={() => fetchBatch(0, true)} />
-        ) : (
-          <DataGrid 
-            key={gridKey}
-            taxa={taxa} 
-            ancestors={ancestors} 
-            preferences={preferences} 
-            onPreferenceChange={setPreferences} 
-            onUpdate={handleTaxonUpdate} 
-            onAction={handleAction} 
-            totalRecords={totalRecords} 
-            isLoadingMore={isFetchingMore || isSearching} 
-            onLoadMore={handleLoadMore} 
-            sortConfig={sortConfig} 
-            onSortChange={(key, direction) => setSortConfig({ key, direction: direction as 'asc' | 'desc' })} 
-            filters={gridFilters} 
-            onFilterChange={handleFilterChange} 
-            error={loadingState === LoadingState.ERROR ? errorDetails : null}
-            visibleColumns={initialLayout.visibleColumns}
-            columnOrder={initialLayout.columnOrder}
-            colWidths={initialLayout.colWidths}
-            onLayoutUpdate={(layout) => { latestLayoutRef.current = layout; }}
-          />
-        )}
-      </main>
+  return (
+    <div className="h-screen bg-slate-50 flex flex-row overflow-hidden relative">
+      <div className={`flex-1 flex flex-col min-w-0 overflow-hidden transition-all duration-300 ${isSidePush ? 'mr-[450px]' : ''}`}>
+          <header className="p-4 bg-white border-b flex justify-between items-center shadow-sm z-30">
+            <div className="flex items-center gap-2 text-leaf-700 font-serif text-xl font-bold"><Leaf className="text-leaf-600" /> FloraCatalog</div>
+            <div className="flex items-center gap-3">
+              <button onClick={() => setShowAddModal(!showAddModal)} className={`flex items-center gap-2 px-4 py-1.5 rounded-full transition-all shadow-sm text-xs font-bold ${showAddModal ? 'bg-slate-800 text-white' : 'bg-leaf-600 text-white hover:bg-leaf-700'}`}>
+                <Plus size={16} /> {showAddModal ? 'Hide Window' : 'Add Plant'}
+              </button>
+              <div className="relative">
+                <button onClick={() => setShowActivityPanel(!showActivityPanel)} className={`p-2 rounded-full transition-colors ${showActivityPanel ? 'bg-leaf-100 text-leaf-700' : 'text-slate-500 hover:bg-slate-100'}`}>
+                  <Activity size={20} />
+                  {activities.filter(a => a.status === 'running' || a.status === 'needs_input').length > 0 && (<span className="absolute top-1 right-1 w-2 h-2 bg-amber-500 rounded-full border-2 border-white"></span>)}
+                </button>
+              </div>
+              <button onClick={() => setShowSettingsModal(true)} className="p-2 text-slate-500 hover:bg-slate-100 rounded-full transition-colors"><Settings size={20} /></button>
+            </div>
+          </header>
+
+          <main className="flex-1 overflow-hidden p-4 relative z-10">
+            {(!isInitialized || initialLayout === null) ? (
+              <div className="h-full flex items-center justify-center"><Loader2 className="animate-spin text-leaf-600" size={48} /></div>
+            ) : isHardError || isActuallyEmpty ? (
+              <EmptyState isOffline={isOffline} loadingState={loadingState} errorDetails={errorDetails} onOpenSettings={() => setShowSettingsModal(true)} onRetry={() => fetchBatch(0, true)} />
+            ) : (
+              <DataGrid 
+                key={gridKey}
+                taxa={taxa} 
+                ancestors={ancestors} 
+                preferences={preferences} 
+                onPreferenceChange={setPreferences} 
+                onUpdate={handleTaxonUpdate} 
+                onAction={handleAction} 
+                totalRecords={totalRecords} 
+                isLoadingMore={isFetchingMore || isSearching} 
+                onLoadMore={handleLoadMore} 
+                sortConfig={sortConfig} 
+                onSortChange={(key, direction) => setSortConfig({ key, direction: direction as 'asc' | 'desc' })} 
+                filters={gridFilters} 
+                onFilterChange={handleFilterChange} 
+                error={loadingState === LoadingState.ERROR ? errorDetails : null}
+                visibleColumns={initialLayout.visibleColumns}
+                columnOrder={initialLayout.columnOrder}
+                colWidths={initialLayout.colWidths}
+                onLayoutUpdate={(layout) => { latestLayoutRef.current = layout; }}
+              />
+            )}
+          </main>
+      </div>
+
+      {/* Persistent Activity Panel (Operations Hub) */}
+      <ActivityPanel 
+          activities={activities} 
+          isOpen={showActivityPanel} 
+          mode={activityPanelMode}
+          onModeChange={setActivityPanelMode}
+          onClose={() => setShowActivityPanel(false)} 
+          onCancel={(id) => { cancelledActivityIds.current.add(id); setActivities(prev => prev.map(a => a.id === id ? { ...a, status: 'error', message: 'Cancelled.' } : a)); }} 
+          onRetry={(item) => {}} 
+          onDismiss={(id) => setActivities(prev => prev.filter(a => a.id !== id))} 
+          onClearAll={() => setActivities([])}
+      />
 
       {showSettingsModal && (
         <SettingsModal 
@@ -482,7 +534,16 @@ export default function App() {
             onReloadLayout={handleReloadLayout}
         />
       )}
-      {showAddModal && (<AddPlantModal isOpen={showAddModal} onClose={() => setShowAddModal(false)} onSuccess={handleAddSuccess} onAddActivity={handleAddActivity} />)}
+      
+      {showAddModal && (
+        <AddPlantModal 
+            isOpen={showAddModal} 
+            onClose={() => setShowAddModal(false)} 
+            onSuccess={handleAddSuccess} 
+            onAddActivity={handleAddActivity} 
+        />
+      )}
+
       {confirmState.isOpen && (<ConfirmDialog isOpen={confirmState.isOpen} title={confirmState.title} message={confirmState.message} confirmLabel={confirmState.confirmLabel} isDestructive={confirmState.isDestructive} onConfirm={confirmState.onConfirm} onCancel={() => setConfirmState(prev => ({ ...prev, isOpen: false }))} />)}
     </div>
   );

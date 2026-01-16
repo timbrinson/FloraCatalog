@@ -11,6 +11,7 @@ export type RankPallet = Record<'kingdom' | 'phylum' | 'class' | 'order' | 'fami
 export interface UserPreferences {
   hybrid_spacing: 'space' | 'nospace';
   auto_enrichment: boolean;
+  auto_open_activity_on_task: boolean; // v2.34.0: For seamless debugging
   auto_fit_max_width?: number;
   fit_screen_max_ratio?: number;
   grid_pallet?: RankPallet;
@@ -159,6 +160,14 @@ export interface SearchCandidate {
 
 export type ActivityStatus = 'running' | 'completed' | 'error' | 'needs_input';
 
+export interface ActivityStep {
+    label: string;
+    status: ActivityStatus;
+    data?: any;
+    error?: string;
+    timestamp: number;
+}
+
 export interface ActivityItem {
   id: string;
   name: string;
@@ -166,8 +175,11 @@ export interface ActivityItem {
   status: ActivityStatus;
   message: string;
   timestamp: number;
+  inputs?: any; // v2.34.0: Original intent for debugging
+  steps: ActivityStep[]; // v2.34.0: Detailed ledger
   payload?: any;
   details?: any;
+  outcome?: string; // v2.34.3: Summary conclusion
   can_retry?: boolean;
   resolution?: {
     type: 'duplicate' | 'synonym' | 'correction' | 'ambiguous';
