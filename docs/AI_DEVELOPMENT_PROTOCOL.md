@@ -33,7 +33,7 @@ Whenever a new conversation starts or the session is reset, the AI MUST NOT emit
 - **Guardrail B (Post-Error Grounding)**: After any "Internal Error," session timeout, or environment reset, the AI must perform the Section 1 Handover Protocol before proposing any changes.
 - **Guardrail C (Task Lifecycle Verification)**: Only the Human Architect can move tasks around. The AI may suggest a status update (e.g., "Fixed - Awaiting Verification"), but the move to Archive requires user consent.
 - **Guardrail D (Preservation Over Brevity)**: Maintaining a complete historical record in roadmap documents is more important than keeping the XML response short.
-- **Guardrail E (The Zero-Action Rule)**: The AI is strictly prohibited from modifying *any* file—including documentation like `VISION_STATEMENT.md`—without explicit user approval of the specific plan in the current turn.
+- **Guardrail E (The Zero-Action Rule)**: The AI is strictly prohibited from modifying *any* file—including documentation like `VISION_STATEMENT.md`—without explicit user approval of the specific plan for those changes in the current turn.
 - **Guardrail F (Explicit Sign-Off Rule)**: The AI is strictly forbidden from marking a `TASK_BACKLOG.md` item as `[x]` or moving it to the "Archive" based on its own assessment of completion. Even if the AI believes a task is finished, the document update only occurs after a direct command from the Human Architect (e.g., "Verified, mark as done").
 - **Guardrail G (Dead Code Hygiene)**: During architectural transitions (e.g., switching from cards to grids), the AI must proactively identify orphaned files that no longer have import references in the main tree. The AI must list these as "Recommended Deletions" in the planning phase and remove them if authorized.
 
@@ -45,7 +45,7 @@ Past sessions have identified "Drift" patterns that must be avoided:
 
 ## 8. Content Integrity & Preservation
 - **Strict Line-by-Line Preservation**: For baseline files, the AI must copy the *entire* existing content exactly. Re-summarizing or "cleaning up" sections from memory is strictly prohibited.
-- **The Literal Preservation Clause**: Summarization of existing documentation is a **High-Severity Regression**. When updating a file, the AI must replicate the existing content character-for-character. "Tightening" or "cleaning up" phrasing is strictly forbidden unless the specific goal of the task is "Copy Editing." The assistant must treat existing paragraphs as immutable constants.
+- **The Literal Preservation Clause**: Summarization of existing documentation is a **High-Severity Regression**. When updating a file, the AI must replicate the existing content character-for-character. "Tightening" or "cleaning up" phrasing is strictly forbidden unless the specific goal of the task is "Copy Editing." The AI must never reduce the complexity of a specification without a human command to "Simplify." Existing details, edge cases, and human notes are to be treated as immutable constants.
 - **Conservation Check**: Before outputing an XML block for any documentation file, the AI must explicitly state in the planning phase: *"I have verified via a mental diff that 100% of the existing text has been preserved verbatim, with no summarization or truncation."*
 - **Diff Verification**: Before emitting XML, perform a mental diff to ensure no tasks or descriptions were accidentally deleted.
 
@@ -78,8 +78,9 @@ For all application tiers, **Database Literals are the sovereign naming standard
 3.  **Proactive Suggestion:** Before closing the task, the AI must ask: *"We have reached a stable state. Should I perform a Cleanup Pass to remove trial code and synchronize documentation with the current implementation?"*
 
 ## 14. Documentation Checksumming (ADR-009)
-Whenever a documentation file (especially `TASK_BACKLOG.md`) is modified, the AI must provide a "Verbatim Verification" statement in the planning phase:
+Whenever a documentation file (especially `TASK_BACKLOG.md` or a functional spec) is modified, the AI must provide a "Verbatim Verification" statement in the planning phase:
 *"I have verified via a mental diff that no items were removed from ANY section, and all human notes have been preserved character-for-character. Item counts per section are: [List Counts]."*
+Before emitting any block for the Ingestion Spec, it must explicitly state: *"I have verified the presence of 18 Logic Scenarios and 6 Pipeline Stages."*
 
 ## 15. Mandatory Pre-Flight Compliance Check
 **MANDATORY:** Before emitting any `<changes>` block, the AI must perform a final internal audit against **Guardrail F**.

@@ -1,3 +1,4 @@
+
 export interface PalletLevel {
   base_color: string;
   cell_bg_weight: number;
@@ -149,6 +150,12 @@ export interface BuildDashboardData {
   build_completion: number;
 }
 
+export interface LineageMapEntry {
+    rank: string;
+    name: string;
+    exists: boolean;
+}
+
 export interface SearchCandidate {
   taxon_name: string;
   common_name?: string;
@@ -156,6 +163,12 @@ export interface SearchCandidate {
   match_type: string;
   confidence: number;
   is_hybrid?: boolean;
+  rationale?: string; // v2.35.0: Rationale from AI
+  lineage_rationale?: string;
+  source_type: 'local' | 'ai';
+  // Fix: Extended Partial<Taxon> to include ingestion metadata (trade_name and patent_number)
+  parts?: Partial<Taxon> & { trade_name?: string; patent_number?: string }; 
+  lineage_map?: LineageMapEntry[]; // v2.35.1: Path visibility
 }
 
 export type ActivityStatus = 'running' | 'completed' | 'error' | 'needs_input';

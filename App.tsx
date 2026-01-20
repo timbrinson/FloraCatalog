@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { Loader2, Leaf, Activity, Settings, Plus } from 'lucide-react';
+import { Loader2, Leaf, Activity, Settings, Plus, Search } from 'lucide-react';
 import { Taxon, LoadingState, UserPreferences, ActivityItem, ActivityStatus, RankPallet } from './types';
 import { dataService } from './services/dataService';
 import { getIsOffline, reloadClient } from './services/supabaseClient';
@@ -39,6 +39,7 @@ export default function App() {
   const [showActivityPanel, setShowActivityPanel] = useState(false);
   const [activityPanelMode, setActivityPanelMode] = useState<'side' | 'floating' | 'full'>('side');
   const [showAddModal, setShowAddModal] = useState(false);
+  const [headerSearchQuery, setHeaderSearchQuery] = useState('');
   
   // Data State
   const [taxa, setTaxa] = useState<Taxon[]>([]);
@@ -103,6 +104,7 @@ export default function App() {
 
   /**
    * loadGlobalSettings: Fetch configuration from database.
+   * v2.35.2: Trusts saved layout explicitly over healers to prevent persistence drift.
    */
   const loadGlobalSettings = async (): Promise<AppLayoutConfig> => {
     try {
@@ -113,7 +115,6 @@ export default function App() {
             if (saved.preferences) {
                 setPreferences(prev => {
                     const mergedPrefs = { ...prev, ...saved.preferences };
-                    // HEALING LOGIC: Ensure all pallet levels exist even if user has a legacy save
                     if (saved.preferences.grid_pallet) {
                         mergedPrefs.grid_pallet = {
                             ...DEFAULT_PALLET,
@@ -200,7 +201,7 @@ export default function App() {
   const isFiltering = useMemo(() => {
     return Object.entries(gridFilters).some(([key, value]) => {
       if (key === 'taxon_status') {
-        return !Array.isArray(value) || value.length !== 1 || value[0] !== 'Accepted';
+        return !Array.isArray(value) || value.length !== 1 || value[0] === 'Accepted';
       }
       return value && (Array.isArray(value) ? value.length > 0 : String(value).trim() !== '');
     });
@@ -425,7 +426,7 @@ export default function App() {
                       ...a, 
                       status: 'completed', 
                       message: 'No new unique references discovered.',
-                      outcome: 'Search complete. No new unique references were discovered beyond existing documentation.',
+                      outcome: 'No new unique references discovered.',
                       steps: a.steps.map(s => ({...s, status: 'completed' as ActivityStatus}))
                   } : a));
               }
@@ -436,7 +437,7 @@ export default function App() {
               ...a, 
               status: 'error', 
               message: e.message || 'AI service unavailable.',
-              outcome: `Process failed due to an upstream service error: ${e.message}`,
+              outcome: `Process failed: ${e.message}`,
               steps: a.steps.map(s => s.status === 'running' ? {...s, status: 'error' as ActivityStatus, error: e.message} : s)
           } : a));
       }
@@ -451,7 +452,7 @@ export default function App() {
       if (preferences.auto_open_activity_on_task) setShowActivityPanel(true);
   };
 
-  const handleAddSuccess = () => { /* we keep it open for multi-add v2.34.1 */ };
+  const handleAddSuccess = () => { /* noop v2.35.3 */ };
   const handleMaintenanceComplete = () => { setTaxa([]); setOffset(0); fetchBatch(0, true); };
 
   const isHardError = (isOffline || (loadingState === LoadingState.ERROR && !isInitialized));
@@ -466,8 +467,23 @@ export default function App() {
           <header className="p-4 bg-white border-b flex justify-between items-center shadow-sm z-30">
             <div className="flex items-center gap-2 text-leaf-700 font-serif text-xl font-bold"><Leaf className="text-leaf-600" /> FloraCatalog</div>
             <div className="flex items-center gap-3">
+              <div className="flex items-center bg-slate-100 rounded-full px-3 py-1.5 border border-slate-200 focus-within:ring-2 focus-within:ring-leaf-200 transition-all">
+                <Search size={14} className="text-slate-400" />
+                <input 
+                  type="text" 
+                  value={headerSearchQuery} 
+                  onChange={(e) => setHeaderSearchQuery(e.target.value)}
+                  placeholder="Enter plant name..."
+                  className="bg-transparent border-none outline-none text-xs px-3 w-40 font-medium text-slate-700 placeholder:text-slate-400"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      setShowAddModal(true);
+                    }
+                  }}
+                />
+              </div>
               <button onClick={() => setShowAddModal(!showAddModal)} className={`flex items-center gap-2 px-4 py-1.5 rounded-full transition-all shadow-sm text-xs font-bold ${showAddModal ? 'bg-slate-800 text-white' : 'bg-leaf-600 text-white hover:bg-leaf-700'}`}>
-                <Plus size={16} /> {showAddModal ? 'Hide Window' : 'Add Plant'}
+                <Plus size={16} /> {showAddModal ? 'Hide Window' : 'Find Plant'}
               </button>
               <div className="relative">
                 <button onClick={() => setShowActivityPanel(!showActivityPanel)} className={`p-2 rounded-full transition-colors ${showActivityPanel ? 'bg-leaf-100 text-leaf-700' : 'text-slate-500 hover:bg-slate-100'}`}>
@@ -538,7 +554,11 @@ export default function App() {
       {showAddModal && (
         <AddPlantModal 
             isOpen={showAddModal} 
-            onClose={() => setShowAddModal(false)} 
+            initialQuery={headerSearchQuery}
+            onClose={() => {
+              setShowAddModal(false);
+              setHeaderSearchQuery('');
+            }} 
             onSuccess={handleAddSuccess} 
             onAddActivity={handleAddActivity} 
         />

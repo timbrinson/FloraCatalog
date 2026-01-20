@@ -1,5 +1,6 @@
 import { getSupabase, getIsOffline } from './supabaseClient';
-import { Taxon, Synonym, Link, DataSource, BuildDashboardData } from '../types';
+import { Taxon, Synonym, Link, DataSource, BuildDashboardData, SearchCandidate, LineageMapEntry } from '../types';
+import { getNakedName, parseBotanicalName, assembleScientificName } from '../utils/formatters';
 
 /**
  * Service to handle interaction with the Supabase PostgreSQL Database.
@@ -161,7 +162,6 @@ export const dataService = {
 
     if (getIsOffline()) return { data: [], count: 0 };
 
-    // Baseline Optimization: If no active user-filters, use a safer counting approach
     const isBaseline = Object.entries(filters).every(([k, v]) => {
       if (k === 'taxon_status') return Array.isArray(v) && v.length === 1 && v[0] === 'Accepted';
       return !v || (Array.isArray(v) && v.length === 0);
@@ -171,16 +171,12 @@ export const dataService = {
       .from(DB_TABLE)
       .select('*, details:app_taxon_details(*)', (should_count && !isBaseline) ? { count: 'estimated' } : {});
 
-    // --- Dynamic Filtering ---
     Object.entries(filters).forEach(([key, value]) => {
         if (value === undefined || value === null || value === '') return;
-        
         const dbKey = key;
-        
         if (typeof value === 'string') {
             const rawSearch = value.trim();
             if (!rawSearch) return;
-
             let cleanVal = rawSearch;
             if (search_mode === 'prefix') {
                 if (key === 'kingdom' || key === 'phylum' || key === 'class' || key === 'order' || key === 'family' || key === 'genus') {
@@ -191,17 +187,11 @@ export const dataService = {
                     cleanVal = rawSearch.charAt(0).toUpperCase() + rawSearch.slice(1);
                 }
             }
-
-            // --- Filter Mode Dispatcher ---
             const isTechnicalId = key === 'id' || key.endsWith('_id');
             const isStrictMetadata = key === 'first_published';
-
             if (key === 'taxon_name') {
-                if (search_mode === 'fuzzy') {
-                    query = query.ilike('taxon_name', `%${rawSearch}%`);
-                } else {
-                    query = query.like('taxon_name', `${cleanVal}%`);
-                }
+                if (search_mode === 'fuzzy') query = query.ilike('taxon_name', `%${rawSearch}%`);
+                else query = query.like('taxon_name', `${cleanVal}%`);
             } else if (isTechnicalId || isStrictMetadata) {
                 query = query.eq(dbKey, cleanVal);
             } else {
@@ -211,16 +201,10 @@ export const dataService = {
             if (value.length > 0) {
                  const hasNull = value.includes('NULL');
                  const realValues = value.filter(v => v !== 'NULL');
-                 
-                 // Quoting values for PostgREST 'or' logic to handle spaces (e.g. "Artificial Hybrid")
-                 // This fixes 500 "No apikey found" errors caused by malformed request URLs.
                  if (realValues.length > 0) {
                     const quotedValues = realValues.map(v => `"${v}"`).join(',');
-                    if (hasNull) {
-                        query = query.or(`${dbKey}.in.(${quotedValues}),${dbKey}.is.null`);
-                    } else {
-                        query = query.or(`${dbKey}.in.(${quotedValues})`);
-                    }
+                    if (hasNull) query = query.or(`${dbKey}.in.(${quotedValues}),${dbKey}.is.null`);
+                    else query = query.or(`${dbKey}.in.(${quotedValues})`);
                  } else if (hasNull) {
                     query = query.is(dbKey, null);
                  }
@@ -228,59 +212,12 @@ export const dataService = {
         }
     });
 
-    // --- Sorting & Pagination ---
-    if (sort_by) {
-        query = query.order(sort_by, { ascending: sort_direction === 'asc' });
-    }
+    if (sort_by) query = query.order(sort_by, { ascending: sort_direction === 'asc' });
 
-    const { data, count, error } = await query
-      .range(offset, offset + limit - 1);
-
-    if (error) {
-      if (error.message?.includes('timeout') || error.code === '57014') {
-          throw new Error("The database timed out processing this large request. Try adding more specific filters.");
-      }
-      throw error;
-    }
-
-    // Baseline fallback count to avoid scanning 1.4M rows on every page load
+    const { data, count, error } = await query.range(offset, offset + limit - 1);
+    if (error) throw error;
     const finalCount = isBaseline ? 1440000 : (count || -1);
-    
     return { data: (data || []).map(mapFromDB), count: finalCount };
-  },
-
-  async getBuildDashboard(): Promise<BuildDashboardData | null> {
-    if (getIsOffline()) return null;
-    
-    try {
-        const supabase = getSupabase();
-        
-        // Use parallel queries for dashboard performance
-        const [totalRes, builtRes, ordersRes, orphansRes] = await Promise.all([
-            supabase.from(DB_TABLE).select('*', { count: 'estimated', head: true }),
-            supabase.from(DB_TABLE).select('id', { count: 'exact', head: true }).not('hierarchy_path', 'is', null),
-            supabase.from(DB_TABLE).select('id', { count: 'exact', head: true }).eq('taxon_rank', 'Order').is('parent_id', null).not('hierarchy_path', 'is', null),
-            supabase.from(DB_TABLE).select('id', { count: 'exact', head: true }).neq('taxon_rank', 'Order').is('parent_id', null).not('hierarchy_path', 'is', null)
-        ]);
-
-        const total = totalRes.count || 1441043; // Fallback to your reported total
-        const built = builtRes.count || 0;
-        const cleaned = total - (total - built); // Logic: How many are NOT NULL?
-
-        // This matches your Query 9 and 10 logic
-        return {
-            total_records: total,
-            dirty_paths: total - built, 
-            cleaned_rows: built,
-            paths_built: built,
-            wfo_order_roots: ordersRes.count || 0,
-            orphaned_roots: orphansRes.count || 0,
-            reset_completion: built > 0 ? 100 : 0, // In Query 9 context, reset completion means hierarchy_path IS NULL
-            build_completion: Math.round((built * 100.0) / total)
-        };
-    } catch (e) {
-        return null;
-    }
   },
 
   async getTaxonById(id: string): Promise<Taxon | null> {
@@ -289,141 +226,363 @@ export const dataService = {
       .from(DB_TABLE)
       .select('*, details:app_taxon_details(*)')
       .eq('id', id)
-      .single();
-
+      .maybeSingle();
     if (error) return null;
+    return data ? mapFromDB(data) : null;
+  },
+
+  /**
+   * findNakedMatch: Stage 0 Botanical Discovery (Deterministic).
+   * v2.35.5: Pivots to high-speed literal name matching for absolute library verification.
+   */
+  async findNakedMatch(query: string): Promise<Taxon[]> {
+      if (getIsOffline()) return [];
+      
+      const parts = parseBotanicalName(query);
+      const assembled = assembleScientificName(parts);
+      const naked = getNakedName(query);
+      
+      if (!assembled && !naked) return [];
+
+      const supabase = getSupabase();
+      
+      // Stage 0 Sovereignty Logic:
+      // We prioritize searching the indexed 'taxon_name' column using both the
+      // algorithmic assembly and the naked input. This is more resilient than
+      // epithet column filtering which relies on varying source data quality.
+      const { data, error } = await supabase
+          .from(DB_TABLE)
+          .select('*, details:app_taxon_details(*)')
+          .or(`taxon_name.ilike."${assembled}",taxon_name.ilike."${naked}"`)
+          .limit(10);
+      
+      if (error) return [];
+      return (data || []).map(mapFromDB);
+  },
+
+  /**
+   * findTaxonByName: Identity lookup with synonym redirection.
+   * v2.35.2: Detects synonyms and follows accepted_plant_name_id.
+   */
+  async findTaxonByName(name: string): Promise<Taxon | null> {
+    if (getIsOffline()) return null;
+    const supabase = getSupabase();
+    
+    // Case-insensitive lookup
+    const { data, error } = await supabase
+        .from(DB_TABLE)
+        .select('*, details:app_taxon_details(*)')
+        .ilike('taxon_name', name.trim())
+        .maybeSingle();
+        
+    if (error || !data) return null;
+
+    // Follow Synonym Chain
+    if (data.taxon_status === 'Synonym' && data.accepted_plant_name_id) {
+        const { data: accepted } = await supabase
+            .from(DB_TABLE)
+            .select('*, details:app_taxon_details(*)')
+            .eq('wcvp_id', data.accepted_plant_name_id)
+            .maybeSingle();
+        if (accepted) return mapFromDB(accepted);
+    }
+
     return mapFromDB(data);
   },
 
   /**
-   * findTaxonByName: Matches names against DB, handling synonym redirection metadata.
+   * findLineageAudit: Performs a background check on the parentage of a suggested name.
+   * v2.35.4 Fix: Use literal column matching for robust ancestry identification.
    */
-  async findTaxonByName(name: string): Promise<(Taxon & { accepted_name_found?: string }) | null> {
-      if (getIsOffline()) return null;
-      const cleanName = name.trim();
-      
-      const { data, error } = await getSupabase()
-          .from(DB_TABLE)
-          .select('*, details:app_taxon_details(*)')
-          .ilike('taxon_name', cleanName)
-          .limit(5);
+  async findLineageAudit(parts: Partial<Taxon>): Promise<LineageMapEntry[]> {
+    if (getIsOffline()) return [];
+    const entries: LineageMapEntry[] = [];
+    const supabase = getSupabase();
+    
+    // 1. Genus Audit
+    if (parts.genus) {
+        const { data: genusRecord } = await supabase
+            .from(DB_TABLE)
+            .select('id')
+            .ilike('genus', parts.genus)
+            .eq('taxon_rank', 'Genus')
+            .maybeSingle();
+        
+        const displayName = parts.genus_hybrid === '×' ? `× ${parts.genus}` : parts.genus;
+        entries.push({ rank: 'Genus', name: displayName, exists: !!genusRecord });
+    }
+    
+    // 2. Species Audit
+    if (parts.genus && parts.species) {
+        const { data: speciesRecord } = await supabase
+            .from(DB_TABLE)
+            .select('id')
+            .ilike('genus', parts.genus)
+            .ilike('species', parts.species)
+            .eq('taxon_rank', 'Species')
+            .maybeSingle();
 
-      if (error || !data || data.length === 0) return null;
-      
-      const bestMatch = data.find(t => t.taxon_status === 'Accepted' || t.taxon_status === 'Artificial Hybrid') || data[0];
-      const mapped = mapFromDB(bestMatch);
+        const displayName = parts.species_hybrid === '×' ? `× ${parts.species}` : parts.species;
+        entries.push({ rank: 'Species', name: displayName, exists: !!speciesRecord });
+    }
 
-      // Synonym Redirection Logic
-      if (bestMatch.taxon_status === 'Synonym' && bestMatch.accepted_plant_name_id) {
-          const { data: accepted } = await getSupabase()
-              .from(DB_TABLE)
-              .select('taxon_name')
-              .eq('wcvp_id', bestMatch.accepted_plant_name_id)
-              .maybeSingle();
-          
-          if (accepted) {
-              return { ...mapped, accepted_name_found: accepted.taxon_name };
-          }
-      }
+    // 3. Infraspecies Audit (v2.35.4 Fix)
+    if (parts.genus && parts.species && parts.infraspecies && parts.infraspecific_rank) {
+        const { data: infraRecord } = await supabase
+            .from(DB_TABLE)
+            .select('id')
+            .ilike('genus', parts.genus)
+            .ilike('species', parts.species)
+            .ilike('infraspecies', parts.infraspecies)
+            .eq('infraspecific_rank', parts.infraspecific_rank)
+            .maybeSingle();
+        entries.push({ rank: 'Infraspecies', name: `${parts.infraspecific_rank} ${parts.infraspecies}`, exists: !!infraRecord });
+    }
 
-      return mapped;
+    // 4. Cultivar Audit (Terminal verification)
+    if (parts.cultivar && parts.genus) {
+        const query = supabase
+            .from(DB_TABLE)
+            .select('id')
+            .ilike('genus', parts.genus)
+            .ilike('cultivar', parts.cultivar)
+            .eq('taxon_rank', 'Cultivar');
+
+        if (parts.species) {
+            query.ilike('species', parts.species);
+        }
+        if (parts.infraspecies) {
+            query.ilike('infraspecies', parts.infraspecies);
+        }
+
+        const { data: cultivarRecord } = await query.maybeSingle();
+        entries.push({ rank: 'Cultivar', name: `'${parts.cultivar}'`, exists: !!cultivarRecord });
+    }
+    
+    return entries;
   },
 
-  async createTaxon(taxon: Taxon): Promise<Taxon> {
-    if (getIsOffline()) throw new Error("Cannot create in offline mode");
-    const dbRow = mapToDB(taxon);
-    const { data, error } = await getSupabase()
-      .from(DB_TABLE)
-      .insert(dbRow)
-      .select()
-      .single();
+  /**
+   * graftTaxonToHierarchy: Stage 5 Commit.
+   * Handles parent-first creation, phylogenetic flow, path materialization, and count sync.
+   */
+  async graftTaxonToHierarchy(candidate: SearchCandidate, onStep: (label: string, data?: any) => void): Promise<{ taxon: Taxon, created: string[] }> {
+    if (getIsOffline()) throw new Error("Offline");
+    const supabase = getSupabase();
+    const createdRanks: string[] = [];
+    const parts = candidate.parts!;
+    
+    // Step 1: Ensure Genus
+    const genusName = parts.genus_hybrid === '×' ? `× ${parts.genus}` : parts.genus;
+    onStep(`Verifying Genus: ${genusName}`);
+    let genusRecord = await this.findTaxonByName(genusName!);
+    
+    if (!genusRecord) {
+        onStep(`Creating new Genus: ${genusName}`);
+        const { data, error } = await supabase.from(DB_TABLE).insert({
+            taxon_name: genusName,
+            taxon_rank: 'Genus',
+            taxon_status: 'Accepted',
+            genus: parts.genus,
+            genus_hybrid: parts.genus_hybrid || null,
+            source_id: 3,
+            verification_level: `Ingestion Engine v2.35.3`
+        }).select().single();
+        if (error) throw error;
+        genusRecord = mapFromDB(data);
+        createdRanks.push('Genus');
+    }
 
-    if (error) throw error;
-    return mapFromDB(data);
+    let parentId = genusRecord.id;
+    let parentPath = genusRecord.hierarchy_path || `root.${genusRecord.id.replace(/-/g, '_')}`;
+
+    // Step 2: Ensure Species
+    if (parts.species) {
+        const speciesFullName = `${genusRecord.taxon_name} ${parts.species_hybrid === '×' ? '× ' : ''}${parts.species}`;
+        onStep(`Verifying Species: ${speciesFullName}`);
+        let speciesRecord = await this.findTaxonByName(speciesFullName);
+        
+        if (!speciesRecord) {
+            onStep(`Creating new Species: ${speciesFullName}`);
+            // Inherit Phylogeny from Genus
+            const { data, error } = await supabase.from(DB_TABLE).insert({
+                parent_id: genusRecord.id,
+                hierarchy_path: `${parentPath.replace(/-/g, '_')}`, // Temporary placeholder, fixed below
+                taxon_name: speciesFullName,
+                taxon_rank: 'Species',
+                taxon_status: 'Accepted',
+                genus: parts.genus,
+                species: parts.species,
+                species_hybrid: parts.species_hybrid || null,
+                kingdom: genusRecord.kingdom,
+                phylum: genusRecord.phylum,
+                class: genusRecord.class,
+                "order": genusRecord.order,
+                family: genusRecord.family,
+                source_id: 3,
+                verification_level: `Ingestion Engine v2.35.3`
+            }).select().single();
+            if (error) throw error;
+            speciesRecord = mapFromDB(data);
+            
+            // Fix Hierarchy Path for new Species
+            const newSpeciesPath = `${parentPath}.${speciesRecord.id.replace(/-/g, '_')}`;
+            await supabase.from(DB_TABLE).update({ hierarchy_path: newSpeciesPath }).eq('id', speciesRecord.id);
+            speciesRecord.hierarchy_path = newSpeciesPath;
+            
+            createdRanks.push('Species');
+        }
+        parentId = speciesRecord.id;
+        parentPath = speciesRecord.hierarchy_path!;
+    }
+
+    // Step 3: Terminal Record
+    onStep(`Committing terminal record: ${candidate.taxon_name}`);
+    
+    // Alternative Names Capture (Trade Names & Patents)
+    const alts: Synonym[] = [];
+    if (candidate.parts?.trade_name) alts.push({ name: candidate.parts.trade_name, type: 'trade' });
+    if (candidate.parts?.patent_number) alts.push({ name: candidate.parts.patent_number, type: 'patent' });
+
+    const terminalPayload: any = {
+        parent_id: parentId,
+        taxon_name: candidate.taxon_name,
+        taxon_rank: candidate.parts?.taxon_rank || 'Cultivar',
+        taxon_status: 'Accepted',
+        genus: parts.genus,
+        species: parts.species,
+        cultivar: parts.cultivar || null,
+        infraspecies: parts.infraspecies || null,
+        infraspecific_rank: parts.infraspecific_rank || null,
+        kingdom: genusRecord.kingdom,
+        phylum: genusRecord.phylum,
+        class: genusRecord.class,
+        "order": genusRecord.order,
+        family: genusRecord.family,
+        source_id: 3,
+        verification_level: `Ingestion Engine v2.35.3`
+    };
+
+    const { data: terminalRow, error: terminalError } = await supabase.from(DB_TABLE).insert(terminalPayload).select().single();
+    if (terminalError) throw terminalError;
+    
+    const terminalRecord = mapFromDB(terminalRow);
+    const terminalPath = `${parentPath}.${terminalRecord.id.replace(/-/g, '_')}`;
+    
+    // Update path and metadata
+    await supabase.from(DB_TABLE).update({ hierarchy_path: terminalPath }).eq('id', terminalRecord.id);
+    
+    // Sync Metadata (Rationales) to Details
+    if (candidate.rationale || candidate.lineage_rationale || alts.length > 0) {
+        await supabase.from(DETAILS_TABLE).upsert({
+            taxon_id: terminalRecord.id,
+            history_metadata: { 
+                background: candidate.rationale,
+                lineage_logic: candidate.lineage_rationale
+            },
+            alternative_names: alts
+        });
+    }
+
+    // Direct SQL Count Update for immediate parent
+    await supabase.rpc('increment_descendant_count', { row_id: parentId });
+    
+    return { taxon: terminalRecord, created: createdRanks };
   },
 
   async updateTaxon(id: string, updates: Partial<Taxon>): Promise<void> {
-    if (getIsOffline()) throw new Error("Cannot update in offline mode");
+    if (getIsOffline()) throw new Error("Offline");
+    const supabase = getSupabase();
     
-    const dbUpdates: any = {};
-    const detailUpdates: any = {};
-    const detailKeys = ['description_text', 'hardiness_zone_min', 'hardiness_zone_max', 'height_min_cm', 'height_max_cm', 'width_min_cm', 'width_max_cm', 'origin_year', 'morphology', 'ecology', 'history_metadata', 'alternative_names', 'reference_links'];
+    const detailKeys = [
+        'description_text', 'hardiness_zone_min', 'hardiness_zone_max', 
+        'height_min_cm', 'height_max_cm', 'width_min_cm', 'width_max_cm',
+        'origin_year', 'morphology', 'ecology', 'history_metadata',
+        'alternative_names', 'reference_links'
+    ];
 
-    Object.entries(updates).forEach(([key, value]) => {
-      if (detailKeys.includes(key)) {
-         detailUpdates[key] = value;
-      } else {
-         dbUpdates[key] = value;
-      }
+    const coreUpdates: any = {};
+    const detailUpdates: any = {};
+
+    Object.entries(updates).forEach(([key, val]) => {
+        if (detailKeys.includes(key)) {
+            detailUpdates[key] = val;
+        } else if (!['id', 'details', 'is_details_loaded', 'created_at', 'name', 'hierarchy_path'].includes(key)) {
+            coreUpdates[key] = val;
+        }
     });
 
-    if (Object.keys(dbUpdates).length > 0) {
-      const { error: coreError } = await getSupabase().from(DB_TABLE).update(dbUpdates).eq('id', id);
-      if (coreError) throw coreError;
+    if (Object.keys(coreUpdates).length > 0) {
+        const { error: coreError } = await supabase
+            .from(DB_TABLE)
+            .update(coreUpdates)
+            .eq('id', id);
+        if (coreError) throw coreError;
     }
 
     if (Object.keys(detailUpdates).length > 0) {
-      const { error: detailError } = await getSupabase().from(DETAILS_TABLE).upsert({ taxon_id: id, ...detailUpdates });
-      if (detailError) throw detailError;
+        const { error: detailError } = await supabase
+            .from(DETAILS_TABLE)
+            .upsert({ taxon_id: id, ...detailUpdates }, { onConflict: 'taxon_id' });
+        if (detailError) throw detailError;
     }
   },
 
-  async deleteTaxon(id: string): Promise<void> {
-    if (getIsOffline()) throw new Error("Cannot delete in offline mode");
-    const { error } = await getSupabase()
-      .from(DB_TABLE)
-      .delete()
-      .eq('id', id);
-
-    if (error) throw error;
-  },
-
-  async purgeNonWCVPTaxa(): Promise<void> {
-      if (getIsOffline()) throw new Error("Cannot reset in offline mode");
-      // Refined Purge Strategy (ADR-003): 
-      // Protect official WCVP (1) and WFO Backbone (2). 
-      // Purge only manual user additions or unknown entries (3+).
-      const { error } = await getSupabase()
-          .from(DB_TABLE)
-          .delete()
-          .not('source_id', 'in', '(1,2)');
-      if (error) {
-          if (error.message.includes('timeout')) {
-              throw new Error("Statement timeout. Please use the SQL editor.");
-          }
-          throw error;
-      }
-  },
-
-  async wipeAllDetails(): Promise<void> {
-      if (getIsOffline()) throw new Error("Cannot reset in offline mode");
-      const { error } = await getSupabase()
-          .from(DETAILS_TABLE)
-          .delete()
-          .neq('taxon_id', '00000000-0000-0000-0000-000000000000');
-      if (error) throw error;
-  },
-
-  // --- SETTINGS PERSISTENCE ---
-
   async getGlobalSettings(): Promise<any> {
-      if (getIsOffline()) return null;
-      const { data, error } = await getSupabase()
-          .from(SETTINGS_TABLE)
-          .select('settings')
-          .eq('id', 'default_config')
-          .maybeSingle();
-      
-      if (error) return null;
-      return data?.settings;
+    if (getIsOffline()) return {};
+    const { data, error } = await getSupabase()
+        .from(SETTINGS_TABLE)
+        .select('settings')
+        .eq('id', 'default_config')
+        .maybeSingle();
+    if (error) return {};
+    return data?.settings || {};
   },
 
   async saveGlobalSettings(settings: any): Promise<void> {
-      if (getIsOffline()) return;
-      const { error } = await getSupabase()
-          .from(SETTINGS_TABLE)
-          .upsert({ id: 'default_config', settings, updated_at: new Date().toISOString() });
-      
-      if (error) console.error("Failed to save global settings:", error);
+    if (getIsOffline()) throw new Error("Offline");
+    const { error } = await getSupabase()
+        .from(SETTINGS_TABLE)
+        .upsert({ id: 'default_config', settings, updated_at: new Date().toISOString() });
+    if (error) throw error;
+  },
+
+  async getBuildDashboard(): Promise<BuildDashboardData | null> {
+    if (getIsOffline()) return null;
+    const supabase = getSupabase();
+    
+    const { count: total } = await supabase.from(DB_TABLE).select('*', { count: 'exact', head: true });
+    const { count: dirty } = await supabase.from(DB_TABLE).select('*', { count: 'exact', head: true }).is('hierarchy_path', null);
+    const { count: wfoRoots } = await supabase.from(DB_TABLE).select('*', { count: 'exact', head: true }).eq('taxon_rank', 'Order').eq('source_id', 2);
+    
+    const totalCount = total || 0;
+    const dirtyCount = dirty || 0;
+    const completion = totalCount > 0 ? Math.round(((totalCount - dirtyCount) / totalCount) * 100) : 100;
+
+    return {
+        total_records: totalCount,
+        dirty_paths: dirtyCount,
+        cleaned_rows: totalCount - dirtyCount,
+        paths_built: totalCount - dirtyCount,
+        wfo_order_roots: wfoRoots || 0,
+        orphaned_roots: 0,
+        reset_completion: completion,
+        build_completion: completion
+    };
+  },
+
+  async purgeNonWCVPTaxa(): Promise<void> {
+    if (getIsOffline()) throw new Error("Offline");
+    const { error } = await getSupabase()
+        .from(DB_TABLE)
+        .delete()
+        .neq('source_id', 1);
+    if (error) throw error;
+  },
+
+  async wipeAllDetails(): Promise<void> {
+    if (getIsOffline()) throw new Error("Offline");
+    const { error } = await getSupabase().from(DETAILS_TABLE).delete().neq('taxon_id', '00000000-0000-0000-0000-000000000000');
+    if (error) throw error;
   }
 };

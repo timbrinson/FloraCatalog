@@ -2,8 +2,10 @@
 
 This document tracks planned features and technical improvements to ensure continuity across development sessions.
 ## Work on Now
-- [ ] **Implement Ingestion Engine:** Rewrite the Add Plant functionality by following the Ingestion Engine design to implement the 5-stage validation pipeline and continuing to adhere to other decisions.
+- [x] **Implement Ingestion Engine:** Rewrite the Add Plant functionality by following the Ingestion Engine design to implement the 6-stage validation pipeline (Stage 0: Deterministic Win, Stage 1: Intent Filter, Stage 2: Global synthesis, Stage 3: Polishing).
+
 ## Awaiting Verification (Recent Builds)
+- [ ] **Find Plant Engine v2.35.0:** Verify the multi-candidate discovery logic and Stage 0 local search priority.
 
 ## High Priority
 - [x] **Fix Finding Plant Details:** The Icon Button for searching for plant details doesn't function. Also the Icon is not obvious what it does. I'm not sure which of the two Icons to select but neither works. The Icon button needs a tool tip saying what it does.

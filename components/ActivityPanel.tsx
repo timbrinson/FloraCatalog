@@ -85,14 +85,16 @@ const ActivityPanel: React.FC<ActivityPanelProps> = ({
               <div className="absolute -left-[7px] top-3 w-3 h-3 rounded-full bg-white border-2 border-slate-100 flex items-center justify-center">
                   {stepIcon}
               </div>
-              <div className="flex-1">
+              <div className="flex-1 overflow-hidden">
                   <div className="flex justify-between items-center">
                       <span className={`text-[11px] font-bold ${step.status === 'running' ? 'text-leaf-700' : 'text-slate-600'}`}>{step.label}</span>
                       <span className="text-[9px] text-slate-400 font-mono">{new Date(step.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', second: '2-digit'})}</span>
                   </div>
                   {step.data && (
-                      <div className="mt-1 p-2 bg-slate-50 border border-slate-100 rounded text-[10px] font-mono text-slate-500 max-h-24 overflow-y-auto overflow-x-hidden">
-                          <pre className="whitespace-pre-wrap">{JSON.stringify(step.data, null, 2)}</pre>
+                      <div className="mt-1 bg-slate-50 border border-slate-100 rounded text-[10px] font-mono text-slate-500 overflow-hidden">
+                          <pre className="p-2 whitespace-pre-wrap resize-y min-h-[60px] max-h-[400px] overflow-auto custom-scrollbar">
+                              {JSON.stringify(step.data, null, 2)}
+                          </pre>
                       </div>
                   )}
                   {step.error && (
@@ -220,8 +222,10 @@ const ActivityPanel: React.FC<ActivityPanelProps> = ({
                       {item.details && (
                         <div className="p-3 bg-indigo-50/30 rounded-lg border border-indigo-100/50">
                             <span className="text-[9px] font-black text-indigo-400 uppercase tracking-widest block mb-2 flex items-center gap-1.5"><Database size={10}/> Metadata Out</span>
-                            <div className="text-[10px] font-mono text-indigo-700 overflow-x-auto max-h-48 whitespace-pre">
-                                {JSON.stringify(item.details, null, 2)}
+                            <div className="text-[10px] font-mono text-indigo-700 overflow-x-auto">
+                                <pre className="p-2 whitespace-pre resize-y min-h-[100px] max-h-[400px] overflow-auto custom-scrollbar">
+                                    {JSON.stringify(item.details, null, 2)}
+                                </pre>
                             </div>
                         </div>
                       )}

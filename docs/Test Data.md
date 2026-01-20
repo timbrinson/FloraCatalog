@@ -353,7 +353,7 @@ Not Hybrid or Infraspecies
     Gardenia jasminoides 'Mystery'
     Gardenia jasminoides 'Summer Snow'
     Gardenia jasminoides 'Veitchii'
-    Gardenia taitensis 'Heaven Scent''
+    Gardenia taitensis 'Heaven Scent'
     Gardenia thunbergia
     Gardenia vietnamensis
     Graptopetalum amethystinum
