@@ -17,7 +17,7 @@ The Ingestion Engine is a multi-stage validation pipeline designed to reconcile 
     - Stand-alone `x` or `X` $\rightarrow$ multiplication signs (`×`).
     - Double quotes (`"`) and back-ticks (`` ` ``) $\rightarrow$ single quotes (`'`).
 2. **Diacritic Transcription:** Map all accented characters to ASCII equivalents (e.g., `ñ` $\rightarrow$ `n`, `é` $\rightarrow$ `e`, `ü` $\rightarrow$ `u`, `Munz1` $\rightarrow$ `Munzi`). Scientific names in the database use transcribed ASCII literals.
-3. **Sanitization (Whitelist):** Preserve only: `A-Z`, `a-z`, `0-9`, spaces, `-`, `'`, `×`, `+`, `.`, `,`, `!`, `/`, `\`, `(`, `)`. Strip all other characters.
+3. **Sanitization (Whitelist):** Preserve only: `A-Z`, `a-z`, `0-9`, spaces, `-`, `'`, `×`, `+`, `.`, ,, `!`, `/`, `\`, `(`, `)`. Strip all other characters.
 4. **Whitespace:** Collapse all multi-spaces into a single space.
 
 **Phase B: Sequential Token Extraction (Consume-from-Left)**
@@ -42,8 +42,8 @@ The Ingestion Engine is a multi-stage validation pipeline designed to reconcile 
 - `cultivar`: Title Case.
 
 **Phase D: Targeted Interrogation (Atomic Token Query)**
-Construct a single SQL query targeting physical database columns based on the *presence* of the extracted tokens.
-- **Logic:** Generate a `WHERE` clause using the equality operator (`=`) for every non-null token found.
+1. **Standard A (Atomic Token Set):** Construct a SQL equality query using individual physical columns (`genus`, `species`, `infraspecies`, `cultivar`, etc.) based on the extracted tokens.
+2. **Standard B (Literal Fallback):** Only if Standard A returns zero hits, execute a secondary query searching the indexed `taxon_name` column against the original search string.
 - **Outcome - Zero Hits:** Proceed to Stage 1.
 - **Outcome - Single Hit:** Prompt the user: *"Match Found in Library. View Existing Record or Search Globally for variations?"*
 - **Outcome - Multi-Hit:** List library matches for selection before proceeding.
@@ -69,16 +69,25 @@ Construct a single SQL query targeting physical database columns based on the *p
     - `rationale`: Why this plant was chosen.
     - `lineage_rationale`: Scientific justification for linking a cultivar to a specific species.
 
-### Stage 3: Identity Guard (The Algorithmic Filter)
-- **Normalization:** Apply the Stage 0 normalization and parsing logic to the assembled name of every AI candidate.
+### Stage 3: Identity Guard (The Atomic Filter)
+- **Standard Execution:** This stage MUST use the exact same rules as Stage 0 Phase D (Atomic Query first, Literal Fallback second).
+- **Consumption:** Instead of lexing a string, it consumes the structured JSON parts provided by the Stage 2 AI response.
 - **Verification:** Search the local DB for the **Atomic Token Set**.
+- **Multi-Match Priority:** If multiple records match the name/tokens, the engine MUST prioritize records with `taxon_status = 'Accepted'`.
 - **Synonym Redirection:** If a candidate matches a local record marked `Synonym`, the engine MUST follow the `accepted_plant_name_id` and redirect the identity to the `Accepted` record.
 - **Status Promotion:** If found (either as an original or a redirected synonym), the candidate is marked "In Library" to prevent duplication.
+- **Instrumentation:** The Process Ledger must explicitly list the `interrogated_tokens` used for the database call.
 
 ### Stage 4: Lineage Status Audit (Ancestry Map)
-- **Method:** Recursive hierarchy check.
-- **Goal:** For the suggested name, determine the existence of every parent level.
+- **Method:** Incremental Atomic Audit.
+- **Goal:** For the suggested name, determine the existence of every parent level using column-level equality.
+- **Interrogation Rules:** 
+    - **Check Genus:** Query `genus = X AND taxon_rank = 'Genus'`.
+    - **Check Species:** Query `genus = X AND species = Y AND taxon_rank = 'Species'`.
+    - **Check Infraspecies:** Query `genus = X AND species = Y AND infraspecies = Z AND infraspecific_rank = R AND taxon_rank = 'Infraspecies'`.
+- **Multi-Match Robustness:** Use `LIMIT 1` for all existence checks to ensure the audit succeeds even if multiple records exist for a parent name.
 - **UI Behavior:** Render an "Ancestry Path" (Genus > Species > Cultivar) for all candidates, visually distinguishing segments already in the library from segments that the system will need to create.
+- **Ledger Requirement:** The results in the Process Ledger must include the `interrogated_tokens` for each incremental audit step.
 
 ### Stage 5: Transactional Commit (The Graft)
 - **Method:** Sequenced Transaction.
@@ -116,4 +125,4 @@ The engine must be tested against and handle the following scenarios:
 15. **Misapplied Name Detection:** AI flags that "Plant A" is often incorrectly sold as "Plant B."
 16. **Intergeneric Hybrids:** Handling complex names like *× Amarine*.
 17. **Parenthetical Author Shift:** AI updates the author string based on the global census.
-18. **Multi-Parent Hybrids:** Handling complex hybrid formulas in rationales and lineage maps.
+18. **Multi-Parent Hyard Hybrids:** Handling complex hybrid formulas in rationales and lineage maps.

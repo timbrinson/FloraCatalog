@@ -233,36 +233,117 @@ export const dataService = {
 
   /**
    * findNakedMatch: Stage 0 Botanical Discovery (Deterministic).
-   * v2.35.5: Pivots to high-speed literal name matching for absolute library verification.
+   * v2.35.5: Switch to Equality (.eq) for Atomic standard to leverage "C" collated indices.
    */
-  async findNakedMatch(query: string): Promise<Taxon[]> {
-      if (getIsOffline()) return [];
+  async findNakedMatch(query: string): Promise<{ data: Taxon[], strategy: string, tokens?: any, error?: string }> {
+      if (getIsOffline()) return { data: [], strategy: 'Offline' };
       
       const parts = parseBotanicalName(query);
-      const assembled = assembleScientificName(parts);
-      const naked = getNakedName(query);
-      
-      if (!assembled && !naked) return [];
-
       const supabase = getSupabase();
+
+      // Standard A: Atomic Token Query
+      // v2.35.5: Corrected query chaining to ensure filters are applied.
+      let atomicQuery = supabase.from(DB_TABLE).select('*, details:app_taxon_details(*)');
+      let hasAtomicTokens = false;
+
+      if (parts.genus) { atomicQuery = atomicQuery.eq('genus', parts.genus); hasAtomicTokens = true; }
+      if (parts.species) { atomicQuery = atomicQuery.eq('species', parts.species); hasAtomicTokens = true; }
+      if (parts.infraspecies) { atomicQuery = atomicQuery.eq('infraspecies', parts.infraspecies); hasAtomicTokens = true; }
+      if (parts.infraspecific_rank) { atomicQuery = atomicQuery.eq('infraspecific_rank', parts.infraspecific_rank); hasAtomicTokens = true; }
+      if (parts.cultivar) { atomicQuery = atomicQuery.eq('cultivar', parts.cultivar); hasAtomicTokens = true; }
+
+      if (hasAtomicTokens) {
+          const { data: atomicHits, error: atomicErr } = await atomicQuery.limit(10);
+          if (atomicErr) return { data: [], strategy: 'Atomic Error', error: atomicErr.message, tokens: parts };
+          if (atomicHits && atomicHits.length > 0) {
+              return { data: atomicHits.map(mapFromDB), strategy: 'Atomic Token Set (Standard A)', tokens: parts };
+          }
+      }
+
+      // Standard B: Literal Fallback
+      const naked = getNakedName(query);
+      const assembled = assembleScientificName(parts);
       
-      // Stage 0 Sovereignty Logic:
-      // We prioritize searching the indexed 'taxon_name' column using both the
-      // algorithmic assembly and the naked input. This is more resilient than
-      // epithet column filtering which relies on varying source data quality.
-      const { data, error } = await supabase
+      if (!assembled && !naked) return { data: [], strategy: 'No valid tokens' };
+
+      const { data: literalHits, error: literalErr } = await supabase
           .from(DB_TABLE)
           .select('*, details:app_taxon_details(*)')
           .or(`taxon_name.ilike."${assembled}",taxon_name.ilike."${naked}"`)
           .limit(10);
       
-      if (error) return [];
-      return (data || []).map(mapFromDB);
+      if (literalErr) return { data: [], strategy: 'Literal Fallback Error', error: literalErr.message, tokens: parts };
+      return { data: (literalHits || []).map(mapFromDB), strategy: 'Literal Name Search (Standard B)', tokens: parts };
+  },
+
+  /**
+   * findAtomicMatch: Stage 3 Identity Guard.
+   * Uses the same Atomic -> Literal logic as Stage 0 but consumes structured AI parts.
+   * v2.35.5: Switch to Equality (.eq) for absolute binary precision on collated columns.
+   */
+  async findAtomicMatch(parts: Partial<Taxon>): Promise<{ taxon: Taxon | null, strategy: string, interrogated_tokens: any, error?: string }> {
+    if (getIsOffline()) return { taxon: null, strategy: 'Offline', interrogated_tokens: parts };
+    const supabase = getSupabase();
+
+    // Standard A: Atomic Token Equality
+    let query = supabase.from(DB_TABLE).select('*, details:app_taxon_details(*)');
+    if (parts.genus) query = query.eq('genus', parts.genus);
+    if (parts.species) query = query.eq('species', parts.species);
+    if (parts.infraspecies) query = query.eq('infraspecies', parts.infraspecies);
+    if (parts.infraspecific_rank) query = query.eq('infraspecific_rank', parts.infraspecific_rank);
+    if (parts.cultivar) query = query.eq('cultivar', parts.cultivar);
+    
+    // Multi-match robustness: Prefer Accepted status if multiple exist
+    query = query.order('taxon_status', { ascending: true }); // 'Accepted' sorts before 'Synonym'
+    
+    const { data: atomicData, error: atomicErr } = await query.limit(1);
+    
+    if (atomicErr) return { taxon: null, strategy: 'Atomic Token Set', interrogated_tokens: parts, error: atomicErr.message };
+
+    if (atomicData && atomicData.length > 0) {
+        let finalTaxon = mapFromDB(atomicData[0]);
+        // Follow Synonym Chain
+        if (finalTaxon.taxon_status === 'Synonym' && finalTaxon.accepted_plant_name_id) {
+            const { data: accepted } = await supabase
+                .from(DB_TABLE)
+                .select('*, details:app_taxon_details(*)')
+                .eq('wcvp_id', finalTaxon.accepted_plant_name_id)
+                .limit(1);
+            if (accepted && accepted.length > 0) finalTaxon = mapFromDB(accepted[0]);
+        }
+        return { taxon: finalTaxon, strategy: 'Atomic Token Set', interrogated_tokens: parts };
+    }
+
+    // Standard B: Literal Fallback
+    const fullName = assembleScientificName(parts);
+    const { data: literalData, error: literalErr } = await supabase
+        .from(DB_TABLE)
+        .select('*, details:app_taxon_details(*)')
+        .ilike('taxon_name', fullName)
+        .order('taxon_status', { ascending: true })
+        .limit(1);
+
+    if (literalErr) return { taxon: null, strategy: 'Literal Fallback', interrogated_tokens: parts, error: literalErr.message };
+
+    if (literalData && literalData.length > 0) {
+        let finalTaxon = mapFromDB(literalData[0]);
+        if (finalTaxon.taxon_status === 'Synonym' && finalTaxon.accepted_plant_name_id) {
+            const { data: accepted } = await supabase
+                .from(DB_TABLE)
+                .select('*, details:app_taxon_details(*)')
+                .eq('wcvp_id', finalTaxon.accepted_plant_name_id)
+                .limit(1);
+            if (accepted && accepted.length > 0) finalTaxon = mapFromDB(accepted[0]);
+        }
+        return { taxon: finalTaxon, strategy: 'Literal Fallback', interrogated_tokens: parts };
+    }
+
+    return { taxon: null, strategy: 'Zero Hits', interrogated_tokens: parts };
   },
 
   /**
    * findTaxonByName: Identity lookup with synonym redirection.
-   * v2.35.2: Detects synonyms and follows accepted_plant_name_id.
+   * v2.35.5: Switched to .limit(1) for multi-record robustness.
    */
   async findTaxonByName(name: string): Promise<Taxon | null> {
     if (getIsOffline()) return null;
@@ -273,93 +354,108 @@ export const dataService = {
         .from(DB_TABLE)
         .select('*, details:app_taxon_details(*)')
         .ilike('taxon_name', name.trim())
-        .maybeSingle();
+        .order('taxon_status', { ascending: true })
+        .limit(1);
         
-    if (error || !data) return null;
+    if (error || !data || data.length === 0) return null;
+
+    const record = data[0];
 
     // Follow Synonym Chain
-    if (data.taxon_status === 'Synonym' && data.accepted_plant_name_id) {
+    if (record.taxon_status === 'Synonym' && record.accepted_plant_name_id) {
         const { data: accepted } = await supabase
             .from(DB_TABLE)
             .select('*, details:app_taxon_details(*)')
-            .eq('wcvp_id', data.accepted_plant_name_id)
-            .maybeSingle();
-        if (accepted) return mapFromDB(accepted);
+            .eq('wcvp_id', record.accepted_plant_name_id)
+            .limit(1);
+        if (accepted && accepted.length > 0) return mapFromDB(accepted[0]);
     }
 
-    return mapFromDB(data);
+    return mapFromDB(record);
   },
 
   /**
    * findLineageAudit: Performs a background check on the parentage of a suggested name.
-   * v2.35.4 Fix: Use literal column matching for robust ancestry identification.
+   * v2.35.5: Incremental Atomic Audit with Equality (.eq) standard.
    */
-  async findLineageAudit(parts: Partial<Taxon>): Promise<LineageMapEntry[]> {
-    if (getIsOffline()) return [];
+  async findLineageAudit(parts: Partial<Taxon>): Promise<{ entries: LineageMapEntry[], interrogated_tokens: Record<string, any>[] }> {
+    if (getIsOffline()) return { entries: [], interrogated_tokens: [] };
     const entries: LineageMapEntry[] = [];
+    const auditLedger: Record<string, any>[] = [];
     const supabase = getSupabase();
     
+    const tryFind = async (rank: string, queryTokens: Record<string, any>, literalName?: string) => {
+        let strategy = 'Atomic';
+        let found = false;
+        let lastError: string | undefined;
+
+        // Try Standard A: Atomic Equality (Normalized tokens match exactly in "C" collated indices)
+        let q = supabase.from(DB_TABLE).select('id');
+        Object.entries(queryTokens).forEach(([k, v]) => { if (v) q = q.eq(k, v); });
+        q = q.eq('taxon_rank', rank);
+        
+        const { data: atomicData, error: atomicErr } = await q.limit(1);
+        if (atomicErr) lastError = atomicErr.message;
+
+        if (atomicData && atomicData.length > 0) {
+            found = true;
+        } else if (literalName) {
+            // Try Standard B: Literal Fallback
+            strategy = 'Literal Fallback';
+            const { data: literalData, error: literalErr } = await supabase
+                .from(DB_TABLE)
+                .select('id')
+                .ilike('taxon_name', literalName)
+                .eq('taxon_rank', rank)
+                .limit(1);
+            if (literalErr) lastError = literalErr.message;
+            if (literalData && literalData.length > 0) found = true;
+        }
+
+        return { found, strategy, error: lastError, tokens: { ...queryTokens, taxon_rank: rank } };
+    };
+
     // 1. Genus Audit
     if (parts.genus) {
-        const { data: genusRecord } = await supabase
-            .from(DB_TABLE)
-            .select('id')
-            .ilike('genus', parts.genus)
-            .eq('taxon_rank', 'Genus')
-            .maybeSingle();
-        
+        const { found, strategy, tokens, error } = await tryFind('Genus', { genus: parts.genus }, parts.genus);
         const displayName = parts.genus_hybrid === '×' ? `× ${parts.genus}` : parts.genus;
-        entries.push({ rank: 'Genus', name: displayName, exists: !!genusRecord });
+        entries.push({ rank: 'Genus', name: displayName!, exists: found });
+        auditLedger.push({ step: 'Genus Audit', strategy, tokens, found, error });
     }
     
     // 2. Species Audit
     if (parts.genus && parts.species) {
-        const { data: speciesRecord } = await supabase
-            .from(DB_TABLE)
-            .select('id')
-            .ilike('genus', parts.genus)
-            .ilike('species', parts.species)
-            .eq('taxon_rank', 'Species')
-            .maybeSingle();
-
+        const speciesName = `${parts.genus} ${parts.species}`;
+        const { found, strategy, tokens, error } = await tryFind('Species', { genus: parts.genus, species: parts.species }, speciesName);
         const displayName = parts.species_hybrid === '×' ? `× ${parts.species}` : parts.species;
-        entries.push({ rank: 'Species', name: displayName, exists: !!speciesRecord });
+        entries.push({ rank: 'Species', name: displayName!, exists: found });
+        auditLedger.push({ step: 'Species Audit', strategy, tokens, found, error });
     }
 
-    // 3. Infraspecies Audit (v2.35.4 Fix)
+    // 3. Infraspecies Audit
     if (parts.genus && parts.species && parts.infraspecies && parts.infraspecific_rank) {
-        const { data: infraRecord } = await supabase
-            .from(DB_TABLE)
-            .select('id')
-            .ilike('genus', parts.genus)
-            .ilike('species', parts.species)
-            .ilike('infraspecies', parts.infraspecies)
-            .eq('infraspecific_rank', parts.infraspecific_rank)
-            .maybeSingle();
-        entries.push({ rank: 'Infraspecies', name: `${parts.infraspecific_rank} ${parts.infraspecies}`, exists: !!infraRecord });
+        const infraName = `${parts.genus} ${parts.species} ${parts.infraspecific_rank} ${parts.infraspecies}`;
+        const { found, strategy, tokens, error } = await tryFind('Infraspecies', { 
+            genus: parts.genus, species: parts.species, 
+            infraspecies: parts.infraspecies, infraspecific_rank: parts.infraspecific_rank 
+        }, infraName);
+        entries.push({ rank: 'Infraspecies', name: `${parts.infraspecific_rank} ${parts.infraspecies}`, exists: found });
+        auditLedger.push({ step: 'Infraspecies Audit', strategy, tokens, found, error });
     }
 
-    // 4. Cultivar Audit (Terminal verification)
+    // 4. Cultivar Audit (Terminal)
     if (parts.cultivar && parts.genus) {
-        const query = supabase
-            .from(DB_TABLE)
-            .select('id')
-            .ilike('genus', parts.genus)
-            .ilike('cultivar', parts.cultivar)
-            .eq('taxon_rank', 'Cultivar');
-
-        if (parts.species) {
-            query.ilike('species', parts.species);
-        }
-        if (parts.infraspecies) {
-            query.ilike('infraspecies', parts.infraspecies);
-        }
-
-        const { data: cultivarRecord } = await query.maybeSingle();
-        entries.push({ rank: 'Cultivar', name: `'${parts.cultivar}'`, exists: !!cultivarRecord });
+        const fullName = assembleScientificName(parts);
+        const { found, strategy, tokens, error } = await tryFind('Cultivar', { 
+            genus: parts.genus, cultivar: parts.cultivar,
+            species: parts.species || null,
+            infraspecies: parts.infraspecies || null
+        }, fullName);
+        entries.push({ rank: 'Cultivar', name: `'${parts.cultivar}'`, exists: found });
+        auditLedger.push({ step: 'Cultivar Audit', strategy, tokens, found, error });
     }
     
-    return entries;
+    return { entries, interrogated_tokens: auditLedger };
   },
 
   /**
@@ -386,7 +482,7 @@ export const dataService = {
             genus: parts.genus,
             genus_hybrid: parts.genus_hybrid || null,
             source_id: 3,
-            verification_level: `Ingestion Engine v2.35.3`
+            verification_level: `Ingestion Engine v2.35.5`
         }).select().single();
         if (error) throw error;
         genusRecord = mapFromDB(data);
@@ -420,7 +516,7 @@ export const dataService = {
                 "order": genusRecord.order,
                 family: genusRecord.family,
                 source_id: 3,
-                verification_level: `Ingestion Engine v2.35.3`
+                verification_level: `Ingestion Engine v2.35.5`
             }).select().single();
             if (error) throw error;
             speciesRecord = mapFromDB(data);
@@ -460,7 +556,7 @@ export const dataService = {
         "order": genusRecord.order,
         family: genusRecord.family,
         source_id: 3,
-        verification_level: `Ingestion Engine v2.35.3`
+        verification_level: `Ingestion Engine v2.35.5`
     };
 
     const { data: terminalRow, error: terminalError } = await supabase.from(DB_TABLE).insert(terminalPayload).select().single();

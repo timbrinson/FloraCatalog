@@ -132,23 +132,22 @@ const AddPlantModal: React.FC<AddPlantModalProps> = ({
           activity.steps.push(step0);
           onAddActivity({ ...activity });
 
-          const lexedParts = parseBotanicalName(searchTarget);
-          const localHits = await dataService.findNakedMatch(searchTarget);
+          const localResult = await dataService.findNakedMatch(searchTarget);
           
           step0.data = { 
-              lexed_tokens: lexedParts,
-              strategy: "Atomic Token Interrogation (Database Equality)",
-              count: localHits.length, 
-              results: localHits.map(h => h.taxon_name) 
+              lexed_tokens: localResult.tokens,
+              strategy: localResult.strategy,
+              count: localResult.data.length, 
+              results: localResult.data.map(h => h.taxon_name) 
           };
           step0.status = 'completed';
           
-          if (localHits.length > 0) {
-              setLocalMatches(localHits);
+          if (localResult.data.length > 0) {
+              setLocalMatches(localResult.data);
               setShowLocalPrompt(true);
               setIsSearching(false);
               activity.status = 'needs_input';
-              activity.message = `${localHits.length} local matches found. Sovereignty prompt active.`;
+              activity.message = `${localResult.data.length} local matches found. Sovereignty prompt active.`;
               onAddActivity({ ...activity });
               return;
           }
@@ -176,12 +175,16 @@ const AddPlantModal: React.FC<AddPlantModalProps> = ({
 
       const aiCandidatesRaw = await generatePlantCandidates(searchTarget);
       step2.data = { raw_count: aiCandidatesRaw.length, ai_response: aiCandidatesRaw }; 
+      onAddActivity({ ...activity });
       
-      // Stage 3: Identity Guard, Audit & Grouping
-      const step3: ActivityStep = { label: 'Stage 3: Identity Guard & Lineage Audit', status: 'running', timestamp: Date.now() };
-      activity.steps.push(step3);
+      // Stage 3 & 4: Identity Guard & Lineage Audit
+      const step3: ActivityStep = { label: 'Stage 3: Identity Guard (Atomic)', status: 'running', timestamp: Date.now() };
+      const step4: ActivityStep = { label: 'Stage 4: Lineage Audit (Incremental)', status: 'running', timestamp: Date.now() };
+      activity.steps.push(step3, step4);
       
       const processed: SearchCandidate[] = [];
+      const step3AuditLog: any[] = [];
+      const step4AuditLog: any[] = [];
 
       for (const c of aiCandidatesRaw) {
           const parts = normalizeTaxonParts({
@@ -190,30 +193,40 @@ const AddPlantModal: React.FC<AddPlantModalProps> = ({
               species_hybrid: c.species_hybrid ? '×' : undefined
           });
           
-          const fullName = assembleScientificName(parts);
-          
-          // Identity Check: Follow Synonym Chains
-          const existingRecord = await dataService.findTaxonByName(fullName);
-          const lineageMap = await dataService.findLineageAudit(parts);
+          // Stage 3: Atomic Identity Verification
+          const identityResult = await dataService.findAtomicMatch(parts);
+          step3AuditLog.push({
+              identity: assembleScientificName(parts),
+              strategy: identityResult.strategy,
+              interrogated_tokens: identityResult.interrogated_tokens,
+              found: !!identityResult.taxon
+          });
+
+          // Stage 4: Incremental Ancestry Check
+          const lineageResult = await dataService.findLineageAudit(parts);
+          step4AuditLog.push({
+              target: assembleScientificName(parts),
+              steps: lineageResult.interrogated_tokens
+          });
 
           processed.push({
-              taxon_name: fullName,
+              taxon_name: assembleScientificName(parts),
               confidence: c.confidence,
               rationale: c.rationale,
               lineage_rationale: c.lineage_rationale,
-              source_type: existingRecord ? 'local' : 'ai',
-              match_type: existingRecord ? 'Existing Library Record' : 'AI Discovery',
+              source_type: identityResult.taxon ? 'local' : 'ai',
+              match_type: identityResult.taxon ? 'Existing Library Record' : 'AI Discovery',
               parts: {
                   ...parts,
                   trade_name: c.trade_name,
                   patent_number: c.patent_number,
                   taxon_status: c.taxon_status 
               },
-              lineage_map: lineageMap
+              lineage_map: lineageResult.entries
           });
       }
 
-      // Grouping Pass: Cluster synonymous name variations into Identities
+      // Grouping Pass
       const groups: Map<string, CandidateGroup> = new Map();
       processed.forEach(c => {
           const p = c.parts!;
@@ -238,14 +251,9 @@ const AddPlantModal: React.FC<AddPlantModalProps> = ({
       setCandidateGroups(finalGroups);
 
       step3.status = 'completed';
-      step3.data = finalGroups.map(g => ({
-          identity: g.primary.taxon_name,
-          variations: g.variations.map(v => v.taxon_name),
-          lineage: g.primary.lineage_map?.map(l => `${l.rank}:${l.name}:${l.exists ? 'FOUND' : 'MISSING'}`)
-      }));
-      onAddActivity({ ...activity });
-
-      step2.status = 'completed';
+      step3.data = step3AuditLog;
+      step4.status = 'completed';
+      step4.data = step4AuditLog;
       
       activity.status = 'completed';
       activity.message = `Analysis complete. Found ${finalGroups.length} unique identities.`;
