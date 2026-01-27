@@ -381,7 +381,7 @@ export const dataService = {
 
   /**
    * findLineageAudit: Performs a background check on the parentage of a suggested name.
-   * v2.35.8: Added status/redirection check to intermediate ranks.
+   * v2.35.9: Returns structured redirected_from objects.
    */
   async findLineageAudit(parts: Partial<Taxon>): Promise<{ 
       entries: LineageMapEntry[], 
@@ -399,7 +399,7 @@ export const dataService = {
         let found = false;
         let lastError: string | undefined;
         let status: string | undefined;
-        let redirectedFrom: string | undefined;
+        let redirectedFrom: { name: string; id: string } | undefined;
         let acceptedRecord: Taxon | undefined;
 
         // Try Standard A: Atomic Equality
@@ -424,7 +424,7 @@ export const dataService = {
                     .limit(1);
                 if (accepted && accepted.length > 0) {
                     acceptedRecord = mapFromDB(accepted[0]);
-                    redirectedFrom = record.taxon_name;
+                    redirectedFrom = { name: record.taxon_name, id: record.id };
                 }
             }
         } else if (literalName) {
@@ -450,7 +450,7 @@ export const dataService = {
                         .limit(1);
                     if (accepted && accepted.length > 0) {
                         acceptedRecord = mapFromDB(accepted[0]);
-                        redirectedFrom = record.taxon_name;
+                        redirectedFrom = { name: record.taxon_name, id: record.id };
                     }
                 }
             }

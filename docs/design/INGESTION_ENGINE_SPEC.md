@@ -1,4 +1,4 @@
-# Specification: Unified Plant Ingestion Engine (v2.35.5)
+# Specification: Unified Plant Ingestion Engine (v2.35.9)
 
 ## 1. Overview
 The Ingestion Engine is a multi-stage validation pipeline designed to reconcile human input (natural language) with botanical standards and the local database state. It prioritizes **Deterministic Sovereignty** (algorithms over AI) to ensure character-perfect nomenclature and rich metadata capture (trade names, patents).
@@ -80,8 +80,11 @@ The Ingestion Engine is a multi-stage validation pipeline designed to reconcile 
 - **Instrumentation:** The Process Ledger must explicitly list the `interrogated_tokens` used for the database call.
 
 ### Stage 4: Lineage Status Audit (Ancestry Map)
-- **Method:** Incremental Atomic Audit.
+- **Method:** Incremental Atomic Audit with **Deep Ancestry Pivot**.
 - **Goal:** For the suggested name, determine the existence of every parent level using column-level equality.
+- **The Pivot Protocol:** 
+    - If an intermediate rank (Genus, Species, or Infraspecies) in the suggested chain is identified as a `Synonym` in the local database, the engine MUST immediately pivot the entire candidate's identity to the lineage of that rank's `Accepted` equivalent.
+    - **Consequence:** This ensures Stage 4 audits the ancestry of the physical phylogenetic parent rather than an unlinked synonymous string.
 - **Interrogation Rules:** 
     - **Check Genus:** Query `genus = X AND taxon_rank = 'Genus'`.
     - **Check Species:** Query `genus = X AND species = Y AND taxon_rank = 'Species'`.

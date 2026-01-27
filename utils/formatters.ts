@@ -151,9 +151,6 @@ export const parseBotanicalName = (input: string): LexedTaxonParts => {
         const firstQuote = remaining.indexOf("'");
         const lastQuote = remaining.lastIndexOf("'");
         
-        // Everything before first quote is "Pre-cultivar Noise"
-        // remaining = remaining.slice(firstQuote); 
-        
         if (firstQuote !== lastQuote && lastQuote - firstQuote > 1) {
             parts.cultivar = toTitleCase(remaining.slice(firstQuote + 1, lastQuote));
             // Metadata is everything remaining outside the quotes
@@ -173,7 +170,7 @@ export const parseBotanicalName = (input: string): LexedTaxonParts => {
 
 /**
  * normalizeTaxonParts: Applies Stage 3 logic to raw AI tokens.
- * v2.35.7: Enhanced rank-prefix stripping to ensure infraspecies literals are clean.
+ * v2.35.9: Centralized all casing and rank-stripping logic.
  */
 export const normalizeTaxonParts = (p: Partial<Taxon>): Partial<Taxon> => {
     const normalized = { ...p };
@@ -205,7 +202,7 @@ export const normalizeTaxonParts = (p: Partial<Taxon>): Partial<Taxon> => {
             cleanInfra = cleanInfra.replace(hybridRegex, '');
         }
         
-        // v2.35.7: Algorithmic strip of rank prefixes (e.g. "subsp. hookeri" -> "hookeri")
+        // Algorithmic strip of rank prefixes (e.g. "subsp. hookeri" -> "hookeri")
         const rankPrefixes = Object.keys(RANK_ALIAS_MAP).sort((a, b) => b.length - a.length);
         for (const pref of rankPrefixes) {
             const regex = new RegExp(`^${pref.replace('.', '\\.')}\\s*`, 'i');

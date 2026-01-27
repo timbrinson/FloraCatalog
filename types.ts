@@ -155,7 +155,7 @@ export interface LineageMapEntry {
     rank: string;
     name: string;
     exists: boolean;
-    redirected_from?: string; // v2.35.8: Intermediate pivot tracking
+    redirected_from?: { name: string; id: string }; // v2.35.9: Structured pivot tracking
 }
 
 export interface SearchCandidate {
