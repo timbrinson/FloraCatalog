@@ -1,4 +1,5 @@
 
+
 export interface PalletLevel {
   base_color: string;
   cell_bg_weight: number;
@@ -154,6 +155,7 @@ export interface LineageMapEntry {
     rank: string;
     name: string;
     exists: boolean;
+    redirected_from?: string; // v2.35.8: Intermediate pivot tracking
 }
 
 export interface SearchCandidate {
@@ -169,6 +171,8 @@ export interface SearchCandidate {
   // Fix: Extended Partial<Taxon> to include ingestion metadata (trade_name and patent_number)
   parts?: Partial<Taxon> & { trade_name?: string; patent_number?: string }; 
   lineage_map?: LineageMapEntry[]; // v2.35.1: Path visibility
+  redirected_from?: string; // v2.35.7: Identity pivot tracking
+  taxon_status?: string; // v2.35.8: Display local status for AI variations
 }
 
 export type ActivityStatus = 'running' | 'completed' | 'error' | 'needs_input';

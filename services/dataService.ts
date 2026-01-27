@@ -1,6 +1,6 @@
 import { getSupabase, getIsOffline } from './supabaseClient';
 import { Taxon, Synonym, Link, DataSource, BuildDashboardData, SearchCandidate, LineageMapEntry } from '../types';
-import { getNakedName, parseBotanicalName, assembleScientificName } from '../utils/formatters';
+import { getNakedName, parseBotanicalName, assembleScientificName, normalizeTaxonParts } from '../utils/formatters';
 
 /**
  * Service to handle interaction with the Supabase PostgreSQL Database.
@@ -233,7 +233,7 @@ export const dataService = {
 
   /**
    * findNakedMatch: Stage 0 Botanical Discovery (Deterministic).
-   * v2.35.5: Switch to Equality (.eq) for Atomic standard to leverage "C" collated indices.
+   * v2.35.5: Added rank filtering to prioritize expected records (e.g., GenusOxalis vs Oxalis species).
    */
   async findNakedMatch(query: string): Promise<{ data: Taxon[], strategy: string, tokens?: any, error?: string }> {
       if (getIsOffline()) return { data: [], strategy: 'Offline' };
@@ -242,7 +242,6 @@ export const dataService = {
       const supabase = getSupabase();
 
       // Standard A: Atomic Token Query
-      // v2.35.5: Corrected query chaining to ensure filters are applied.
       let atomicQuery = supabase.from(DB_TABLE).select('*, details:app_taxon_details(*)');
       let hasAtomicTokens = false;
 
@@ -252,7 +251,13 @@ export const dataService = {
       if (parts.infraspecific_rank) { atomicQuery = atomicQuery.eq('infraspecific_rank', parts.infraspecific_rank); hasAtomicTokens = true; }
       if (parts.cultivar) { atomicQuery = atomicQuery.eq('cultivar', parts.cultivar); hasAtomicTokens = true; }
 
+      // Rank Specificity Filter (Prioritize the most specific rank identified by the lexer)
       if (hasAtomicTokens) {
+          if (parts.cultivar) atomicQuery = atomicQuery.eq('taxon_rank', 'Cultivar');
+          else if (parts.infraspecies) atomicQuery = atomicQuery.eq('taxon_rank', 'Infraspecies');
+          else if (parts.species) atomicQuery = atomicQuery.eq('taxon_rank', 'Species');
+          else if (parts.genus) atomicQuery = atomicQuery.eq('taxon_rank', 'Genus');
+
           const { data: atomicHits, error: atomicErr } = await atomicQuery.limit(10);
           if (atomicErr) return { data: [], strategy: 'Atomic Error', error: atomicErr.message, tokens: parts };
           if (atomicHits && atomicHits.length > 0) {
@@ -376,86 +381,145 @@ export const dataService = {
 
   /**
    * findLineageAudit: Performs a background check on the parentage of a suggested name.
-   * v2.35.5: Incremental Atomic Audit with Equality (.eq) standard.
+   * v2.35.8: Added status/redirection check to intermediate ranks.
    */
-  async findLineageAudit(parts: Partial<Taxon>): Promise<{ entries: LineageMapEntry[], interrogated_tokens: Record<string, any>[] }> {
+  async findLineageAudit(parts: Partial<Taxon>): Promise<{ 
+      entries: LineageMapEntry[], 
+      interrogated_tokens: Record<string, any>[],
+      pivoted_parts?: Partial<Taxon> 
+  }> {
     if (getIsOffline()) return { entries: [], interrogated_tokens: [] };
     const entries: LineageMapEntry[] = [];
     const auditLedger: Record<string, any>[] = [];
     const supabase = getSupabase();
+    let pivotedParts: Partial<Taxon> | undefined = undefined;
     
     const tryFind = async (rank: string, queryTokens: Record<string, any>, literalName?: string) => {
         let strategy = 'Atomic';
         let found = false;
         let lastError: string | undefined;
+        let status: string | undefined;
+        let redirectedFrom: string | undefined;
+        let acceptedRecord: Taxon | undefined;
 
-        // Try Standard A: Atomic Equality (Normalized tokens match exactly in "C" collated indices)
-        let q = supabase.from(DB_TABLE).select('id');
+        // Try Standard A: Atomic Equality
+        let q = supabase.from(DB_TABLE).select('*, details:app_taxon_details(*)');
         Object.entries(queryTokens).forEach(([k, v]) => { if (v) q = q.eq(k, v); });
-        q = q.eq('taxon_rank', rank);
+        q = q.eq('taxon_rank', rank).order('taxon_status', { ascending: true });
         
         const { data: atomicData, error: atomicErr } = await q.limit(1);
         if (atomicErr) lastError = atomicErr.message;
 
         if (atomicData && atomicData.length > 0) {
             found = true;
+            const record = mapFromDB(atomicData[0]);
+            status = record.taxon_status;
+            
+            // Redirection logic for intermediate synonyms
+            if (status === 'Synonym' && record.accepted_plant_name_id) {
+                const { data: accepted } = await supabase
+                    .from(DB_TABLE)
+                    .select('*, details:app_taxon_details(*)')
+                    .eq('wcvp_id', record.accepted_plant_name_id)
+                    .limit(1);
+                if (accepted && accepted.length > 0) {
+                    acceptedRecord = mapFromDB(accepted[0]);
+                    redirectedFrom = record.taxon_name;
+                }
+            }
         } else if (literalName) {
             // Try Standard B: Literal Fallback
             strategy = 'Literal Fallback';
             const { data: literalData, error: literalErr } = await supabase
                 .from(DB_TABLE)
-                .select('id')
+                .select('*, details:app_taxon_details(*)')
                 .ilike('taxon_name', literalName)
                 .eq('taxon_rank', rank)
+                .order('taxon_status', { ascending: true })
                 .limit(1);
             if (literalErr) lastError = literalErr.message;
-            if (literalData && literalData.length > 0) found = true;
+            if (literalData && literalData.length > 0) {
+                found = true;
+                const record = mapFromDB(literalData[0]);
+                status = record.taxon_status;
+                if (status === 'Synonym' && record.accepted_plant_name_id) {
+                    const { data: accepted } = await supabase
+                        .from(DB_TABLE)
+                        .select('*, details:app_taxon_details(*)')
+                        .eq('wcvp_id', record.accepted_plant_name_id)
+                        .limit(1);
+                    if (accepted && accepted.length > 0) {
+                        acceptedRecord = mapFromDB(accepted[0]);
+                        redirectedFrom = record.taxon_name;
+                    }
+                }
+            }
         }
 
-        return { found, strategy, error: lastError, tokens: { ...queryTokens, taxon_rank: rank } };
+        return { found, strategy, error: lastError, tokens: { ...queryTokens, taxon_rank: rank }, status, redirectedFrom, acceptedRecord };
     };
 
+    let currentParts = { ...parts };
+
     // 1. Genus Audit
-    if (parts.genus) {
-        const { found, strategy, tokens, error } = await tryFind('Genus', { genus: parts.genus }, parts.genus);
-        const displayName = parts.genus_hybrid === '×' ? `× ${parts.genus}` : parts.genus;
-        entries.push({ rank: 'Genus', name: displayName!, exists: found });
-        auditLedger.push({ step: 'Genus Audit', strategy, tokens, found, error });
+    if (currentParts.genus) {
+        const { found, strategy, tokens, error, redirectedFrom, acceptedRecord } = await tryFind('Genus', { genus: currentParts.genus }, currentParts.genus);
+        const displayName = currentParts.genus_hybrid === '×' ? `× ${currentParts.genus}` : currentParts.genus;
+        
+        if (redirectedFrom && acceptedRecord) {
+            pivotedParts = { ...pivotedParts, ...normalizeTaxonParts(acceptedRecord) };
+            currentParts = { ...currentParts, ...normalizeTaxonParts(acceptedRecord) };
+        }
+
+        entries.push({ rank: 'Genus', name: displayName!, exists: found, redirected_from: redirectedFrom });
+        auditLedger.push({ step: 'Genus Audit', strategy, tokens, found, error, redirected_from: redirectedFrom });
     }
     
     // 2. Species Audit
-    if (parts.genus && parts.species) {
-        const speciesName = `${parts.genus} ${parts.species}`;
-        const { found, strategy, tokens, error } = await tryFind('Species', { genus: parts.genus, species: parts.species }, speciesName);
-        const displayName = parts.species_hybrid === '×' ? `× ${parts.species}` : parts.species;
-        entries.push({ rank: 'Species', name: displayName!, exists: found });
-        auditLedger.push({ step: 'Species Audit', strategy, tokens, found, error });
+    if (currentParts.genus && currentParts.species) {
+        const speciesName = `${currentParts.genus} ${currentParts.species}`;
+        const { found, strategy, tokens, error, redirectedFrom, acceptedRecord } = await tryFind('Species', { genus: currentParts.genus, species: currentParts.species }, speciesName);
+        const displayName = currentParts.species_hybrid === '×' ? `× ${currentParts.species}` : currentParts.species;
+        
+        if (redirectedFrom && acceptedRecord) {
+            pivotedParts = { ...pivotedParts, ...normalizeTaxonParts(acceptedRecord) };
+            currentParts = { ...currentParts, ...normalizeTaxonParts(acceptedRecord) };
+        }
+
+        entries.push({ rank: 'Species', name: displayName!, exists: found, redirected_from: redirectedFrom });
+        auditLedger.push({ step: 'Species Audit', strategy, tokens, found, error, redirected_from: redirectedFrom });
     }
 
     // 3. Infraspecies Audit
-    if (parts.genus && parts.species && parts.infraspecies && parts.infraspecific_rank) {
-        const infraName = `${parts.genus} ${parts.species} ${parts.infraspecific_rank} ${parts.infraspecies}`;
-        const { found, strategy, tokens, error } = await tryFind('Infraspecies', { 
-            genus: parts.genus, species: parts.species, 
-            infraspecies: parts.infraspecies, infraspecific_rank: parts.infraspecific_rank 
+    if (currentParts.genus && currentParts.species && currentParts.infraspecies && currentParts.infraspecific_rank) {
+        const infraName = `${currentParts.genus} ${currentParts.species} ${currentParts.infraspecific_rank} ${currentParts.infraspecies}`;
+        const { found, strategy, tokens, error, redirectedFrom, acceptedRecord } = await tryFind('Infraspecies', { 
+            genus: currentParts.genus, species: currentParts.species, 
+            infraspecies: currentParts.infraspecies, infraspecific_rank: currentParts.infraspecific_rank 
         }, infraName);
-        entries.push({ rank: 'Infraspecies', name: `${parts.infraspecific_rank} ${parts.infraspecies}`, exists: found });
-        auditLedger.push({ step: 'Infraspecies Audit', strategy, tokens, found, error });
+
+        if (redirectedFrom && acceptedRecord) {
+            pivotedParts = { ...pivotedParts, ...normalizeTaxonParts(acceptedRecord) };
+            currentParts = { ...currentParts, ...normalizeTaxonParts(acceptedRecord) };
+        }
+
+        entries.push({ rank: 'Infraspecies', name: `${currentParts.infraspecific_rank} ${currentParts.infraspecies}`, exists: found, redirected_from: redirectedFrom });
+        auditLedger.push({ step: 'Infraspecies Audit', strategy, tokens, found, error, redirected_from: redirectedFrom });
     }
 
     // 4. Cultivar Audit (Terminal)
-    if (parts.cultivar && parts.genus) {
-        const fullName = assembleScientificName(parts);
+    if (currentParts.cultivar && currentParts.genus) {
+        const fullName = assembleScientificName(currentParts);
         const { found, strategy, tokens, error } = await tryFind('Cultivar', { 
-            genus: parts.genus, cultivar: parts.cultivar,
-            species: parts.species || null,
-            infraspecies: parts.infraspecies || null
+            genus: currentParts.genus, cultivar: currentParts.cultivar,
+            species: currentParts.species || null,
+            infraspecies: currentParts.infraspecies || null
         }, fullName);
-        entries.push({ rank: 'Cultivar', name: `'${parts.cultivar}'`, exists: found });
+        entries.push({ rank: 'Cultivar', name: `'${currentParts.cultivar}'`, exists: found });
         auditLedger.push({ step: 'Cultivar Audit', strategy, tokens, found, error });
     }
     
-    return { entries, interrogated_tokens: auditLedger };
+    return { entries, interrogated_tokens: auditLedger, pivoted_parts: pivotedParts };
   },
 
   /**

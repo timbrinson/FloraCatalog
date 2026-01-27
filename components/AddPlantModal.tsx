@@ -4,14 +4,14 @@ import {
     X, Sprout, Loader2, Sparkles, Database, PlusCircle, CheckCircle2, 
     AlertTriangle, ArrowRight, CornerDownRight, GripHorizontal, 
     Search, Library, Info, ChevronRight, Globe, Cpu, Check, Boxes,
-    Eye, SearchCode, Tags, Award, ChevronDown, Layers
+    Eye, SearchCode, Tags, Award, ChevronDown, Layers, RotateCcw
 } from 'lucide-react';
 import { validatePlantIntent, generatePlantCandidates } from '../services/geminiService';
 import { dataService } from '../services/dataService';
 import { Taxon, ActivityItem, ActivityStatus, ActivityStep, SearchCandidate, Synonym } from '../types';
 import { assembleScientificName, normalizeTaxonParts, getNakedName, parseBotanicalName } from '../utils/formatters';
 
-const APP_VERSION = 'v2.35.5';
+const APP_VERSION = 'v2.35.8';
 
 interface CandidateGroup {
     primary: SearchCandidate;
@@ -22,7 +22,7 @@ interface AddPlantModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess: () => void;
-  onAddActivity: (activity: ActivityItem) => void;
+  onAddActivity: (activity: Partial<ActivityItem>) => void;
   initialQuery?: string;
 }
 
@@ -37,6 +37,9 @@ const AddPlantModal: React.FC<AddPlantModalProps> = ({
   const [isCommiting, setIsCommiting] = useState(false);
   const [showLocalPrompt, setShowLocalPrompt] = useState(false);
   const [expandedGroups, setExpandedGroups] = useState<Set<number>>(new Set());
+  
+  // v2.35.5: Track the activity ID to allow status updates after interaction
+  const [activeActivityId, setActiveActivityId] = useState<string | null>(null);
 
   // Refs
   const inputRef = useRef<HTMLInputElement>(null);
@@ -76,6 +79,7 @@ const AddPlantModal: React.FC<AddPlantModalProps> = ({
             setLocalMatches([]);
             setShowLocalPrompt(false);
             setError(null);
+            setActiveActivityId(null);
         }
         
         // Focus the input
@@ -103,6 +107,23 @@ const AddPlantModal: React.FC<AddPlantModalProps> = ({
       setExpandedGroups(next);
   };
 
+  /**
+   * handleInternalClose: Enhanced dismissal logic to ensure 'Interaction Required' section is cleared.
+   * v2.35.6: Now includes a timestamp for consistent ledger sorting.
+   */
+  const handleInternalClose = (reason: string = 'Discovery Session Dismissed.') => {
+      if (activeActivityId) {
+          onAddActivity({ 
+              id: activeActivityId, 
+              status: 'completed', 
+              message: 'Session closed.', 
+              outcome: reason,
+              timestamp: Date.now()
+          });
+      }
+      onClose();
+  };
+
   const handleDiscovery = async (forceGlobal: boolean = false, overrideQuery?: string) => {
     const searchTarget = overrideQuery || query;
     if (!searchTarget.trim()) return;
@@ -112,7 +133,20 @@ const AddPlantModal: React.FC<AddPlantModalProps> = ({
     setCandidateGroups([]);
     setLocalMatches([]);
 
+    // v2.35.5: If forceGlobal is true and we have an active activity, mark it complete before starting a new one
+    if (forceGlobal && activeActivityId) {
+        onAddActivity({
+            id: activeActivityId,
+            status: 'completed',
+            message: 'Bypassing local matches for global synthesis.',
+            outcome: 'User resolved local sovereignty prompt by choosing Global Search.',
+            timestamp: Date.now()
+        });
+    }
+
     const activityId = crypto.randomUUID();
+    setActiveActivityId(activityId);
+
     const activity: ActivityItem = {
         id: activityId,
         name: `Discovery: ${searchTarget}`,
@@ -187,7 +221,7 @@ const AddPlantModal: React.FC<AddPlantModalProps> = ({
       const step4AuditLog: any[] = [];
 
       for (const c of aiCandidatesRaw) {
-          const parts = normalizeTaxonParts({
+          let parts = normalizeTaxonParts({
               ...c,
               genus_hybrid: c.genus_hybrid ? '×' : undefined,
               species_hybrid: c.species_hybrid ? '×' : undefined
@@ -195,15 +229,43 @@ const AddPlantModal: React.FC<AddPlantModalProps> = ({
           
           // Stage 3: Atomic Identity Verification
           const identityResult = await dataService.findAtomicMatch(parts);
+          
+          // v2.35.7: Identity Pivot logic. 
+          // If found identity name differs from search name, it's a redirect (Synonym -> Accepted).
+          let redirectedFrom: string | undefined = undefined;
+          const originalSearchName = assembleScientificName(parts);
+          let localStatus: string | undefined = undefined;
+
+          if (identityResult.taxon) {
+              const matchedTaxon = identityResult.taxon;
+              localStatus = matchedTaxon.taxon_status;
+              if (matchedTaxon.taxon_name.toLowerCase() !== originalSearchName.toLowerCase()) {
+                  redirectedFrom = originalSearchName;
+                  // Pivot: Update parts to the Accepted Identity found in DB.
+                  // This ensures Stage 4 audits the correct hierarchical lineage.
+                  parts = {
+                      ...normalizeTaxonParts(matchedTaxon),
+                      taxon_status: matchedTaxon.taxon_status
+                  };
+              }
+          }
+
           step3AuditLog.push({
               identity: assembleScientificName(parts),
               strategy: identityResult.strategy,
               interrogated_tokens: identityResult.interrogated_tokens,
-              found: !!identityResult.taxon
+              found: !!identityResult.taxon,
+              redirected_from: redirectedFrom
           });
 
-          // Stage 4: Incremental Ancestry Check
+          // Stage 4: Incremental Ancestry Check (Uses the potentially PIVOTED parts)
+          // v2.35.8: findLineageAudit now detects and reports intermediate redirections.
           const lineageResult = await dataService.findLineageAudit(parts);
+          
+          if (lineageResult.pivoted_parts) {
+              parts = { ...parts, ...lineageResult.pivoted_parts };
+          }
+
           step4AuditLog.push({
               target: assembleScientificName(parts),
               steps: lineageResult.interrogated_tokens
@@ -216,6 +278,8 @@ const AddPlantModal: React.FC<AddPlantModalProps> = ({
               lineage_rationale: c.lineage_rationale,
               source_type: identityResult.taxon ? 'local' : 'ai',
               match_type: identityResult.taxon ? 'Existing Library Record' : 'AI Discovery',
+              redirected_from: redirectedFrom, // Capture for UI
+              taxon_status: localStatus, // v2.35.8: Capture for alternate view
               parts: {
                   ...parts,
                   trade_name: c.trade_name,
@@ -273,7 +337,7 @@ const AddPlantModal: React.FC<AddPlantModalProps> = ({
   const handleCommit = async (group: CandidateGroup, selectionOverride?: SearchCandidate) => {
     const candidate = selectionOverride || group.primary;
     if (candidate.source_type === 'local') {
-        onClose(); 
+        handleInternalClose(`Selected existing library identity: ${candidate.taxon_name}`); 
         return;
     }
 
@@ -355,7 +419,7 @@ const AddPlantModal: React.FC<AddPlantModalProps> = ({
                     <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">{APP_VERSION} Identity Guard</p>
                 </div>
             </div>
-            <button onClick={onClose} className="p-1.5 text-slate-400 hover:text-red-500 rounded-md transition-all"><X size={20} /></button>
+            <button onClick={() => handleInternalClose()} className="p-1.5 text-slate-400 hover:text-red-500 rounded-md transition-all"><X size={20} /></button>
         </div>
 
         <div className="p-6 space-y-6 flex-1 overflow-hidden flex flex-col">
@@ -397,19 +461,26 @@ const AddPlantModal: React.FC<AddPlantModalProps> = ({
                                 </p>
                                 <div className="flex gap-2">
                                     <button onClick={() => handleDiscovery(true)} className="px-4 py-2 bg-white border border-amber-300 text-amber-800 rounded-lg text-xs font-bold hover:bg-amber-100 shadow-sm transition-all flex items-center gap-2"><Globe size={14}/> Search Globally</button>
-                                    <button onClick={onClose} className="px-4 py-2 text-amber-600 text-xs font-bold hover:underline">Dismiss Discovery</button>
+                                    <button onClick={() => handleInternalClose('User declined to proceed after local match discovery.')} className="px-4 py-2 text-amber-600 text-xs font-bold hover:underline">Dismiss Discovery</button>
                                 </div>
                             </div>
                         </div>
                         <div className="grid grid-cols-1 gap-3">
                             {localMatches.map((m, i) => (
                                 <div key={i} className="bg-white border border-slate-200 rounded-xl p-4 flex justify-between items-center group hover:border-leaf-300 transition-all">
-                                    <div>
-                                        <span className="text-[10px] font-black uppercase text-slate-400 block mb-1">Local Identity</span>
-                                        <h4 className="text-lg font-serif italic text-slate-800">{m.taxon_name}</h4>
-                                        <p className="text-xs text-slate-500">{m.family} &bull; {m.taxon_rank}</p>
+                                    <div className="flex-1 overflow-hidden pr-4">
+                                        <div className="flex items-center gap-2 mb-1.5">
+                                            <span className="text-[10px] font-black uppercase text-slate-400 block">Local Identity</span>
+                                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${m.taxon_status === 'Accepted' ? 'bg-green-50 text-green-700 border-green-200' : 'bg-amber-50 text-amber-700 border-amber-200'}`}>
+                                                {m.taxon_status}
+                                            </span>
+                                        </div>
+                                        <h4 className="text-lg font-serif italic text-slate-800 truncate">{m.taxon_name}</h4>
+                                        <p className="text-xs text-slate-500">
+                                          {m.family} &bull; {m.taxon_rank}
+                                        </p>
                                     </div>
-                                    <button onClick={onClose} className="p-2 text-slate-400 hover:text-leaf-600 hover:bg-leaf-50 rounded-lg transition-all"><Eye size={20}/></button>
+                                    <button onClick={() => handleInternalClose(`User opted to use existing library record: ${m.taxon_name}`)} className="p-2 text-slate-400 hover:text-leaf-600 hover:bg-leaf-50 rounded-lg transition-all"><Eye size={20}/></button>
                                 </div>
                             ))}
                         </div>
@@ -429,6 +500,11 @@ const AddPlantModal: React.FC<AddPlantModalProps> = ({
                                                 <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded border ${c.source_type === 'local' ? 'bg-green-50 text-green-700 border-green-200' : 'bg-blue-50 text-blue-700 border-blue-200'}`}>
                                                     {c.source_type === 'local' ? 'In Library' : 'Global Suggestion'}
                                                 </span>
+                                                {c.redirected_from && (
+                                                    <span className="text-[10px] font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded border border-amber-200 flex items-center gap-1">
+                                                        <RotateCcw size={10} /> Redirected from {c.redirected_from}
+                                                    </span>
+                                                )}
                                                 {c.confidence > 0 && (
                                                     <span className="text-[10px] font-bold text-slate-400 bg-slate-50 px-2 py-0.5 rounded">{Math.round(c.confidence * 100)}% Certainty</span>
                                                 )}
@@ -443,11 +519,18 @@ const AddPlantModal: React.FC<AddPlantModalProps> = ({
                                                 <span className="text-[9px] font-black uppercase text-slate-400 tracking-widest mr-1">Lineage Audit:</span>
                                                 {c.lineage_map?.map((segment, sIdx) => (
                                                     <React.Fragment key={sIdx}>
-                                                        <div className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold ${segment.exists ? 'bg-green-50 text-green-600 border border-green-100' : 'bg-amber-50 text-amber-600 border border-amber-100 italic'}`}>
-                                                            {segment.exists && <Check size={10} />}
-                                                            {segment.name}
+                                                        <div className={`flex flex-col gap-0.5`}>
+                                                            <div className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold ${segment.exists ? 'bg-green-50 text-green-600 border border-green-100' : 'bg-amber-50 text-amber-600 border border-amber-100 italic'}`}>
+                                                                {segment.exists && <Check size={10} />}
+                                                                {segment.name}
+                                                            </div>
+                                                            {segment.redirected_from && (
+                                                                <span className="text-[8px] font-bold text-amber-500 uppercase tracking-tighter pl-1">
+                                                                    Redir: {segment.redirected_from}
+                                                                </span>
+                                                            )}
                                                         </div>
-                                                        {sIdx < c.lineage_map!.length - 1 && <ChevronRight size={10} className="text-slate-300" />}
+                                                        {sIdx < c.lineage_map!.length - 1 && <ChevronRight size={10} className="text-slate-300 mt-1" />}
                                                     </React.Fragment>
                                                 ))}
                                             </div>
@@ -515,6 +598,9 @@ const AddPlantModal: React.FC<AddPlantModalProps> = ({
                                                         <div className="flex items-center gap-2 mb-0.5">
                                                             <span className="text-[9px] font-bold text-slate-400 bg-slate-50 px-1.5 py-0.5 rounded border border-slate-100">{v.parts?.taxon_rank}</span>
                                                             <span className="text-[9px] font-bold text-blue-600">AI Variation</span>
+                                                            {v.taxon_status === 'Synonym' && (
+                                                                <span className="text-[9px] font-black text-amber-600 uppercase bg-amber-50 px-1 rounded border border-amber-100">Synonym (Local)</span>
+                                                            )}
                                                             {v.parts?.taxon_status?.toLowerCase() === 'misapplied' && (
                                                                 <span className="text-[9px] font-black text-red-600 uppercase">Misapplied</span>
                                                             )}
@@ -560,7 +646,7 @@ const AddPlantModal: React.FC<AddPlantModalProps> = ({
                 <CheckCircle2 size={12} />
                 Identity Guard Active &bull; Phylogenetic Bridge Ready
             </div>
-            <button onClick={onClose} className="px-4 py-2 text-xs font-bold text-slate-500 hover:text-slate-800">Dismiss</button>
+            <button onClick={() => handleInternalClose()} className="px-4 py-2 text-xs font-bold text-slate-500 hover:text-slate-800">Dismiss</button>
         </div>
       </div>
     </div>

@@ -12,6 +12,7 @@ We implement **Atomic Token Sovereignty** as the primary standard for all databa
 ### The Hierarchy of Identity:
 1.  **Standard A (Atomic Token Query):** The engine first attempts to find a record using strict **Equality** column matching (e.g., `WHERE genus = 'Abies' AND species = 'spectabilis'`). 
     - **Rationale:** Strict equality utilizes standard B-Tree indices on "C" collated columns. Since the engine normalizes tokens to specific casing (Title Case for Genus, lowercase for Species), `eq()` provides character-perfect binary verification.
+    - **Rank Specificity:** STANDARD A must include a filter for `taxon_rank` matching the most specific token provided (e.g., searching for "Oxalis" prioritizes `taxon_rank = 'Genus'`). This prevents higher-level searches from being diluted by thousands of descendant records.
 2.  **Standard B (Literal Fallback):** If Standard A returns zero hits, the engine performs a search using the `taxon_name` column against the original search string or synthesized name via `ilike`. This serves as the "Safety Net" for records with incomplete column data or messy user input.
 
 ### Implementation Rules:

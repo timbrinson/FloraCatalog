@@ -64,9 +64,15 @@ const ActivityPanel: React.FC<ActivityPanelProps> = ({
       dragStartRef.current = { x: e.clientX, y: e.clientY, startX: pos.x, startY: pos.y };
   };
 
+  // v2.35.5: Unified logic to prevent duplication and ensure status-based flow.
   const needsInput = useMemo(() => activities.filter(a => a.status === 'needs_input'), [activities]);
-  const running = useMemo(() => activities.filter(a => a.status === 'running'), [activities]);
-  const history = useMemo(() => activities.filter(a => a.status === 'completed' || a.status === 'error').sort((a,b) => b.timestamp - a.timestamp), [activities]);
+  
+  const activeAndRecent = useMemo(() => 
+      activities
+          .filter(a => a.status !== 'needs_input')
+          .sort((a,b) => (b.timestamp || 0) - (a.timestamp || 0)), 
+      [activities]
+  );
 
   const toggleExpand = (id: string) => {
       const next = new Set(expandedItems);
@@ -74,11 +80,25 @@ const ActivityPanel: React.FC<ActivityPanelProps> = ({
       setExpandedItems(next);
   };
 
+  /**
+   * formatTime: Safety-first time formatter.
+   * v2.35.6: Enhanced validation to prevent --:-- placeholders.
+   */
+  const formatTime = (ts: number | undefined) => {
+      if (!ts) return '--:--';
+      const d = new Date(ts);
+      if (isNaN(d.getTime())) return '--:--';
+      return d.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+  };
+
   const renderStep = (step: ActivityStep, idx: number) => {
       let stepIcon = <Clock size={12} className="text-slate-300" />;
       if (step.status === 'running') stepIcon = <Loader2 size={12} className="animate-spin text-leaf-500" />;
       if (step.status === 'completed') stepIcon = <CheckCircle2 size={12} className="text-green-500" />;
       if (step.status === 'error') stepIcon = <XCircle size={12} className="text-red-500" />;
+
+      const stepTime = step.timestamp ? new Date(step.timestamp) : null;
+      const isValidTime = stepTime && !isNaN(stepTime.getTime());
 
       return (
           <div key={idx} className="flex items-start gap-3 py-2 border-l-2 border-slate-100 ml-2 pl-4 relative group/step">
@@ -88,7 +108,9 @@ const ActivityPanel: React.FC<ActivityPanelProps> = ({
               <div className="flex-1 overflow-hidden">
                   <div className="flex justify-between items-center">
                       <span className={`text-[11px] font-bold ${step.status === 'running' ? 'text-leaf-700' : 'text-slate-600'}`}>{step.label}</span>
-                      <span className="text-[9px] text-slate-400 font-mono">{new Date(step.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', second: '2-digit'})}</span>
+                      <span className="text-[9px] text-slate-400 font-mono">
+                        {isValidTime ? stepTime.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', second: '2-digit'}) : ''}
+                      </span>
                   </div>
                   {step.data && (
                       <div className="mt-1 bg-slate-50 border border-slate-100 rounded text-[10px] font-mono text-slate-500 overflow-hidden">
@@ -189,7 +211,7 @@ const ActivityPanel: React.FC<ActivityPanelProps> = ({
                       </div>
                   </div>
                   <div className="flex items-center gap-2">
-                      <span className="text-[10px] text-slate-400 font-mono">{new Date(item.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
+                      <span className="text-[10px] text-slate-400 font-mono">{formatTime(item.timestamp)}</span>
                       <button onClick={() => toggleExpand(item.id)} className="p-1 text-slate-300 hover:text-slate-600 transition-colors">
                           {isExpanded ? <ChevronDown size={16}/> : <ChevronRight size={16}/>}
                       </button>
@@ -223,7 +245,7 @@ const ActivityPanel: React.FC<ActivityPanelProps> = ({
                         <div className="p-3 bg-indigo-50/30 rounded-lg border border-indigo-100/50">
                             <span className="text-[9px] font-black text-indigo-400 uppercase tracking-widest block mb-2 flex items-center gap-1.5"><Database size={10}/> Metadata Out</span>
                             <div className="text-[10px] font-mono text-indigo-700 overflow-x-auto">
-                                <pre className="p-2 whitespace-pre resize-y min-h-[100px] max-h-[400px] overflow-auto custom-scrollbar">
+                                <pre className="p-2 whitespace-pre resize-y min-h[100px] max-h-[400px] overflow-auto custom-scrollbar">
                                     {JSON.stringify(item.details, null, 2)}
                                 </pre>
                             </div>
@@ -281,7 +303,7 @@ const ActivityPanel: React.FC<ActivityPanelProps> = ({
                 <div className="p-2 bg-leaf-600 text-white rounded-lg"><LayoutDashboard size={18}/></div>
                 <div>
                     <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wide">Operations Hub</h3>
-                    <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">v2.34.3 Process Ledger</p>
+                    <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">v2.35.5 Process Ledger</p>
                 </div>
             </div>
             
@@ -309,7 +331,7 @@ const ActivityPanel: React.FC<ActivityPanelProps> = ({
                         <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2"><Clock size={12}/> Active & Recent</span>
                         <button onClick={onClearAll} className="text-[10px] font-bold text-red-500 uppercase flex items-center gap-1 hover:underline"><Trash2 size={10}/> Wipe History</button>
                     </div>
-                    {activities.length === 0 ? (
+                    {activeAndRecent.length === 0 ? (
                         <div className="flex flex-col items-center justify-center py-20 text-slate-300 opacity-50">
                             <Activity size={48} className="mb-4" />
                             <p className="text-sm font-bold uppercase tracking-widest">No processes tracked</p>
@@ -317,7 +339,7 @@ const ActivityPanel: React.FC<ActivityPanelProps> = ({
                         </div>
                     ) : (
                         <div className="space-y-4">
-                            {activities.map(renderItem)}
+                            {activeAndRecent.map(renderItem)}
                         </div>
                     )}
                 </div>

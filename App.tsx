@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Loader2, Leaf, Activity, Settings, Plus, Search } from 'lucide-react';
-import { Taxon, LoadingState, UserPreferences, ActivityItem, ActivityStatus, RankPallet } from './types';
+import { Taxon, LoadingState, UserPreferences, ActivityItem, ActivityStatus, RankPallet, SearchCandidate } from './types';
 import { dataService } from './services/dataService';
 import { getIsOffline, reloadClient } from './services/supabaseClient';
 import { enrichTaxon, findAdditionalLinks } from './services/geminiService';
@@ -359,13 +359,57 @@ export default function App() {
   };
 
   /**
+   * handleAddActivity: Property-safe high-fidelity merge logic.
+   * v2.35.7: Ensures concluding updates (Dismiss/Commit) do not overwrite 
+   * high-fidelity technical data (steps, inputs) with undefined values.
+   */
+  const handleAddActivity = (activityUpdate: Partial<ActivityItem>) => {
+      setActivities(prev => {
+          const index = prev.findIndex(a => a.id === activityUpdate.id);
+          if (index !== -1) {
+              const updated = [...prev];
+              const existing = updated[index];
+              
+              // Safe Merge: Only overwrite properties provided in activityUpdate
+              const merged: ActivityItem = {
+                  ...existing,
+                  ...Object.fromEntries(
+                      Object.entries(activityUpdate).filter(([_, v]) => v !== undefined)
+                  ),
+                  // Explicitly preserve arrays if not provided in update
+                  steps: activityUpdate.steps || existing.steps,
+                  inputs: activityUpdate.inputs || existing.inputs,
+                  timestamp: existing.timestamp || activityUpdate.timestamp || Date.now()
+              };
+              
+              updated[index] = merged;
+              return updated;
+          }
+          
+          // New Task Creation
+          const newTask: ActivityItem = {
+              id: activityUpdate.id!,
+              name: activityUpdate.name || 'Unknown Task',
+              type: activityUpdate.type || 'search',
+              status: activityUpdate.status || 'running',
+              message: activityUpdate.message || '',
+              timestamp: activityUpdate.timestamp || Date.now(),
+              steps: activityUpdate.steps || [],
+              ...activityUpdate
+          };
+          return [newTask, ...prev];
+      });
+      if (preferences.auto_open_activity_on_task) setShowActivityPanel(true);
+  };
+
+  /**
    * handleAction: Orchestrates AI Curator Tasks (Mining/Enrichment).
    */
   const handleAction = async (action: 'mine' | 'enrich', taxon: Taxon) => {
       const id = crypto.randomUUID();
       const actionName = action === 'mine' ? 'Mining' : 'Enriching';
       
-      const newActivity: ActivityItem = {
+      handleAddActivity({
           id,
           name: `${actionName} ${taxon.taxon_name}`,
           type: action === 'mine' ? 'mining' : 'enrichment',
@@ -374,38 +418,37 @@ export default function App() {
           timestamp: Date.now(),
           inputs: { taxon_id: taxon.id, taxon_name: taxon.taxon_name },
           steps: [{ label: 'Initialize AI curator', status: 'running', timestamp: Date.now() }]
-      };
-      
-      setActivities(prev => [newActivity, ...prev]);
-      if (preferences.auto_open_activity_on_task) setShowActivityPanel(true);
+      });
 
       try {
           if (action === 'enrich') {
-              setActivities(prev => prev.map(a => a.id === id ? { 
-                ...a, 
+              const current = activities.find(a => a.id === id);
+              handleAddActivity({ 
+                id,
                 message: 'Consulting primary authorities...',
-                steps: [...a.steps, { label: 'Query primary authorities', status: 'running', timestamp: Date.now() }]
-              } : a));
+                steps: [...(current?.steps || []), { label: 'Query primary authorities', status: 'running', timestamp: Date.now() }]
+              });
               const findings = await enrichTaxon(taxon);
               
               if (cancelledActivityIds.current.has(id)) return;
 
               await handleTaxonUpdate(taxon.id, findings);
               
-              setActivities(prev => prev.map(a => a.id === id ? { 
-                  ...a, 
+              handleAddActivity({ 
+                  id,
                   status: 'completed', 
                   message: 'Horticultural record enriched.',
                   details: findings,
                   outcome: `Enriched botanical record with ${Object.keys(findings).length} high-fidelity data points.`,
-                  steps: a.steps.map(s => ({...s, status: 'completed' as ActivityStatus}))
-              } : a));
+                  steps: (activities.find(a => a.id === id)?.steps || []).map(s => ({...s, status: 'completed' as ActivityStatus}))
+              });
           } else {
-              setActivities(prev => prev.map(a => a.id === id ? { 
-                ...a, 
+              const current = activities.find(a => a.id === id);
+              handleAddActivity({ 
+                id,
                 message: 'Searching herbaria and web records...',
-                steps: [...a.steps, { label: 'Web herbaria search', status: 'running', timestamp: Date.now() }]
-              } : a));
+                steps: [...(current?.steps || []), { label: 'Web herbaria search', status: 'running', timestamp: Date.now() }]
+              });
               const currentLinks = taxon.reference_links || [];
               const findings = await findAdditionalLinks(taxon.taxon_name, currentLinks);
               
@@ -413,46 +456,98 @@ export default function App() {
 
               if (findings.length > 0) {
                   await handleTaxonUpdate(taxon.id, { reference_links: [...currentLinks, ...findings] });
-                  setActivities(prev => prev.map(a => a.id === id ? { 
-                      ...a, 
+                  handleAddActivity({ 
+                      id,
                       status: 'completed', 
                       message: `Found ${findings.length} authoritative links.`,
                       details: findings,
                       outcome: `Successfully mapped ${findings.length} new unique reference authorities to the plant record.`,
-                      steps: a.steps.map(s => ({...s, status: 'completed' as ActivityStatus}))
-                  } : a));
+                      steps: (activities.find(a => a.id === id)?.steps || []).map(s => ({...s, status: 'completed' as ActivityStatus}))
+                  });
               } else {
-                  setActivities(prev => prev.map(a => a.id === id ? { 
-                      ...a, 
+                  handleAddActivity({ 
+                      id,
                       status: 'completed', 
                       message: 'No new unique references discovered.',
                       outcome: 'No new unique references discovered.',
-                      steps: a.steps.map(s => ({...s, status: 'completed' as ActivityStatus}))
-                  } : a));
+                      steps: (activities.find(a => a.id === id)?.steps || []).map(s => ({...s, status: 'completed' as ActivityStatus}))
+                  });
               }
           }
       } catch (e: any) {
           if (cancelledActivityIds.current.has(id)) return;
-          setActivities(prev => prev.map(a => a.id === id ? { 
-              ...a, 
+          handleAddActivity({ 
+              id,
               status: 'error', 
               message: e.message || 'AI service unavailable.',
               outcome: `Process failed: ${e.message}`,
-              steps: a.steps.map(s => s.status === 'running' ? {...s, status: 'error' as ActivityStatus, error: e.message} : s)
-          } : a));
+              steps: (activities.find(a => a.id === id)?.steps || []).map(s => s.status === 'running' ? {...s, status: 'error' as ActivityStatus, error: e.message} : s)
+          });
       }
   };
 
-  const handleAddActivity = (activity: ActivityItem) => {
-      setActivities(prev => {
-          const exists = prev.find(a => a.id === activity.id);
-          if (exists) return prev.map(a => a.id === activity.id ? activity : a);
-          return [activity, ...prev];
-      });
-      if (preferences.auto_open_activity_on_task) setShowActivityPanel(true);
+  /**
+   * handleActivityResolve: Manages the transition of interactive tasks in the ledger.
+   * v2.35.5: Explicitly updates status to ensure items flow out of 'Interaction Required'.
+   */
+  const handleActivityResolve = async (id: string, choice: 'accept' | 'reject' | 'select', payload?: any) => {
+      const activity = activities.find(a => a.id === id);
+      if (!activity) return;
+
+      if (choice === 'reject' || (activity.resolution?.type === 'duplicate' && choice === 'accept')) {
+          handleAddActivity({ 
+              id,
+              status: 'completed', 
+              message: 'Interaction dismissed.',
+              outcome: 'User declined action or acknowledged duplicate.',
+              timestamp: Date.now()
+          });
+          return;
+      }
+
+      if (choice === 'accept' || choice === 'select') {
+          // If we have a candidate to catalog (Synonym/Correction/Ambiguous)
+          if (payload) {
+              const candidate = payload as SearchCandidate;
+              handleAddActivity({ 
+                  id,
+                  status: 'running', 
+                  message: `Cataloging: ${candidate.taxon_name}...`,
+                  steps: [...activity.steps, { label: `User selection: ${candidate.taxon_name}`, status: 'completed', timestamp: Date.now() }]
+              });
+
+              try {
+                  const { taxon, created } = await dataService.graftTaxonToHierarchy(candidate, (label, data) => {
+                      const currentSteps = activities.find(a => a.id === id)?.steps || [];
+                      handleAddActivity({ 
+                          id,
+                          steps: [...currentSteps, { label, status: 'completed', timestamp: Date.now(), data }]
+                      });
+                  });
+                  
+                  handleAddActivity({ 
+                      id,
+                      status: 'completed', 
+                      message: 'Record active.',
+                      outcome: `Successfully committed ${taxon.taxon_name}. ${created.length > 0 ? `Created: ${created.join(' > ')}` : 'Linked to existing lineage.'}`,
+                      timestamp: Date.now()
+                  });
+                  
+                  fetchBatch(0, true);
+              } catch (e: any) {
+                  handleAddActivity({ 
+                      id,
+                      status: 'error', 
+                      message: e.message,
+                      outcome: `Commit failed: ${e.message}`,
+                      timestamp: Date.now()
+                  });
+              }
+          }
+      }
   };
 
-  const handleAddSuccess = () => { /* noop v2.35.3 */ };
+  const handleAddSuccess = () => { fetchBatch(0, true); };
   const handleMaintenanceComplete = () => { setTaxa([]); setOffset(0); fetchBatch(0, true); };
 
   const isHardError = (isOffline || (loadingState === LoadingState.ERROR && !isInitialized));
@@ -533,10 +628,11 @@ export default function App() {
           mode={activityPanelMode}
           onModeChange={setActivityPanelMode}
           onClose={() => setShowActivityPanel(false)} 
-          onCancel={(id) => { cancelledActivityIds.current.add(id); setActivities(prev => prev.map(a => a.id === id ? { ...a, status: 'error', message: 'Cancelled.' } : a)); }} 
+          onCancel={(id) => { cancelledActivityIds.current.add(id); handleAddActivity({ id, status: 'error', message: 'Cancelled.' }); }} 
           onRetry={(item) => {}} 
           onDismiss={(id) => setActivities(prev => prev.filter(a => a.id !== id))} 
           onClearAll={() => setActivities([])}
+          onResolve={handleActivityResolve}
       />
 
       {showSettingsModal && (

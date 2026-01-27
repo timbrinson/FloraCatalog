@@ -173,6 +173,7 @@ export const parseBotanicalName = (input: string): LexedTaxonParts => {
 
 /**
  * normalizeTaxonParts: Applies Stage 3 logic to raw AI tokens.
+ * v2.35.7: Enhanced rank-prefix stripping to ensure infraspecies literals are clean.
  */
 export const normalizeTaxonParts = (p: Partial<Taxon>): Partial<Taxon> => {
     const normalized = { ...p };
@@ -202,6 +203,16 @@ export const normalizeTaxonParts = (p: Partial<Taxon>): Partial<Taxon> => {
         let cleanInfra = normalized.infraspecies.trim();
         if (hybridRegex.test(cleanInfra)) {
             cleanInfra = cleanInfra.replace(hybridRegex, '');
+        }
+        
+        // v2.35.7: Algorithmic strip of rank prefixes (e.g. "subsp. hookeri" -> "hookeri")
+        const rankPrefixes = Object.keys(RANK_ALIAS_MAP).sort((a, b) => b.length - a.length);
+        for (const pref of rankPrefixes) {
+            const regex = new RegExp(`^${pref.replace('.', '\\.')}\\s*`, 'i');
+            if (regex.test(cleanInfra)) {
+                cleanInfra = cleanInfra.replace(regex, '');
+                break; 
+            }
         }
         normalized.infraspecies = cleanInfra.toLowerCase();
     }

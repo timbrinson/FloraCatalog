@@ -41,9 +41,10 @@ The Ingestion Engine is a multi-stage validation pipeline designed to reconcile 
 - `species` & `infraspecies`: Lowercase.
 - `cultivar`: Title Case.
 
-**Phase D: Targeted Interrogation (Atomic Token Query)**
+**Phase D: Targeted Interrogation (Rank-Prioritized Atomic Query)**
 1. **Standard A (Atomic Token Set):** Construct a SQL equality query using individual physical columns (`genus`, `species`, `infraspecies`, `cultivar`, etc.) based on the extracted tokens.
-2. **Standard B (Literal Fallback):** Only if Standard A returns zero hits, execute a secondary query searching the indexed `taxon_name` column against the original search string.
+2. **Rank Filter:** The query MUST include a filter for `taxon_rank` corresponding to the most specific token provided. (e.g. searching "Oxalis" filters for `taxon_rank = 'Genus'`).
+3. **Standard B (Literal Fallback):** Only if Standard A returns zero hits, execute a secondary query searching the indexed `taxon_name` column against the original search string.
 - **Outcome - Zero Hits:** Proceed to Stage 1.
 - **Outcome - Single Hit:** Prompt the user: *"Match Found in Library. View Existing Record or Search Globally for variations?"*
 - **Outcome - Multi-Hit:** List library matches for selection before proceeding.

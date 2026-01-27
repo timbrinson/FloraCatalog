@@ -32,7 +32,7 @@ export async function validatePlantIntent(query: string): Promise<{ is_valid: bo
 /**
  * generatePlantCandidates: Stage 2 Knowledge Synthesis (Pro Tier).
  * Returns an array of potential candidates for ambiguous or descriptive queries.
- * v2.35.1: Volume expansion (up to 10) and Enrichment extraction.
+ * v2.35.7: Explicit instruction to separate rank from epithet.
  */
 export async function generatePlantCandidates(query: string): Promise<any[]> {
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
@@ -49,7 +49,8 @@ export async function generatePlantCandidates(query: string): Promise<any[]> {
     1. Fill in missing ranks (like species) where known. 
     2. Explicitly identify the 'taxon_rank' of the final name (Genus, Species, Infraspecies, or Cultivar).
     3. Provide a 'lineage_rationale' explaining why you linked a cultivar to a specific species.
-    4. Distinguish between a selection of a species (e.g. Acer circinatum 'Pacific Fire') and a species itself.`,
+    4. Distinguish between a selection of a species (e.g. Acer circinatum 'Pacific Fire') and a species itself.
+    5. DATA INTEGRITY: The 'infraspecies' field must contain ONLY the epithet. Do NOT include rank prefixes like 'subsp.' or 'var.' in the name field; use the 'infraspecific_rank' field for the abbreviation.`,
     config: {
       responseMimeType: "application/json",
       responseSchema: {

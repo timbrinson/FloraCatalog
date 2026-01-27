@@ -5,7 +5,8 @@ This document tracks planned features and technical improvements to ensure conti
 - [x] **Implement Ingestion Engine:** Rewrite the Add Plant functionality by following the Ingestion Engine design to implement the 6-stage validation pipeline (Stage 0: Deterministic Win, Stage 1: Intent Filter, Stage 2: Global synthesis, Stage 3: Polishing).
 
 ## Awaiting Verification (Recent Builds)
-- [ ] **Find Plant Engine v2.35.0:** Verify the multi-candidate discovery logic and Stage 0 local search priority.
+- [ ] **Ingestion Engine v2.35.8:** Verify intermediate rank synonym redirection where synonyms in the parent chain are automatically pivoted to their accepted equivalents during lineage audit.
+- [ ] **Ingestion Engine v2.35.7:** Verify the "Identity Pivot" logic where synonyms are redirected to accepted identities before Stage 4 lineage audit.
 
 ## High Priority
 - [x] **Fix Finding Plant Details:** The Icon Button for searching for plant details doesn't function. Also the Icon is not obvious what it does. I'm not sure which of the two Icons to select but neither works. The Icon button needs a tool tip saying what it does.
@@ -74,7 +75,7 @@ This document tracks planned features and technical improvements to ensure conti
 - [x] **Phylogenetic Extension (Order Level):** Extend the taxonomic hierarchy above the Family level by creating physical 'Order' records. This anchors the catalog to globally accepted phylogenetic standards: APG IV (Angiosperms), Christenhusz (Gymnosperms), and PPG I (Pteridophytes).
     * **Human Note:** Follow the implementation strategy defined in docs/design/ORDER_FAMILY_MAPPING_SPEC.md, prioritizing the WFO Backbone (Path A) for bulk efficiency. Use a new source based on where the data comes from.
     * **Human Note:** The WFO _DwC_backbone_R.zip file was downloaded 2026-01-09. That file contains one file named "classification.csv". This text is from https://www.worldfloraonline.org/downloadData: "When citing the World Flora Online, you may use: "WFO ([Year]): World Flora Online. Version [Year].[Month]. Published on the Internet; http://www.worldfloraonline.org. Accessed on:[Date]". Please ensure that the [Date] of accession accords with the date for your use of the system and the [Year] and [Month] correspond to the file you are using."
-    * **Human Note:** If the "Hierarchy Build" (Step 11) appears to stall with 0 IOPs, use the updated `scripts/check_progress.sql.txt` to verify if a query is actually running in Postgres. If `pg_stat_activity` is empty, your Node.js process has likely hung or lost the socket connection; restart the build script and select Step 11 to resume.
+    * **Human Note:** If the "Hierarchy Build" (Step 11) appeared to stall with 0 IOPs, use the updated `scripts/check_progress.sql.txt` to verify if a query is actually running in Postgres. If `pg_stat_activity` is empty, your Node.js process has likely hung or lost the socket connection; restart the build script and select Step 11 to resume.
     > **AI Context:** 
     1. Source Identification: Use `_DwC_backbone_R.zip` from WFO (v2025.12). **WARNING:** The `classification.csv` is ~950MB. Local pre-filtering (distillation) via `scripts/distill_wfo.py.txt` is mandatory to generate a manageable `wfo_import.csv` file.
     2. Automation: Aligned WFO import with the WCVP staging pattern. Steps 2, 5, and 9 handle WFO-specific logic. **v2.31.9 update:** Step 5 now includes a self-healing `CREATE TABLE IF NOT EXISTS` block to allow enriching an existing DB without a schema reset.

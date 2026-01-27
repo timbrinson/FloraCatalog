@@ -57,7 +57,11 @@ A User Preference (`auto_open_activity_on_task`) controls whether the panel laun
 - **Default:** OFF.
 - **Behavior:** When ON, the panel slides open the moment an asynchronous AI process is initiated in a modal or via the grid actions.
 
-### 4.3 Cleanup Logic
+### 4.3 Post-Interaction State Transitions
+- **The Flow Rule:** Any activity in a `needs_input` state MUST transition to a non-input state (`running`, `completed`, or `error`) immediately upon user interaction.
+- **Implementation:** Handlers for resolution buttons (e.g., `onResolve`) are responsible for updating the activity status. This ensures that resolved items automatically "fall" out of the **Interaction Required** section into the history ledger.
+
+### 4.4 Cleanup Logic
 - **Dismiss:** Removes a single task from history.
 - **Wipe History:** Clears all completed or failed tasks from memory and storage.
 - **Active Protection:** The system prevents wiping or dismissing tasks in a `running` state.
