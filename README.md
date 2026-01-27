@@ -1,9 +1,9 @@
 # FloraCatalog: Project Atlas
 
-FloraCatalog is a high-performance botanical database application designed to bridge the gap between static scientific checklists (Kew Gardens WCVP), horticultural registration standards (ICRA), and living garden collections. It serves as a Multi-Dimensional Data Dashboard for botanical precision, utilizing AI to anchor diverse records to authoritative designations and curate a shared Holistic Plant Archive.
+FloraCatalog is a high-performance botanical database application designed to bridge the gap between static scientific checklists (Kew Gardens WCVP), horticultural registration standards (ICRA), and the diverse nomenclature recognized across the horticultural trade and various gardening circles. It serves as a Multi-Dimensional Data Dashboard for botanical precision, utilizing AI to anchor diverse records to authoritative designations and curate a shared Holistic Plant Archive.
 
 ## 🌿 Project Philosophy
-- **Authoritative Anchoring:** We anchor garden collections to scientific standards (WCVP) and horticultural registration standards (ICRA) to ensure nomenclature remains precise and traceable.
+- **Authoritative Anchoring:** We anchor botanical records to the most trusted standards: **WCVP** for nomenclature, **WFO** for higher-level phylogenetic taxonomy (Kingdom through Family), and **ICRA** for horticultural registration. This multi-layered approach allows the catalog to bridge the gap between specific cultivars and higher-level botanical classification, ensuring structural integrity and traceability across all taxonomic ranks.
 - **Unified Knowledge:** We consolidate botanical information fragmented across specialized plant communities, specialist nurseries, universities, scientific organizations, online catalogs, and commercial sales sites.
 - **UX Stability:** The application is a high-density professional tool. UI state preservation (filters, scroll, focus) is as critical as data accuracy.
 - **AI as Curator:** Generative AI is used to parse, standardize, and mine data, always operating within the constraints of authoritative botanical rules.

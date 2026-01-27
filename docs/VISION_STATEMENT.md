@@ -16,16 +16,16 @@ A core tenet of the FloraCatalog mission is **Nomenclature Sovereignty**. We do 
 
 ## Three Levels of Botanical Reality
 Plant information exists at three distinct layers, yet no universal system exists to tie them together holistically:
-1.  **Higher Level Classification:** Categories above Genus (Families, Orders).
+1. **Higher Level Classification:** Phylogenetic categories from Kingdom through to Family (**Kingdom, Phylum, Class, Order, and Family**).
 2.  **Natural Nomenclature:** Naturally occurring plants (Genus, Species, Infraspecies).
 3.  **Cultivated Plants:** Human-selected variations (Cultivars, Grexes, Trade Names).
 
 ## The FloraCatalog Mission: Bridging the Gap
-FloraCatalog is a botanical bridge that anchors diverse collections to authoritative scientific standards (WCVP) and horticultural registration standards (ICRA). We build a multi-layered, shared knowledge base upon the advanced work of existing authorities.
+FloraCatalog is a botanical bridge that anchors **nomenclature recognized across gardening circles and the horticultural trade** to authoritative scientific nomenclature (**WCVP**), phylogenetic lineages (**WFO**), and horticultural registration standards (**ICRA**). We build a multi-layered, shared knowledge base upon the advanced work of existing authorities.
 
 ### The UI Philosophy: Findability & Density
 We recognize that for a botanical catalog, the user interface is the primary value driver.
-- **Multi-Dimensional Data Dashboard (90% Priority):** A flexible, high-density interface designed for instant findability. It allows users to slice and group millions of records—spanning the vast WCVP baseline and an ever-expanding library of garden cultivars and hybrids—transforming massive datasets into a shared, navigable collection.
+- **Multi-Dimensional Data Dashboard (90% Priority):** A flexible, high-density interface designed for instant findability. It allows users to slice and group millions of records—spanning the **WFO phylogenetic backbone**, the **WCVP nomenclature core**, and an ever-expanding library of garden cultivars and hybrids—transforming massive datasets into a shared, navigable collection.
 - **Universal Plant Profile (Details Panel):** While the grid handles "Findability," the Details Panel provides "Depth." This panel is a high-fidelity repository for everything known about a plant, consolidated from scientific checklists and horticultural trade sources.
 - **Background Task Orchestrator (Activity Panel):** A centralized hub for monitoring and auditing long-running operations. It allows users to track real-time progress, resolve nomenclature ambiguities, and review the processing details and outcomes after the fact during the current session.
 
