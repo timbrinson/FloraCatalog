@@ -13,16 +13,16 @@ Per **ADR-004 (Universal Naming Standardization)**, this document serves as the 
 
 | Group | Grid Column | Filter Type | Default Setting | Default Value | Grid Label | Grid Label Tooltip | System Literal (snake_case) | DB Column (Identity Check) | WCVP Column | WCVP Value | WCVP Class | WCVP Description | WCVP Remark (Notes) |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| **System** | id | Text | unselected | (none) | Internal ID | Internal UUID | id | id | — | — | — | — | — |
-| | parent_id | Text | unselected | (none) | Parent ID | Parent UUID | parent_id | parent_id | — | — | — | — | — |
-| | tree_control | — | selected | tree | Tree | Tree Control | — | — | — | — | — | — | — | — |
-| | descendant_count | Text | selected | (none) | # | Child Count | descendant_count | descendant_count | — | — | — | — | — |
-| | actions | — | unselected | — | Actions | Actions | — | — | — | — | — | — | — | — |
+| **System** | id | Text | unselected | (none) | Internal ID | Internal UUID | id | id | - | - | - | - | - |
+| | parent_id | Text | unselected | (none) | Parent ID | Parent UUID | parent_id | parent_id | - | - | - | - | - |
+| | tree_control | - | selected | tree | Tree | Tree Control | - | - | - | - | - | - | - | - |
+| | descendant_count | Text | selected | (none) | # | Child Count | descendant_count | descendant_count | - | - | - | - | - |
+| | actions | - | unselected | - | Actions | Actions | - | - | - | - | - | - | - | - |
 | **Taxonomy** | taxon_name | Text | selected | (none) | Plant Name | Scientific Name | taxon_name | taxon_name | taxon_name | | chr | Full name string | |
-| | kingdom | Text | unselected | (none) | Kingdom | Taxonomic Kingdom | kingdom | kingdom | — | — | — | — | — |
-| | phylum | Text | unselected | (none) | Phylum | Taxonomic Phylum | phylum | phylum | — | — | — | — | — |
-| | class | Text | unselected | (none) | Class | Taxonomic Class | class | class | — | — | — | — | — |
-| | order | Text | selected | (none) | Order | Phylogenetic Order | order | order | — | — | — | — | — |
+| | kingdom | Text | unselected | (none) | Kingdom | Taxonomic Kingdom | kingdom | kingdom | - | - | - | - | - |
+| | phylum | Text | unselected | (none) | Phylum | Taxonomic Phylum | phylum | phylum | - | - | - | - | - |
+| | class | Text | unselected | (none) | Class | Taxonomic Class | class | class | - | - | - | - | - |
+| | order | Text | selected | (none) | Order | Phylogenetic Order | order | order | - | - | - | - | - |
 | | family | Text | unselected | (none) | Family | Family Name | family | family | family | | chr | Botanical Family | |
 | **Taxon Status**| taxon_rank | Multi-select | unselected | (none) | Rank | Taxonomic Rank | taxon_rank | taxon_rank | taxon_rank | Kingdom, Phylum... | chr | Hierarchical level | |
 | | taxon_status | Multi-select | unselected | Accepted | Status | Taxonomic Status | taxon_status | taxon_status | taxon_status | Accepted, Synonym... | chr | Nomenclatural status | |
@@ -41,14 +41,14 @@ Per **ADR-004 (Universal Naming Standardization)**, this document serves as the 
 | | basionym_plant_name_id | Text | unselected | (none) | Basionym ID | Basionym Plant Name ID | basionym_plant_name_id | basionym_plant_name_id | basionym_plant_name_id | | chr | ID of the original name | |
 | | ipni_id | Text | unselected | (none) | IPNI ID | IPNI ID | ipni_id | ipni_id | ipni_id | | chr | IPNI identifier | |
 | | powo_id | Text | unselected | (none) | POWO ID | POWO ID | powo_id | powo_id | powo_id | | chr | POWO identifier | |
-| **WFO Identifiers**| wfo_id | Text | unselected | (none) | WFO ID | World Flora Online ID | wfo_id | wfo_id | — | — | — | — | — |
-| | wfo_accepted_id | Text | unselected | (none) | WFO Acc. ID | WFO Accepted Name ID | wfo_accepted_id | wfo_accepted_id | — | — | — | — | — |
-| | wfo_parent_id | Text | unselected | (none) | WFO Parent ID | WFO Parent ID | wfo_parent_id | wfo_parent_id | — | — | — | — | — |
-| | wfo_original_id | Text | unselected | (none) | WFO Orig. ID | WFO Original ID | wfo_original_id | wfo_original_id | — | — | — | — | — |
-| | wfo_scientific_name_id | Text | unselected | (none) | WFO Sci. ID | WFO Scientific ID | wfo_scientific_name_id | wfo_scientific_name_id | — | — | — | — | — |
+| **WFO Identifiers**| wfo_id | Text | unselected | (none) | WFO ID | World Flora Online ID | wfo_id | wfo_id | - | - | - | - | - |
+| | wfo_accepted_id | Text | unselected | (none) | WFO Acc. ID | WFO Accepted Name ID | wfo_accepted_id | wfo_accepted_id | - | - | - | - | - |
+| | wfo_parent_id | Text | unselected | (none) | WFO Parent ID | WFO Parent ID | wfo_parent_id | wfo_parent_id | - | - | - | - | - |
+| | wfo_original_id | Text | unselected | (none) | WFO Orig. ID | WFO Original ID | wfo_original_id | wfo_original_id | - | - | - | - | - |
+| | wfo_scientific_name_id | Text | unselected | (none) | WFO Sci. ID | WFO Scientific ID | wfo_scientific_name_id | wfo_scientific_name_id | - | - | - | - | - |
 | **Publication** | taxon_authors | Text | unselected | (none) | Authorship | Taxon Authors | taxon_authors | taxon_authors | taxon_authors | | chr | Concatenation of authors. | |
-| | parenthetical_author | Text | unselected | (none) | Paren. Author | Parenthetical Author | parenthetical_author | parenthetical_author | parenthetical_author | | chr | Author of the basionym. | |
 | | primary_author | Text | unselected | (none) | Prim. Author | Primary Author | primary_author | primary_author | primary_author | | chr | Author who published the scientific name. | |
+| | parenthetical_author | Text | unselected | (none) | Paren. Author | Parenthetical Author | parenthetical_author | parenthetical_author | parenthetical_author | | chr | Author of the basionym. | |
 | | publication_author | Text | unselected | (none) | Pub. Author | Publication Author | publication_author | publication_author | publication_author | | chr | Book author if different. | |
 | | replaced_synonym_author| Text | unselected | (none) | Syn. Author | Replaced Synonym Author| replaced_synonym_author | replaced_synonym_author | replaced_synonym_author | | chr | Author of replaced synonym. | |
 | | place_of_publication | Text | unselected | (none) | Pub. Place | Place Of Publication | place_of_publication | place_of_publication | place_of_publication | | chr | Journal or book of publication. | |
