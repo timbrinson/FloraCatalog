@@ -34,13 +34,17 @@ Per **ADR-004 (Universal Naming Standardization)**, this document serves as the 
 | | infraspecific_rank | Multi-select | selected | (none) | I Rank | Infraspecific Rank | infraspecific_rank | infraspecific_rank | infraspecific_rank | subsp., var... | chr | Rank of infraspecies | |
 | | infraspecies | Text | selected | (none) | Infraspecies | Infraspecific Designation | infraspecies | infraspecies | infraspecies | | chr | Infraspecific epithet | |
 | | cultivar | Text | selected | (none) | Cultivar | Cultivar Name | cultivar | cultivar | (ICNCP) | | chr | Cultivated variety | |
-| **Standard Identifiers**| wcvp_id | Text | unselected | (none) | WCVP ID | WCVP Plant Name ID | wcvp_id | wcvp_id | plant_name_id | | chr | World Checklist of Vascular Plants identifier | |
-| | ipni_id | Text | unselected | (none) | IPNI ID | IPNI ID | ipni_id | ipni_id | ipni_id | | chr | International Plant Name Index identifier | |
-| | powo_id | Text | unselected | (none) | POWO ID | POWO ID | powo_id | powo_id | powo_id | | chr | POWO lookup identifier | |
-| | wfo_id | Text | unselected | (none) | WFO ID | World Flora Online ID | wfo_id | wfo_id | taxonID | | chr | WFO Identifier | |
+| **Standard Identifiers**| wcvp_id | Text | unselected | (none) | WCVP ID | WCVP Plant Name ID | wcvp_id | wcvp_id | plant_name_id | | chr | WCVP identifier | |
+| | accepted_plant_name_id | Text | unselected | (none) | Accepted ID | Accepted Plant Name ID | accepted_plant_name_id | accepted_plant_name_id | accepted_plant_name_id | | chr | ID of the accepted name | |
+| | parent_plant_name_id | Text | unselected | (none) | Parent Plant ID | Parent Plant Name ID | parent_plant_name_id | parent_plant_name_id | parent_plant_name_id | | chr | ID for the parent taxon | |
+| | basionym_plant_name_id | Text | unselected | (none) | Basionym ID | Basionym Plant Name ID | basionym_plant_name_id | basionym_plant_name_id | basionym_plant_name_id | | chr | ID of the original name | |
+| | ipni_id | Text | unselected | (none) | IPNI ID | IPNI ID | ipni_id | ipni_id | ipni_id | | chr | IPNI identifier | |
+| | powo_id | Text | unselected | (none) | POWO ID | POWO ID | powo_id | powo_id | powo_id | | chr | POWO identifier | |
+| **WFO Identifiers**| wfo_id | Text | unselected | (none) | WFO ID | World Flora Online ID | wfo_id | wfo_id | taxonID | | chr | WFO Identifier | |
 | | wfo_accepted_id | Text | unselected | (none) | WFO Acc. ID | WFO Accepted Name ID | wfo_accepted_id | wfo_accepted_id | acceptedNameUsageID | | chr | Synonym Redirection Anchor | |
-| | wfo_scientific_name_id | Text | unselected | (none) | WFO Sci. ID | WFO Scientific ID | wfo_scientific_name_id | wfo_scientific_name_id | scientificNameID | | chr | IPNI Anchor in WFO | |
+| | wfo_parent_id | Text | unselected | (none) | WFO Parent ID | WFO Parent ID | wfo_parent_id | wfo_parent_id | parentNameUsageID | | chr | Backbone Parent ID | |
 | | wfo_original_id | Text | unselected | (none) | WFO Orig. ID | WFO Original ID | wfo_original_id | wfo_original_id | originalNameUsageID | | chr | Basionym ID | |
+| | wfo_scientific_name_id | Text | unselected | (none) | WFO Sci. ID | WFO Scientific ID | wfo_scientific_name_id | wfo_scientific_name_id | scientificNameID | | chr | IPNI Anchor in WFO | |
 | **Publication** | taxon_authors | Text | unselected | (none) | Authorship | Taxon Authors | taxon_authors | taxon_authors | taxon_authors | | chr | Concatenation of authors. | |
 | | primary_author | Text | unselected | (none) | Prim. Author | Primary Author | primary_author | primary_author | primary_author | | chr | Author who published the scientific name. | |
 | | publication_author | Text | unselected | (none) | Pub. Author | Publication Author | publication_author | publication_author | publication_author | | chr | Book author if different. | |
@@ -50,11 +54,8 @@ Per **ADR-004 (Universal Naming Standardization)**, this document serves as the 
 | | nomenclatural_remarks| Text | unselected | (none) | Nom. Remarks | Nomenclatural Remarks | nomenclatural_remarks | nomenclatural_remarks | nomenclatural_remarks | | chr | Remarks on nomenclature. | |
 | | reviewed | Multi-select | unselected | (none) | Reviewed | Reviewed Status | reviewed | reviewed | reviewed | | chr | Peer review flag. | |
 | **Related Plants** | homotypic_synonym | Text | unselected | (none) | Homotypic Syn. | Homotypic Synonym Flag | homotypic_synonym | homotypic_synonym | homotypic_synonym | 0 | logical | TRUE if homotypic synonym. | ICN Link |
-| | accepted_plant_name_id | Text | unselected | (none) | Accepted ID | Accepted Plant Name ID | accepted_plant_name_id | accepted_plant_name_id | accepted_plant_name_id | | chr | ID of the accepted name. | |
 | | parenthetical_author | Text | unselected | (none) | Paren. Author | Parenthetical Author | parenthetical_author | parenthetical_author | parenthetical_author | | chr | Author of the basionym. | |
 | | replaced_synonym_author| Text | unselected | (none) | Syn. Author | Replaced Synonym Author| replaced_synonym_author | replaced_synonym_author | replaced_synonym_author | | chr | Author of replaced synonym. | |
-| | parent_plant_name_id | Text | unselected | (none) | Parent Plant ID | Parent Plant Name ID | parent_plant_name_id | parent_plant_name_id | parent_plant_name_id | | chr | ID for the parent taxon. | |
-| | basionym_plant_name_id | Text | unselected | (none) | Basionym ID | Basionym Plant Name ID | basionym_plant_name_id | basionym_plant_name_id | basionym_plant_name_id | | chr | ID of the original name. | |
 
 ## The Golden Record (Horticultural Details)
 These fields are stored in the `app_taxon_details` table and are used to enrich standard scientific nomenclature. Per ADR-004, the System Literal and Database Column are identical.
@@ -82,4 +83,4 @@ These fields are stored in the `app_taxon_details` table and are used to enrich 
 
 ### Climate Literals
 **Values:** `desert or dry shrubland, montane tropical, seasonally dry tropical, subalpine or subarctic, subtropical, subtropical or tropical, temperate, temperate, subtropical or tropical, wet tropical.`
-*Note: These are strictly lowercase in the database. Individual terms within the CSV are also preserved character-for-character to maintain baseline integrity.*
+*Note: These are strictly lowercase in the database. Individual terms within the CSV are also preserved character-for-character to maintain baseline integrity.`

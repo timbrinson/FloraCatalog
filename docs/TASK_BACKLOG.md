@@ -2,6 +2,7 @@
 
 This document tracks planned features and technical improvements to ensure continuity across development sessions.
 ## Work on Now
+- [ ] **Fix Data Mapping:** The columns shown in the grid do not match those in the data mapping. Analyze the differences and report back. Also compare the data mapping to the data columns and report back any discrepencies.
 
 ## Awaiting Verification (Recent Builds)
 - [ ] **Stabilization Pass v2.35.9:** Verify unified normalization, App.tsx hydration cleanup, and Operations Hub rationale toggles.
