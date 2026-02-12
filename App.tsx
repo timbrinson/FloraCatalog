@@ -18,7 +18,39 @@ interface AppLayoutConfig {
     colWidths?: Record<string, number>;
 }
 
-// Fix: DEFAULT_PALLET was missing kingdom, phylum, and class keys required by RankPallet
+// System-wide default columns/widths used for resets
+const ALL_DEFAULT_COLS = [
+    { id: 'actions', width: 90, on: true },
+    { id: 'descendant_count', width: 50, on: true },
+    { id: 'tree_control', width: 55, on: true },
+    { id: 'taxon_name', width: 220, on: true },
+    { id: 'order', width: 120, on: true },
+    { id: 'genus_hybrid', width: 40, on: true },
+    { id: 'genus', width: 120, on: true },
+    { id: 'species_hybrid', width: 40, on: true },
+    { id: 'species', width: 120, on: true },
+    { id: 'infraspecific_rank', width: 80, on: true },
+    { id: 'infraspecies', width: 120, on: true },
+    { id: 'cultivar', width: 150, on: true },
+    // Technical cols off by default
+    { id: 'id', width: 100, on: false },
+    { id: 'parent_id', width: 100, on: false },
+    { id: 'taxon_rank', width: 110, on: false },
+    { id: 'taxon_status', width: 110, on: false },
+    { id: 'homotypic_synonym', width: 100, on: false },
+    { id: 'hybrid_formula', width: 180, on: false },
+    { id: 'kingdom', width: 100, on: false },
+    { id: 'phylum', width: 100, on: false },
+    { id: 'class', width: 100, on: false },
+    { id: 'family', width: 120, on: false },
+    { id: 'lifeform_description', width: 150, on: false },
+    { id: 'geographic_area', width: 180, on: false },
+    { id: 'climate_description', width: 180, on: false },
+    { id: 'wcvp_id', width: 120, on: false },
+    { id: 'ipni_id', width: 100, on: false },
+    { id: 'powo_id', width: 100, on: false }
+];
+
 const DEFAULT_PALLET: RankPallet = {
   kingdom: { base_color: 'slate', cell_bg_weight: 50, text_weight: 600, badge_bg_weight: 100, badge_border_weight: 200 },
   phylum: { base_color: 'gray', cell_bg_weight: 50, text_weight: 600, badge_bg_weight: 100, badge_border_weight: 200 },
@@ -30,6 +62,9 @@ const DEFAULT_PALLET: RankPallet = {
   infraspecies: { base_color: 'orange', cell_bg_weight: 50, text_weight: 600, badge_bg_weight: 100, badge_border_weight: 200 },
   cultivar: { base_color: 'sky', cell_bg_weight: 50, text_weight: 600, badge_bg_weight: 100, badge_border_weight: 200 }
 };
+
+export type WorkspaceCategory = 'colors' | 'order' | 'widths' | 'selection' | 'filters';
+export type WorkspaceAction = 'reset_ui' | 'reload_ui' | 'delete_db';
 
 export default function App() {
   const [loadingState, setLoadingState] = useState<LoadingState>(LoadingState.IDLE);
@@ -181,6 +216,40 @@ export default function App() {
     if (getIsOffline()) return;
     const config = await loadGlobalSettings();
     if (settingsLoadedRef.current) { setInitialLayout(config); setGridKey(prev => prev + 1); alert("Settings reloaded."); }
+  };
+
+  /**
+   * handleWorkspaceAction: Granular surgical control (v2.35.10)
+   */
+  const handleWorkspaceAction = async (category: WorkspaceCategory, action: WorkspaceAction) => {
+      if (action === 'reload_ui') {
+          await handleReloadLayout();
+          return;
+      }
+
+      const applyUIRange = (config: Partial<AppLayoutConfig>) => {
+          setInitialLayout(prev => ({ ...prev, ...config }));
+          setGridKey(k => k + 1);
+      };
+
+      if (action === 'reset_ui') {
+          switch (category) {
+              case 'colors': setPreferences(p => ({ ...p, grid_pallet: DEFAULT_PALLET })); break;
+              case 'filters': setGridFilters({ taxon_status: ['Accepted'] }); break;
+              case 'order': applyUIRange({ columnOrder: ALL_DEFAULT_COLS.map(c => c.id) }); break;
+              case 'widths': applyUIRange({ colWidths: Object.fromEntries(ALL_DEFAULT_COLS.map(c => [c.id, c.width])) }); break;
+              case 'selection': applyUIRange({ visibleColumns: new Set(ALL_DEFAULT_COLS.filter(c => c.on).map(c => c.id)) }); break;
+          }
+      }
+
+      if (action === 'delete_db') {
+          if (!confirm(`Permanently delete saved ${category} customization from the database?`)) return;
+          const keyMap: Record<WorkspaceCategory, string> = {
+              colors: 'grid_pallet', order: 'columnOrder', widths: 'colWidths', selection: 'visibleColumns', filters: 'filters'
+          };
+          await dataService.deleteGlobalSettingsKeys([keyMap[category]]);
+          await handleReloadLayout();
+      }
   };
 
   const fetchBatch = async (currentOffset: number, isNewSearch: boolean) => {
@@ -384,7 +453,18 @@ export default function App() {
       </div>
 
       <ActivityPanel activities={activities} isOpen={showActivityPanel} mode={activityPanelMode} onModeChange={setActivityPanelMode} onClose={() => setShowActivityPanel(false)} onCancel={(id) => { cancelledActivityIds.current.add(id); handleAddActivity({ id, status: 'error', message: 'Cancelled.' }); }} onRetry={(item) => {}} onDismiss={(id) => setActivities(prev => prev.filter(a => a.id !== id))} onClearAll={() => setActivities([])} onResolve={handleActivityResolve} />
-      {showSettingsModal && (<SettingsModal isOpen={showSettingsModal} onClose={handleSettingsClose} preferences={preferences} onUpdate={setPreferences} onMaintenanceComplete={handleMaintenanceComplete} onSaveLayout={handleSaveLayout} onReloadLayout={handleReloadLayout} />)}
+      {showSettingsModal && (
+        <SettingsModal 
+            isOpen={showSettingsModal} 
+            onClose={handleSettingsClose} 
+            preferences={preferences} 
+            onUpdate={setPreferences} 
+            onMaintenanceComplete={handleMaintenanceComplete} 
+            onSaveLayout={handleSaveLayout} 
+            onReloadLayout={handleReloadLayout}
+            onWorkspaceAction={handleWorkspaceAction}
+        />
+      )}
       {showAddModal && (<AddPlantModal isOpen={showAddModal} initialQuery={headerSearchQuery} onClose={() => { setShowAddModal(false); setHeaderSearchQuery(''); }} onSuccess={handleAddSuccess} onAddActivity={handleAddActivity} />)}
       {confirmState.isOpen && (<ConfirmDialog isOpen={confirmState.isOpen} title={confirmState.title} message={confirmState.message} onConfirm={confirmState.onConfirm} onCancel={() => setConfirmState(prev => ({ ...prev, isOpen: false }))} />)}
     </div>

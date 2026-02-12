@@ -143,14 +143,14 @@ const COLUMN_GROUPS: ColumnGroup[] = [
         columns: [
             { id: 'id', label: 'Internal ID', tooltip: 'Internal UUID', defaultWidth: 100, filterType: 'text', defaultOn: false },
             { id: 'parent_id', label: 'Parent ID', tooltip: 'Parent UUID', defaultWidth: 100, filterType: 'text', defaultOn: false },
-            { id: 'tree_control', label: 'Tree', tooltip: 'Tree Control', defaultWidth: 55, disableSorting: true, lockWidth: true, hideHeaderIcons: true, headerAlign: 'center', defaultOn: true },
-            { id: 'descendant_count', label: '#', tooltip: 'Child Count', defaultWidth: 50, filterType: 'text', hideHeaderIcons: true, headerAlign: 'center', lockWidth: true, defaultOn: true },
             { id: 'actions', label: 'Actions', tooltip: 'Actions', defaultWidth: 90, disableSorting: true, lockWidth: true, hideHeaderIcons: true, headerAlign: 'center', defaultOn: true },
+            { id: 'descendant_count', label: '#', tooltip: 'Child Count', defaultWidth: 50, filterType: 'text', hideHeaderIcons: true, headerAlign: 'center', lockWidth: true, defaultOn: true },
+            { id: 'tree_control', label: 'Tree', tooltip: 'Tree Control', defaultWidth: 55, disableSorting: true, lockWidth: true, hideHeaderIcons: true, headerAlign: 'center', defaultOn: true },
         ]
     },
     {
-        id: 'taxonomy',
-        label: 'Taxonomy',
+        id: 'taxon_status',
+        label: 'Taxon Status',
         columns: [
             { id: 'taxon_name', label: 'Plant Name', tooltip: 'Scientific Name', defaultWidth: 220, filterType: 'text', defaultOn: true },
             { 
@@ -172,12 +172,19 @@ const COLUMN_GROUPS: ColumnGroup[] = [
                 filterOptions: ['Accepted', 'Synonym', 'Unplaced', 'Unchecked', 'Registered', 'Provisional', 'Artificial Hybrid', 'Illegitimate', 'Invalid', 'Local Biotype', 'Misapplied', 'Orthographic', 'Provisionally Accepted'], 
                 defaultOn: false 
             },
-            { id: 'kingdom', label: 'Kingdom', tooltip: 'Kingdom', defaultWidth: 100, filterType: 'text', defaultOn: false },
-            { id: 'phylum', label: 'Phylum', tooltip: 'Phylum', defaultWidth: 100, filterType: 'text', defaultOn: false },
-            { id: 'class', label: 'Class', tooltip: 'Class', defaultWidth: 100, filterType: 'text', defaultOn: false },
-            { id: 'order', label: 'Order', tooltip: 'Phylogenetic Order', defaultWidth: 120, filterType: 'text', defaultOn: true },
-            { id: 'family', label: 'Family', tooltip: 'Family', defaultWidth: 120, filterType: 'text', defaultOn: false },
+            { id: 'homotypic_synonym', label: 'Homotypic Syn.', tooltip: 'Homotypic Synonym Flag', defaultWidth: 100, filterType: 'text', defaultOn: false },
             { id: 'hybrid_formula', label: 'Hybrid Formula', tooltip: 'Hybrid Formula', defaultWidth: 180, filterType: 'text', defaultOn: false },
+        ]
+    },
+    {
+        id: 'taxonomy',
+        label: 'Taxonomy',
+        columns: [
+            { id: 'kingdom', label: 'Kingdom', tooltip: 'Taxonomic Kingdom', defaultWidth: 100, filterType: 'text', defaultOn: false },
+            { id: 'phylum', label: 'Phylum', tooltip: 'Taxonomic Phylum', defaultWidth: 100, filterType: 'text', defaultOn: false },
+            { id: 'class', label: 'Class', tooltip: 'Taxonomic Class', defaultWidth: 100, filterType: 'text', defaultOn: false },
+            { id: 'order', label: 'Order', tooltip: 'Phylogenetic Order', defaultWidth: 120, filterType: 'text', defaultOn: true },
+            { id: 'family', label: 'Family', tooltip: 'Family Name', defaultWidth: 120, filterType: 'text', defaultOn: false },
         ]
     },
     {
@@ -205,13 +212,34 @@ const COLUMN_GROUPS: ColumnGroup[] = [
         ]
     },
     {
+        id: 'standard_identifiers',
+        label: 'Standard Identifiers',
+        columns: [
+            { id: 'wcvp_id', label: 'WCVP ID', tooltip: 'WCVP Plant Name ID', defaultWidth: 120, filterType: 'text', defaultOn: false },
+            { id: 'accepted_plant_name_id', label: 'Accepted ID', tooltip: 'Accepted Plant Name ID', defaultWidth: 100, filterType: 'text', defaultOn: false },
+            { id: 'parent_plant_name_id', label: 'Parent Plant ID', tooltip: 'Parent Plant Name ID', defaultWidth: 100, filterType: 'text', defaultOn: false },
+            { id: 'basionym_plant_name_id', label: 'Basionym ID', tooltip: 'Basionym Plant Name ID', defaultWidth: 100, filterType: 'text', defaultOn: false },
+            { id: 'ipni_id', label: 'IPNI ID', tooltip: 'IPNI ID', defaultWidth: 100, filterType: 'text', defaultOn: false },
+            { id: 'powo_id', label: 'POWO ID', tooltip: 'POWO ID', defaultWidth: 100, filterType: 'text', defaultOn: false },
+        ]
+    },
+    {
+        id: 'wfo_identifiers',
+        label: 'WFO Identifiers',
+        columns: [
+            { id: 'wfo_id', label: 'WFO ID', tooltip: 'World Flora Online ID', defaultWidth: 120, filterType: 'text', defaultOn: false },
+            { id: 'wfo_accepted_id', label: 'WFO Acc. ID', tooltip: 'WFO Accepted Name ID', defaultWidth: 120, filterType: 'text', defaultOn: false },
+            { id: 'wfo_parent_id', label: 'WFO Parent ID', tooltip: 'WFO Parent ID', defaultWidth: 120, filterType: 'text', defaultOn: false },
+            { id: 'wfo_original_id', label: 'WFO Orig. ID', tooltip: 'WFO Original ID', defaultWidth: 120, filterType: 'text', defaultOn: false },
+            { id: 'wfo_scientific_name_id', label: 'WFO Sci. ID', tooltip: 'WFO Scientific ID', defaultWidth: 120, filterType: 'text', defaultOn: false },
+        ]
+    },
+    {
         id: 'descriptive',
         label: 'Descriptive',
         columns: [
-            { id: 'common_name', label: 'Common Name', tooltip: 'Common Name', defaultWidth: 150, filterType: 'text', defaultOn: false },
-            { id: 'description_text', label: 'Description', tooltip: 'Description', defaultWidth: 250, filterType: 'text', defaultOn: false },
-            { id: 'geographic_area', label: 'Geography', tooltip: 'Geographic Area', defaultWidth: 180, filterType: 'text', defaultOn: false },
             { id: 'lifeform_description', label: 'Lifeform', tooltip: 'Lifeform Description', defaultWidth: 150, filterType: 'text', defaultOn: false },
+            { id: 'geographic_area', label: 'Geography', tooltip: 'Geographic Area', defaultWidth: 180, filterType: 'text', defaultOn: false },
             { 
                 id: 'climate_description', 
                 label: 'Climate', 
@@ -224,24 +252,19 @@ const COLUMN_GROUPS: ColumnGroup[] = [
         ]
     },
     {
-        id: 'standard_identifiers',
-        label: 'Standard Identifiers',
+        id: 'publication',
+        label: 'Publication',
         columns: [
-            { id: 'wcvp_id', label: 'WCVP ID', tooltip: 'WCVP Plant Name ID', defaultWidth: 120, filterType: 'text', defaultOn: false },
-            { id: 'ipni_id', label: 'IPNI ID', tooltip: 'IPNI ID', defaultWidth: 100, filterType: 'text', defaultOn: false },
-            { id: 'powo_id', label: 'POWO ID', tooltip: 'POWO ID', defaultWidth: 100, filterType: 'text', defaultOn: false },
-        ]
-    },
-    {
-        id: 'related',
-        label: 'Related Plants',
-        columns: [
-            { id: 'homotypic_synonym', label: 'Homotypic Syn.', tooltip: 'Homotypic Synonym Flag', defaultWidth: 100, filterType: 'text', defaultOn: false },
-            { id: 'accepted_plant_name_id', label: 'Accepted ID', tooltip: 'Accepted Plant Name ID', defaultWidth: 100, filterType: 'text', defaultOn: false },
+            { id: 'taxon_authors', label: 'Authorship', tooltip: 'Taxon Authors', defaultWidth: 180, filterType: 'text', defaultOn: false },
+            { id: 'primary_author', label: 'Prim. Author', tooltip: 'Primary Author', defaultWidth: 150, filterType: 'text', defaultOn: false },
             { id: 'parenthetical_author', label: 'Paren. Author', tooltip: 'Parenthetical Author', defaultWidth: 150, filterType: 'text', defaultOn: false },
+            { id: 'publication_author', label: 'Pub. Author', tooltip: 'Publication Author', defaultWidth: 150, filterType: 'text', defaultOn: false },
             { id: 'replaced_synonym_author', label: 'Syn. Author', tooltip: 'Replaced Synonym Author', defaultWidth: 150, filterType: 'text', defaultOn: false },
-            { id: 'parent_plant_name_id', label: 'Parent Plant ID', tooltip: 'Parent Plant Name ID', defaultWidth: 100, filterType: 'text', defaultOn: false },
-            { id: 'basionym_plant_name_id', label: 'Basionym ID', tooltip: 'Basionym Plant Name ID', defaultWidth: 100, filterType: 'text', defaultOn: false },
+            { id: 'place_of_publication', label: 'Pub. Place', tooltip: 'Place Of Publication', defaultWidth: 200, filterType: 'text', defaultOn: false },
+            { id: 'volume_and_page', label: 'Vol/Page', tooltip: 'Volume And Page', defaultWidth: 120, filterType: 'text', defaultOn: false },
+            { id: 'first_published', label: 'First Published', tooltip: 'First Published Date', defaultWidth: 100, filterType: 'text', defaultOn: false },
+            { id: 'nomenclatural_remarks', label: 'Nom. Remarks', tooltip: 'Nomenclatural Remarks', defaultWidth: 200, filterType: 'text', defaultOn: false },
+            { id: 'reviewed', label: 'Reviewed', tooltip: 'Reviewed Status', defaultWidth: 100, filterType: 'multi-select', filterOptions: ['TRUE', 'FALSE', 'NULL'], defaultOn: false },
         ]
     }
 ];
@@ -662,6 +685,7 @@ export const DataGrid: React.FC<DataGridProps> = ({
   const toggleColumnGroup = (groupId: string) => { const group = COLUMN_GROUPS.find(g => g.id === groupId); if (!group) return; const groupColIds = group.columns.map(c => c.id); const isCurrentlySelected = groupColIds.every(id => visibleColumns.has(id)); const next = new Set(visibleColumns); if (isCurrentlySelected) groupColIds.forEach(id => next.delete(id)); else groupColIds.forEach(id => next.add(id)); setVisibleColumns(next); };
   const handleDragStart = (e: React.DragEvent, id: string) => { if (ALL_COLUMNS.find(c=>c.id===id)?.disableDrag) return; setDraggedColumn(id); e.dataTransfer.effectAllowed = "move"; };
   const handleDragOver = (e: React.DragEvent) => { e.preventDefault(); e.dataTransfer.dropEffect = "move"; };
+  
   const handleDrop = (e: React.DragEvent, targetId: string) => { e.preventDefault(); if (!draggedColumn || draggedColumn === targetId) return; const newOrder = [...columnOrder]; const sIdx = newOrder.indexOf(draggedColumn); const tIdx = newOrder.indexOf(targetId); newOrder.splice(sIdx, 1); newOrder.splice(tIdx, 0, draggedColumn); setColumnOrder(newOrder); setDraggedColumn(null); };
 
   const isAnyGroupCollapsed = collapsedGroups.size > 0;
@@ -938,4 +962,4 @@ export const DataGrid: React.FC<DataGridProps> = ({
       </div>
     </div>
   );
-};
+}

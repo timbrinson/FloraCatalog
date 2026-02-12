@@ -15,9 +15,9 @@ Per **ADR-004 (Universal Naming Standardization)**, this document serves as the 
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
 | **System** | id | Text | unselected | (none) | Internal ID | Internal UUID | id | id | - | - | - | - | - |
 | | parent_id | Text | unselected | (none) | Parent ID | Parent UUID | parent_id | parent_id | - | - | - | - | - |
-| | tree_control | - | selected | tree | Tree | Tree Control | - | - | - | - | - | - | - | - |
-| | descendant_count | Text | selected | (none) | # | Child Count | descendant_count | descendant_count | - | - | - | - | - |
 | | actions | - | unselected | - | Actions | Actions | - | - | - | - | - | - | - | - |
+| | descendant_count | Text | selected | (none) | # | Child Count | descendant_count | descendant_count | - | - | - | - | - |
+| | tree_control | - | selected | tree | Tree | Tree Control | - | - | - | - | - | - | - | - |
 | **Taxon Status**| taxon_name | Text | selected | (none) | Plant Name | Scientific Name | taxon_name | taxon_name | taxon_name | | chr | Full name string | |
 | | taxon_rank | Multi-select | unselected | (none) | Rank | Taxonomic Rank | taxon_rank | taxon_rank | taxon_rank | Kingdom, Phylum... | chr | Hierarchical level | |
 | | taxon_status | Multi-select | unselected | Accepted | Status | Taxonomic Status | taxon_status | taxon_status | taxon_status | Accepted, Synonym... | chr | Nomenclatural status | |
@@ -46,6 +46,9 @@ Per **ADR-004 (Universal Naming Standardization)**, this document serves as the 
 | | wfo_parent_id | Text | unselected | (none) | WFO Parent ID | WFO Parent ID | wfo_parent_id | wfo_parent_id | - | - | - | - | - |
 | | wfo_original_id | Text | unselected | (none) | WFO Orig. ID | WFO Original ID | wfo_original_id | wfo_original_id | - | - | - | - | - |
 | | wfo_scientific_name_id | Text | unselected | (none) | WFO Sci. ID | WFO Scientific ID | wfo_scientific_name_id | wfo_scientific_name_id | - | - | - | - | - |
+| **Descriptive** | lifeform_description | Text | unselected | (none) | Lifeform | Lifeform Description | lifeform_description | lifeform_description | lifeform_description | | chr | Raunkiær description | |
+| | geographic_area | Text | unselected | (none) | Geography | Geographic Area | geographic_area | geographic_area | geographic_area | | chr | Distribution range | |
+| | climate_description | Multi-select | unselected | (none) | Climate | Climate Description | climate_description | climate_description | climate_description | | chr | Habitat type | |
 | **Publication** | taxon_authors | Text | unselected | (none) | Authorship | Taxon Authors | taxon_authors | taxon_authors | taxon_authors | | chr | Concatenation of authors. | |
 | | primary_author | Text | unselected | (none) | Prim. Author | Primary Author | primary_author | primary_author | primary_author | | chr | Author who published the scientific name. | |
 | | parenthetical_author | Text | unselected | (none) | Paren. Author | Parenthetical Author | parenthetical_author | parenthetical_author | parenthetical_author | | chr | Author of the basionym. | |
@@ -57,4 +60,30 @@ Per **ADR-004 (Universal Naming Standardization)**, this document serves as the 
 | | nomenclatural_remarks| Text | unselected | (none) | Nom. Remarks | Nomenclatural Remarks | nomenclatural_remarks | nomenclatural_remarks | nomenclatural_remarks | | chr | Remarks on nomenclature. | |
 | | reviewed | Multi-select | unselected | (none) | Reviewed | Reviewed Status | reviewed | reviewed | reviewed | | chr | Peer review flag. | |
 
-## The Golden
+## The Golden Record (Horticultural Details)
+These fields are stored in the `app_taxon_details` table and are used to enrich standard scientific nomenclature. Per ADR-004, the System Literal and Database Column are identical.
+
+| Group | System Literal (snake_case) | DB Column (Identity Check) | Data Type | Notes |
+| :--- | :--- | :--- | :--- | :--- |
+| **Traits** | description_text | description_text | text | Narrative description |
+| | hardiness_zone_min | hardiness_zone_min | integer | USDA Hardiness Zone |
+| | hardiness_zone_max | hardiness_zone_max | integer | USDA Hardiness Zone |
+| | height_min_cm | height_min_cm | integer | Stored in Centimeters |
+| | height_max_cm | height_max_cm | integer | Stored in Centimeters |
+| | width_min_cm | width_min_cm | integer | Stored in Centimeters |
+| | width_max_cm | width_max_cm | integer | Stored in Centimeters |
+| | origin_year | origin_year | integer | Year of discovery/introduction |
+| **JSONB Layers** | morphology | morphology | jsonb | Leaf/Flower color, texture, shape |
+| | ecology | ecology | jsonb | Soil type, light needs, watering |
+| | history_metadata | history_metadata | jsonb | Background, Discovery story |
+| | alternative_names | alternative_names | jsonb | Trademarks, Patents, Patents, AKAs |
+| | reference_links | reference_links | jsonb | Reputable source URLs |
+
+## Technical Notes
+
+### Infraspecific Ranks
+**Vocabulary:** `subsp., var., subvar., f., subf., agamosp., convar., ecas., grex, group, lusus, microf., microgène, micromorphe, modif., monstr., mut., nid, nothof., nothosubsp., nothovar., positio, proles, provar., psp., stirps, subap., sublusus, subproles, subspecioid, subsubsp., unterrasse.`
+
+### Climate Literals
+**Values:** `desert or dry shrubland, montane tropical, seasonally dry tropical, subalpine or subarctic, subtropical, subtropical or tropical, temperate, temperate, subtropical or tropical, wet tropical.`
+*Note: These are strictly lowercase in the database. Individual terms within the CSV are also preserved character-for-character to maintain baseline integrity.`

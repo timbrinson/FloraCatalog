@@ -1,5 +1,3 @@
-
-
 export interface PalletLevel {
   base_color: string;
   cell_bg_weight: number;
@@ -78,7 +76,6 @@ export interface Taxon {
   class?: string;
   order?: string;
   family?: string;
-  common_name?: string;
   genus?: string;
   genus_hybrid?: string;
   species?: string;
@@ -160,7 +157,6 @@ export interface LineageMapEntry {
 
 export interface SearchCandidate {
   taxon_name: string;
-  common_name?: string;
   accepted_name?: string;
   match_type: string;
   confidence: number;

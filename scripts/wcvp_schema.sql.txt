@@ -152,7 +152,6 @@ CREATE TABLE app_taxa (
     class text COLLATE "C",
     "order" text COLLATE "C",
     family text COLLATE "C",
-    common_name text,
     
     genus text COLLATE "C",
     genus_hybrid text, 

@@ -5,6 +5,7 @@ This document tracks planned features and technical improvements to ensure conti
 - [ ] **Fix Data Mapping:** The columns shown in the grid do not match those in the data mapping. Analyze the differences and report back. Also compare the data mapping to the data columns and report back any discrepencies.
 
 ## Awaiting Verification (Recent Builds)
+- [ ] **Surgical Resets v2.35.9:** Verify individual reset buttons for Colors, Layout (Order/Width/Visibility), and Filters in the Settings menu. Ensure these update the Live UI for preview and require a manual "Save Config" for DB persistence.
 - [ ] **Stabilization Pass v2.35.9:** Verify unified normalization, App.tsx hydration cleanup, and Operations Hub rationale toggles.
 - [ ] **Ingestion Engine v2.35.8:** Verify intermediate rank synonym redirection where synonyms in the parent chain are automatically pivoted to their accepted equivalents during lineage audit.
 - [ ] **Ingestion Engine v2.35.7:** Verify the "Identity Pivot" logic where synonyms are redirected to accepted identities before Stage 4 lineage audit.
@@ -80,7 +81,7 @@ This document tracks planned features and technical improvements to ensure conti
     * **Human Note:** If the "Hierarchy Build" (Step 11) appeared to stall with 0 IOPs, use the updated `scripts/check_progress.sql.txt` to verify if a query is actually running in Postgres. If `pg_stat_activity` is empty, your Node.js process has likely hung or lost the socket connection; restart the build script and select Step 11 to resume.
     > **AI Context:** 
     1. Source Identification: Use `_DwC_backbone_R.zip` from WFO (v2025.12). **WARNING:** The `classification.csv` is ~950MB. Local pre-filtering (distillation) via `scripts/distill_wfo.py.txt` is mandatory to generate a manageable `wfo_import.csv` file.
-    2. Automation: Aligned WFO import with the WCVP staging pattern. Steps 2, 5, and 9 handle WFO-specific logic. **v2.31.9 update:** Step 5 now includes a self-healing `CREATE TABLE IF NOT EXISTS` block to allow enriching an existing DB without a schema reset.
+    2. Automation: Aligned WFO import with the WCVP staging table pattern. Steps 2, 5, and 9 handle WFO-specific logic. **v2.31.9 update:** Step 5 now includes a self-healing `CREATE TABLE IF NOT EXISTS` block to allow enriching an existing DB without a schema reset.
     3. Creation: Step 9 now uses SQL set logic to populate all Orders from `wfo_import` and link 'Derived' Family records to their phylogenetic parents.
     4. Citation: "WFO (2025): World Flora Online. Version 2025.12. Published on the Internet; http://www.worldfloraonline.org. Accessed on: 2026-01-09".
     5. Hierarchy: Re-running Step 11 (Hierarchy Build) shifts the entire database tree down, anchoring it to the new Order roots. **Optimization Note:** Step 13 now includes the `idx_build_path_null` partial index specifically to speed up child-matching during this phase.

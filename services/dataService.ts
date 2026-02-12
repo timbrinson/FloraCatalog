@@ -76,7 +76,6 @@ const mapToDB = (taxon: Taxon) => {
     class: clean(taxon.class),
     "order": clean(taxon.order),
     family: clean(taxon.family),
-    common_name: clean(taxon.common_name),
     genus: clean(taxon.genus),
     genus_hybrid: clean(taxon.genus_hybrid),
     species: clean(taxon.species),
@@ -705,6 +704,30 @@ export const dataService = {
         .from(SETTINGS_TABLE)
         .upsert({ id: 'default_config', settings, updated_at: new Date().toISOString() });
     if (error) throw error;
+  },
+
+  /**
+   * deleteGlobalSettingsKeys: v2.35.10 surgical removal.
+   */
+  async deleteGlobalSettingsKeys(keys: string[]): Promise<void> {
+    if (getIsOffline()) return;
+    const { data } = await getSupabase()
+        .from(SETTINGS_TABLE)
+        .select('settings')
+        .eq('id', 'default_config')
+        .maybeSingle();
+    
+    if (data?.settings) {
+        const newSettings = { ...data.settings };
+        keys.forEach(k => {
+            if (k === 'grid_pallet') {
+                if (newSettings.preferences) delete newSettings.preferences.grid_pallet;
+            } else {
+                delete newSettings[k];
+            }
+        });
+        await this.saveGlobalSettings(newSettings);
+    }
   },
 
   async getBuildDashboard(): Promise<BuildDashboardData | null> {

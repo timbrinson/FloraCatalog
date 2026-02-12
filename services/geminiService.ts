@@ -109,7 +109,6 @@ export async function enrichTaxon(taxon: Taxon): Promise<Partial<Taxon>> {
         type: Type.OBJECT,
         properties: {
           description_text: { type: Type.STRING },
-          common_name: { type: Type.STRING },
           hardiness_zone_min: { type: Type.INTEGER },
           hardiness_zone_max: { type: Type.INTEGER },
           height_min_cm: { type: Type.INTEGER },

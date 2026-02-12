@@ -3,9 +3,11 @@ import {
     X, Settings, Layout, Zap, Palette, Database, Save, Search as SearchIcon, 
     Cpu, AlertTriangle, RefreshCw, Loader2, Trash2, Bug, RotateCcw, 
     Download, Droplets, Type, Square, Grid2X2, Activity, ShieldCheck, 
-    ServerCrash, CheckCircle2, TrendingUp, MonitorCheck
+    ServerCrash, CheckCircle2, TrendingUp, MonitorCheck, FilterX, Columns,
+    TableProperties, Eraser, Undo2, LayoutPanelLeft
 } from 'lucide-react';
 import { UserPreferences, RankPallet, PalletLevel, BuildDashboardData } from '../types';
+import { WorkspaceCategory, WorkspaceAction } from '../App';
 import { reloadClient, MANUAL_URL, MANUAL_KEY, getIsOffline } from '../services/supabaseClient';
 import { dataService } from '../services/dataService';
 import ConfirmDialog from './ConfirmDialog';
@@ -18,6 +20,7 @@ interface SettingsModalProps {
   onMaintenanceComplete?: () => void;
   onSaveLayout?: () => void;
   onReloadLayout?: () => void;
+  onWorkspaceAction: (category: WorkspaceCategory, action: WorkspaceAction) => void;
 }
 
 const TAILWIND_COLORS = ['slate', 'gray', 'zinc', 'neutral', 'stone', 'red', 'orange', 'amber', 'yellow', 'lime', 'green', 'emerald', 'teal', 'cyan', 'sky', 'blue', 'indigo', 'violet', 'purple', 'fuchsia', 'pink', 'rose'];
@@ -35,7 +38,10 @@ const DEFAULT_PALLET_INTERNAL: RankPallet = {
   cultivar: { base_color: 'sky', cell_bg_weight: 50, text_weight: 600, badge_bg_weight: 100, badge_border_weight: 200 }
 };
 
-const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, preferences, onUpdate, onMaintenanceComplete, onSaveLayout, onReloadLayout }) => {
+const SettingsModal: React.FC<SettingsModalProps> = ({ 
+    isOpen, onClose, preferences, onUpdate, onMaintenanceComplete, onSaveLayout, onReloadLayout,
+    onWorkspaceAction
+}) => {
   const [dbUrl, setDbUrl] = useState(localStorage.getItem('supabase_url') || MANUAL_URL);
   const [dbKey, setDbKey] = useState(localStorage.getItem('supabase_anon_key') || MANUAL_KEY);
   const [isPurging, setIsPurging] = useState(false);
@@ -130,13 +136,6 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, preferen
       }
   };
 
-  const resetToSystemDefaults = async () => {
-      if (confirm("This will clear all saved column layouts, filters, and preferences. Continue?")) {
-          await dataService.saveGlobalSettings({});
-          window.location.reload();
-      }
-  };
-
   const renderPalletRow = (label: string, key: keyof RankPallet) => {
     const p = pallet[key];
     if (!p) return null; // Safety check
@@ -185,6 +184,39 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, preferen
       </div>
     );
   };
+
+  const WorkspaceActionRow = ({ label, category }: { label: string, category: WorkspaceCategory }) => (
+    <tr className="border-b border-slate-100 hover:bg-slate-50/50 transition-colors">
+        <td className="py-2.5 px-2 text-[10px] font-black uppercase text-slate-500 tracking-tight">{label}</td>
+        <td className="py-2.5 px-2 text-center">
+            <button 
+                onClick={() => onWorkspaceAction(category, 'reset_ui')}
+                className="p-1.5 text-blue-600 hover:bg-blue-50 rounded transition-all"
+                title="Reset active UI to system defaults"
+            >
+                <RotateCcw size={14} />
+            </button>
+        </td>
+        <td className="py-2.5 px-2 text-center">
+            <button 
+                onClick={() => onWorkspaceAction(category, 'reload_ui')}
+                className="p-1.5 text-indigo-600 hover:bg-indigo-50 rounded transition-all"
+                title="Reload from last saved DB state"
+            >
+                <RefreshCw size={14} />
+            </button>
+        </td>
+        <td className="py-2.5 px-2 text-center">
+            <button 
+                onClick={() => onWorkspaceAction(category, 'delete_db')}
+                className="p-1.5 text-red-600 hover:bg-red-50 rounded transition-all"
+                title="Permanently clear customization from database"
+            >
+                <Trash2 size={14} />
+            </button>
+        </td>
+    </tr>
+  );
 
   return (
     <div className="fixed inset-0 bg-black/60 z-[100] flex items-center justify-center p-4 animate-in fade-in duration-200">
@@ -294,23 +326,56 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, preferen
 
             <div>
                 <div className="flex justify-between items-center mb-3">
-                    <h4 className="text-sm font-bold text-slate-700 uppercase tracking-wide flex items-center gap-2"><Layout size={14}/> Persistence</h4>
+                    <h4 className="text-sm font-bold text-slate-700 uppercase tracking-wide flex items-center gap-2"><LayoutPanelLeft size={14}/> Workspace Snapshot</h4>
                 </div>
                 <div className="bg-slate-50 p-4 rounded-lg border border-slate-200 space-y-3">
-                    <p className="text-[10px] text-slate-500 mb-2">Save your layout and custom pallet to the database.</p>
+                    <p className="text-[10px] text-slate-500 mb-2 font-medium">Commit your current session layout and pallet to the database as the new personal baseline.</p>
                     <div className="grid grid-cols-2 gap-3">
                         <button 
                             onClick={onSaveLayout} 
                             className="flex items-center justify-center gap-2 py-2.5 bg-slate-800 text-white rounded-lg hover:bg-slate-900 text-xs font-bold shadow-sm transition-all"
                         >
-                            <Save size={14} /> Save Config
+                            <Save size={14} /> Save Current to DB
                         </button>
                         <button 
                             onClick={onReloadLayout} 
                             className="flex items-center justify-center gap-2 py-2.5 bg-white border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 text-xs font-bold shadow-sm transition-all"
                         >
-                            <Download size={14} /> Reload
+                            <Download size={14} /> Reload from DB
                         </button>
+                    </div>
+                </div>
+            </div>
+
+            {/* v2.35.10 Granular Workspace Control Center */}
+            <div>
+                <div className="flex justify-between items-center mb-3">
+                    <h4 className="text-sm font-bold text-slate-700 uppercase tracking-wide flex items-center gap-2"><TableProperties size={14}/> Workspace Control Center</h4>
+                </div>
+                <div className="bg-slate-50 rounded-lg border border-slate-200 overflow-hidden shadow-sm">
+                    <table className="w-full text-left text-xs border-collapse">
+                        <thead className="bg-slate-100/50 border-b border-slate-200">
+                            <tr>
+                                <th className="py-2 px-2 text-[9px] font-black uppercase text-slate-400">Category</th>
+                                <th className="py-2 px-2 text-[9px] font-black uppercase text-slate-400 text-center">UI Reset</th>
+                                <th className="py-2 px-2 text-[9px] font-black uppercase text-slate-400 text-center">DB Undo</th>
+                                <th className="py-2 px-2 text-[9px] font-black uppercase text-slate-400 text-center">DB Wipe</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <WorkspaceActionRow label="Taxonomic Colors" category="colors" />
+                            <WorkspaceActionRow label="Column Order" category="order" />
+                            <WorkspaceActionRow label="Column Widths" category="widths" />
+                            <WorkspaceActionRow label="Column Selection" category="selection" />
+                            <WorkspaceActionRow label="Active Filters" category="filters" />
+                        </tbody>
+                    </table>
+                    <div className="p-3 bg-white border-t border-slate-100">
+                        <div className="grid grid-cols-3 gap-2">
+                            <div className="flex items-center gap-1 text-[8px] text-slate-400 font-bold uppercase"><RotateCcw size={10} className="text-blue-500" /> UI Default</div>
+                            <div className="flex items-center gap-1 text-[8px] text-slate-400 font-bold uppercase"><RefreshCw size={10} className="text-indigo-500" /> Reload Last</div>
+                            <div className="flex items-center gap-1 text-[8px] text-slate-400 font-bold uppercase"><Trash2 size={10} className="text-red-500" /> Nuke DB Key</div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -342,11 +407,10 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, preferen
 
             <div>
                 <div className="flex justify-between items-center mb-3">
-                    <h4 className="text-sm font-bold text-slate-700 uppercase tracking-wide flex items-center gap-2"><Palette size={14}/> Grid Customization</h4>
-                    <button onClick={resetToSystemDefaults} className="flex items-center gap-1 text-[10px] font-bold text-red-600 uppercase hover:underline"><RotateCcw size={10}/> Reset Pallet</button>
+                    <h4 className="text-sm font-bold text-slate-700 uppercase tracking-wide flex items-center gap-2"><Palette size={14}/> Pallet Lab</h4>
                 </div>
                 <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 space-y-3">
-                    <p className="text-[10px] text-slate-500 mb-2">Granular control over grid colors and weights (Tailwind CSS v3 based).</p>
+                    <p className="text-[10px] text-slate-500 mb-2 font-medium">Fine-tune contrast and visibility weights for the taxonomic tree.</p>
                     {renderPalletRow('Kingdom', 'kingdom')}
                     {renderPalletRow('Phylum', 'phylum')}
                     {renderPalletRow('Class', 'class')}
