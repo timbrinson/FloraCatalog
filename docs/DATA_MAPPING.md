@@ -8,6 +8,7 @@ Per **ADR-004 (Universal Naming Standardization)**, this document serves as the 
 3.  **The Presentation Authority:** It is the master source for human-facing metadata (UI Labels and Tooltips).
 4.  **The Provenance Link:** It maintains the critical link between unified internal literals and the raw WCVP source columns.
 5.  **Auditability:** The columns for "System Literal" and "DB Column" in the table below are identical by design, serving as a visual parity check for AI-driven development.
+6.  **Sequence Sovereignty:** The order of rows in this document is the definitive **System Default Order** for the application's Data Grid. Workspace resets revert the column sequence to this specific vertical order.
 
 ## Master Mapping Table
 
@@ -19,14 +20,14 @@ Per **ADR-004 (Universal Naming Standardization)**, this document serves as the 
 | | descendant_count | Text | selected | (none) | # | Child Count | descendant_count | descendant_count | - | - | - | - | - |
 | | tree_control | - | selected | tree | Tree | Tree Control | - | - | - | - | - | - | - | - |
 | **Taxon Status**| taxon_name | Text | selected | (none) | Plant Name | Scientific Name | taxon_name | taxon_name | taxon_name | | chr | Full name string | |
-| | taxon_rank | Multi-select | unselected | (none) | Rank | Taxonomic Rank | taxon_rank | taxon_rank | taxon_rank | Kingdom, Phylum... | chr | Hierarchical level | |
-| | taxon_status | Multi-select | unselected | Accepted | Status | Taxonomic Status | taxon_status | taxon_status | taxon_status | Accepted, Synonym... | chr | Nomenclatural status | |
+| | taxon_rank | Multi-select | selected | (none) | Rank | Taxonomic Rank | taxon_rank | taxon_rank | taxon_rank | Kingdom, Phylum... | chr | Hierarchical level | |
+| | taxon_status | Multi-select | selected | Accepted, Artificial Hybrid, Registered, Provisional | Status | Taxonomic Status | taxon_status | taxon_status | taxon_status | Accepted, Synonym... | chr | Nomenclatural status | |
 | | homotypic_synonym | Text | unselected | (none) | Homotypic Syn. | Homotypic Synonym Flag | homotypic_synonym | homotypic_synonym | homotypic_synonym | 0 | logical | TRUE if homotypic synonym. | ICN Link |
 | | hybrid_formula | Text | unselected | (none) | Hybrid Formula | Hybrid Formula | hybrid_formula | hybrid_formula | hybrid_formula | | chr | Hybrid parentage | |
 | **Taxonomy** | kingdom | Text | unselected | (none) | Kingdom | Taxonomic Kingdom | kingdom | kingdom | - | - | - | - | - |
 | | phylum | Text | unselected | (none) | Phylum | Taxonomic Phylum | phylum | phylum | - | - | - | - | - |
 | | class | Text | unselected | (none) | Class | Taxonomic Class | class | class | - | - | - | - | - |
-| | order | Text | selected | (none) | Order | Phylogenetic Order | order | order | - | - | - | - | - |
+| | order | Text | unselected | (none) | Order | Phylogenetic Order | order | order | - | - | - | - | - |
 | | family | Text | unselected | (none) | Family | Family Name | family | family | family | | chr | Botanical Family | |
 | **Nomenclature** | genus_hybrid | Multi-select | selected | (none) | GH | Genus Hybrid Indicator | genus_hybrid | genus_hybrid | genus_hybrid | +, × | chr | Hybrid marker | |
 | | genus | Text | selected | (none) | Genus | Genus Designation | genus | genus | genus | | chr | Botanical Genus | |
@@ -86,4 +87,4 @@ These fields are stored in the `app_taxon_details` table and are used to enrich 
 
 ### Climate Literals
 **Values:** `desert or dry shrubland, montane tropical, seasonally dry tropical, subalpine or subarctic, subtropical, subtropical or tropical, temperate, temperate, subtropical or tropical, wet tropical.`
-*Note: These are strictly lowercase in the database. Individual terms within the CSV are also preserved character-for-character to maintain baseline integrity.`
+*Note: These are strictly lowercase in the database. Individual terms within the CSV are also preserved character-for-character to maintain baseline integrity.

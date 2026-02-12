@@ -18,13 +18,27 @@ interface AppLayoutConfig {
     colWidths?: Record<string, number>;
 }
 
-// System-wide default columns/widths used for resets
+// v2.35.10: Definitive System Order matched to docs/DATA_MAPPING.md
 const ALL_DEFAULT_COLS = [
-    { id: 'actions', width: 90, on: true },
+    // System
+    { id: 'id', width: 100, on: false },
+    { id: 'parent_id', width: 100, on: false },
+    { id: 'actions', width: 90, on: false },
     { id: 'descendant_count', width: 50, on: true },
     { id: 'tree_control', width: 55, on: true },
+    // Taxon Status
     { id: 'taxon_name', width: 220, on: true },
-    { id: 'order', width: 120, on: true },
+    { id: 'taxon_rank', width: 110, on: true },
+    { id: 'taxon_status', width: 110, on: true },
+    { id: 'homotypic_synonym', width: 100, on: false },
+    { id: 'hybrid_formula', width: 180, on: false },
+    // Taxonomy
+    { id: 'kingdom', width: 100, on: false },
+    { id: 'phylum', width: 100, on: false },
+    { id: 'class', width: 100, on: false },
+    { id: 'order', width: 120, on: false },
+    { id: 'family', width: 120, on: false },
+    // Nomenclature
     { id: 'genus_hybrid', width: 40, on: true },
     { id: 'genus', width: 120, on: true },
     { id: 'species_hybrid', width: 40, on: true },
@@ -32,23 +46,34 @@ const ALL_DEFAULT_COLS = [
     { id: 'infraspecific_rank', width: 80, on: true },
     { id: 'infraspecies', width: 120, on: true },
     { id: 'cultivar', width: 150, on: true },
-    // Technical cols off by default
-    { id: 'id', width: 100, on: false },
-    { id: 'parent_id', width: 100, on: false },
-    { id: 'taxon_rank', width: 110, on: false },
-    { id: 'taxon_status', width: 110, on: false },
-    { id: 'homotypic_synonym', width: 100, on: false },
-    { id: 'hybrid_formula', width: 180, on: false },
-    { id: 'kingdom', width: 100, on: false },
-    { id: 'phylum', width: 100, on: false },
-    { id: 'class', width: 100, on: false },
-    { id: 'family', width: 120, on: false },
+    // Standard Identifiers
+    { id: 'wcvp_id', width: 120, on: false },
+    { id: 'accepted_plant_name_id', width: 100, on: false },
+    { id: 'parent_plant_name_id', width: 100, on: false },
+    { id: 'basionym_plant_name_id', width: 100, on: false },
+    { id: 'ipni_id', width: 100, on: false },
+    { id: 'powo_id', width: 100, on: false },
+    // WFO Identifiers
+    { id: 'wfo_id', width: 120, on: false },
+    { id: 'wfo_accepted_id', width: 120, on: false },
+    { id: 'wfo_parent_id', width: 120, on: false },
+    { id: 'wfo_original_id', width: 120, on: false },
+    { id: 'wfo_scientific_name_id', width: 120, on: false },
+    // Descriptive
     { id: 'lifeform_description', width: 150, on: false },
     { id: 'geographic_area', width: 180, on: false },
     { id: 'climate_description', width: 180, on: false },
-    { id: 'wcvp_id', width: 120, on: false },
-    { id: 'ipni_id', width: 100, on: false },
-    { id: 'powo_id', width: 100, on: false }
+    // Publication
+    { id: 'taxon_authors', width: 180, on: false },
+    { id: 'primary_author', width: 150, on: false },
+    { id: 'parenthetical_author', width: 150, on: false },
+    { id: 'publication_author', width: 150, on: false },
+    { id: 'replaced_synonym_author', width: 150, on: false },
+    { id: 'place_of_publication', width: 200, on: false },
+    { id: 'volume_and_page', width: 120, on: false },
+    { id: 'first_published', width: 100, on: false },
+    { id: 'nomenclatural_remarks', width: 200, on: false },
+    { id: 'reviewed', width: 100, on: false }
 ];
 
 const DEFAULT_PALLET: RankPallet = {
@@ -65,6 +90,9 @@ const DEFAULT_PALLET: RankPallet = {
 
 export type WorkspaceCategory = 'colors' | 'order' | 'widths' | 'selection' | 'filters';
 export type WorkspaceAction = 'reset_ui' | 'reload_ui' | 'delete_db';
+
+// Multi-authority baseline Status set
+const DEFAULT_STATUS_LIST = ['Accepted', 'Artificial Hybrid', 'Registered', 'Provisional'];
 
 export default function App() {
   const [loadingState, setLoadingState] = useState<LoadingState>(LoadingState.IDLE);
@@ -92,7 +120,7 @@ export default function App() {
   const settingsLoadedRef = useRef(false);
 
   const [sortConfig, setSortConfig] = useState<{ key: string, direction: 'asc' | 'desc' }>({ key: 'taxon_name', direction: 'asc' });
-  const [gridFilters, setGridFilters] = useState<Record<string, any>>({ taxon_status: ['Accepted'] });
+  const [gridFilters, setGridFilters] = useState<Record<string, any>>({ taxon_status: DEFAULT_STATUS_LIST });
   const [isOffline, setIsOffline] = useState(getIsOffline());
   const [preferences, setPreferences] = useState<UserPreferences>({ 
       hybrid_spacing: 'space',
@@ -194,7 +222,11 @@ export default function App() {
 
   const isFiltering = useMemo(() => {
     return Object.entries(gridFilters).some(([key, value]) => {
-      if (key === 'taxon_status') return !Array.isArray(value) || value.length !== 1 || value[0] === 'Accepted';
+      if (key === 'taxon_status') {
+          if (!Array.isArray(value)) return true;
+          if (value.length !== DEFAULT_STATUS_LIST.length) return true;
+          return !DEFAULT_STATUS_LIST.every(s => value.includes(s));
+      }
       return value && (Array.isArray(value) ? value.length > 0 : String(value).trim() !== '');
     });
   }, [gridFilters]);
@@ -227,15 +259,25 @@ export default function App() {
           return;
       }
 
+      // v2.35.11: Live-merge logic to ensure surgical resets don't clobber other session changes
       const applyUIRange = (config: Partial<AppLayoutConfig>) => {
-          setInitialLayout(prev => ({ ...prev, ...config }));
+          const live = latestLayoutRef.current;
+          
+          // Construct base from LIVE session if available, else fall back to initialLayout (DB)
+          const base: AppLayoutConfig = {
+              visibleColumns: live ? new Set(live.visibleColumns) : (initialLayout?.visibleColumns || new Set()),
+              columnOrder: live ? live.columnOrder : (initialLayout?.columnOrder || []),
+              colWidths: live ? live.colWidths : (initialLayout?.colWidths || {}),
+          };
+
+          setInitialLayout({ ...base, ...config });
           setGridKey(k => k + 1);
       };
 
       if (action === 'reset_ui') {
           switch (category) {
               case 'colors': setPreferences(p => ({ ...p, grid_pallet: DEFAULT_PALLET })); break;
-              case 'filters': setGridFilters({ taxon_status: ['Accepted'] }); break;
+              case 'filters': setGridFilters({ taxon_status: DEFAULT_STATUS_LIST }); break;
               case 'order': applyUIRange({ columnOrder: ALL_DEFAULT_COLS.map(c => c.id) }); break;
               case 'widths': applyUIRange({ colWidths: Object.fromEntries(ALL_DEFAULT_COLS.map(c => [c.id, c.width])) }); break;
               case 'selection': applyUIRange({ visibleColumns: new Set(ALL_DEFAULT_COLS.filter(c => c.on).map(c => c.id)) }); break;
