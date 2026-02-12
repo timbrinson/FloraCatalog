@@ -12,6 +12,9 @@ const DETAILS_TABLE = 'app_taxon_details';
 const SOURCES_TABLE = 'app_data_sources';
 const SETTINGS_TABLE = 'app_settings_global';
 
+// Multi-authority baseline Status set (v2.36.0 baseline trigger)
+const BASELINE_STATUS_LIST = ['Accepted', 'Artificial Hybrid', 'Registered', 'Provisional'];
+
 // --- MAPPERS ---
 
 const mapSourceFromDB = (row: any): DataSource => ({
@@ -161,8 +164,13 @@ export const dataService = {
 
     if (getIsOffline()) return { data: [], count: 0 };
 
+    // v2.36.0: Trigger baseline count estimation only if filters match the multi-authority default set
     const isBaseline = Object.entries(filters).every(([k, v]) => {
-      if (k === 'taxon_status') return Array.isArray(v) && v.length === 1 && v[0] === 'Accepted';
+      if (k === 'taxon_status') {
+          if (!Array.isArray(v)) return false;
+          if (v.length !== BASELINE_STATUS_LIST.length) return false;
+          return BASELINE_STATUS_LIST.every(s => v.includes(s));
+      }
       return !v || (Array.isArray(v) && v.length === 0);
     });
 

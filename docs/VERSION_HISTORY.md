@@ -1,8 +1,18 @@
 # Version History
 
+## v2.36.0 - Authority & Ingestion Milestone Completion
+**Date:** January 14, 2026
+**Status:** Clean Snapshot Baseline
+
+### Synchronization & Registry Alignment
+- **Registry Parity:** Synchronized all code defaults with `docs/DATA_MAPPING.md`. Status and Rank are now selected by default; Actions and Order are unselected.
+- **Baseline Count Logic:** Updated the 1.44M record "Estimated Count" trigger to recognize the new multi-authority status default (Accepted, Artificial Hybrid, Registered, Provisional).
+- **Type Refinement:** Eliminated legacy "any" casting in the Data Grid row engine. Introduced a strictly typed `TreeRow` for virtual hierarchy nodes.
+- **Surgical Matrix Reset:** Hardened the Workspace Control center to allow individual resets of Order, Widths, and Selection without clobbering live session state.
+
 ## v2.34.3 - Process Conclusion & Outcome Auditing
 **Date:** January 13, 2026
-**Status:** Current Release
+**Status:** (Historical)
 
 ### Activity Hub
 - **Outcome Summaries:** Introduced a high-visibility "Final Outcome" block at the bottom of activity cards. Completed tasks now explicitly summarize their results (e.g., "Found 4 authoritative links", "Successfully cataloged record") for faster post-mortem review.

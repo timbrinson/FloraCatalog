@@ -105,6 +105,7 @@ const MultiSelectFilter = ({ options, selected, onChange, label }: { options: st
     );
 };
 
+// v2.36.0 Strictly typed TreeRow for hierarchy management
 type TreeRow = Taxon & {
     is_tree_header?: boolean;
     tree_expanded?: boolean;
@@ -136,6 +137,7 @@ interface ColumnGroup {
     columns: ColumnConfig[];
 }
 
+// v2.36.0 Alignment with Sovereign DATA_MAPPING.md
 const COLUMN_GROUPS: ColumnGroup[] = [
     {
         id: 'system',
@@ -143,7 +145,7 @@ const COLUMN_GROUPS: ColumnGroup[] = [
         columns: [
             { id: 'id', label: 'Internal ID', tooltip: 'Internal UUID', defaultWidth: 100, filterType: 'text', defaultOn: false },
             { id: 'parent_id', label: 'Parent ID', tooltip: 'Parent UUID', defaultWidth: 100, filterType: 'text', defaultOn: false },
-            { id: 'actions', label: 'Actions', tooltip: 'Actions', defaultWidth: 90, disableSorting: true, lockWidth: true, hideHeaderIcons: true, headerAlign: 'center', defaultOn: true },
+            { id: 'actions', label: 'Actions', tooltip: 'Actions', defaultWidth: 90, disableSorting: true, lockWidth: true, hideHeaderIcons: true, headerAlign: 'center', defaultOn: false },
             { id: 'descendant_count', label: '#', tooltip: 'Child Count', defaultWidth: 50, filterType: 'text', hideHeaderIcons: true, headerAlign: 'center', lockWidth: true, defaultOn: true },
             { id: 'tree_control', label: 'Tree', tooltip: 'Tree Control', defaultWidth: 55, disableSorting: true, lockWidth: true, hideHeaderIcons: true, headerAlign: 'center', defaultOn: true },
         ]
@@ -161,7 +163,7 @@ const COLUMN_GROUPS: ColumnGroup[] = [
                 filterType: 'multi-select', 
                 filterOptions: ['Kingdom', 'Phylum', 'Class', 'Order', 'Family', 'Genus', 'Species', 'Subspecies', 'Variety', 'Subvariety', 'Form', 'Subform', 'Cultivar', 'Unranked', 'agamosp.', 'Convariety', 'ecas.', 'grex', 'lusus', 'microf.', 'microgène', 'micromorphe', 'modif.', 'monstr.', 'mut.', 'nid', 'nothof.', 'nothosubsp.', 'nothovar.', 'positio', 'proles', 'provar.', 'psp.', 'stirps', 'subap.', 'sublusus', 'subproles', 'subspecioid', 'subsubsp.'], 
                 lockWidth: true, 
-                defaultOn: false 
+                defaultOn: true 
             },
             { 
                 id: 'taxon_status', 
@@ -170,7 +172,7 @@ const COLUMN_GROUPS: ColumnGroup[] = [
                 defaultWidth: 110, 
                 filterType: 'multi-select', 
                 filterOptions: ['Accepted', 'Synonym', 'Unplaced', 'Unchecked', 'Registered', 'Provisional', 'Artificial Hybrid', 'Illegitimate', 'Invalid', 'Local Biotype', 'Misapplied', 'Orthographic', 'Provisionally Accepted'], 
-                defaultOn: false 
+                defaultOn: true 
             },
             { id: 'homotypic_synonym', label: 'Homotypic Syn.', tooltip: 'Homotypic Synonym Flag', defaultWidth: 100, filterType: 'text', defaultOn: false },
             { id: 'hybrid_formula', label: 'Hybrid Formula', tooltip: 'Hybrid Formula', defaultWidth: 180, filterType: 'text', defaultOn: false },
@@ -183,7 +185,7 @@ const COLUMN_GROUPS: ColumnGroup[] = [
             { id: 'kingdom', label: 'Kingdom', tooltip: 'Taxonomic Kingdom', defaultWidth: 100, filterType: 'text', defaultOn: false },
             { id: 'phylum', label: 'Phylum', tooltip: 'Taxonomic Phylum', defaultWidth: 100, filterType: 'text', defaultOn: false },
             { id: 'class', label: 'Class', tooltip: 'Taxonomic Class', defaultWidth: 100, filterType: 'text', defaultOn: false },
-            { id: 'order', label: 'Order', tooltip: 'Phylogenetic Order', defaultWidth: 120, filterType: 'text', defaultOn: true },
+            { id: 'order', label: 'Order', tooltip: 'Phylogenetic Order', defaultWidth: 120, filterType: 'text', defaultOn: false },
             { id: 'family', label: 'Family', tooltip: 'Family Name', defaultWidth: 120, filterType: 'text', defaultOn: false },
         ]
     },
@@ -307,41 +309,28 @@ export const DataGrid: React.FC<DataGridProps> = ({
 }) => {
   
   /**
-   * Layout Healers: Ensure new standard features are injected.
+   * Layout Healers: Ensure new standard features are injected into session state.
    */
-  const healVisibleColumns = useCallback((incoming: Set<string>, incomingOrder?: string[]) => {
+  const healVisibleColumns = useCallback((incoming: Set<string>) => {
       const healed = new Set(incoming);
-      const newDefaults = ['kingdom', 'phylum', 'class', 'order'];
-      if (incomingOrder) {
-          newDefaults.forEach(id => {
-              if (!incomingOrder.includes(id)) {
-                  const col = ALL_COLUMNS.find(c => c.id === id);
-                  if (col?.defaultOn) healed.add(id);
-              }
-          });
-      }
+      // Ensure Rank and Status are on if we are healing a legacy config
+      const required = ['taxon_rank', 'taxon_status', 'descendant_count', 'tree_control'];
+      required.forEach(id => {
+          if (!healed.has(id)) healed.add(id);
+      });
       return healed;
   }, []);
 
   const healColumnOrder = useCallback((incoming: string[]) => {
       let baseOrder = [...incoming];
-      const newRanks = ['kingdom', 'phylum', 'class', 'order'];
-      const missing = newRanks.filter(id => !baseOrder.includes(id));
-      
-      if (missing.length > 0) {
-          // Place at index 3 onwards for high visibility
-          missing.forEach((id, idx) => {
-              baseOrder.splice(3 + idx, 0, id);
-          });
-      }
-      
-      const finalMissing = ALL_COLUMNS.filter(c => !baseOrder.includes(c.id)).map(c => c.id);
-      return [...baseOrder, ...finalMissing];
+      const allIds = ALL_COLUMNS.map(c => c.id);
+      const missing = allIds.filter(id => !baseOrder.includes(id));
+      return [...baseOrder, ...missing];
   }, []);
 
   const [visibleColumns, setVisibleColumns] = useState<Set<string>>(() => {
       if (propVisibleColumns !== undefined) {
-          return healVisibleColumns(propVisibleColumns, propColumnOrder);
+          return healVisibleColumns(propVisibleColumns);
       }
       return new Set(ALL_COLUMNS.filter(c => c.defaultOn).map(c => c.id));
   });
@@ -433,8 +422,8 @@ export const DataGrid: React.FC<DataGridProps> = ({
 
   const { allTaxaPool, authorityRegistry } = useMemo(() => {
     const registry = new Map<string, TreeRow>();
-    ancestors.forEach(t => registry.set(t.id, { ...t, origin_type: 'ancestor' }));
-    taxa.forEach(t => registry.set(t.id, { ...t, origin_type: 'result' }));
+    ancestors.forEach(t => registry.set(t.id, { ...t, origin_type: 'ancestor' } as TreeRow));
+    taxa.forEach(t => registry.set(t.id, { ...t, origin_type: 'result' } as TreeRow));
     const pool = Array.from(registry.values());
     return { allTaxaPool: pool, authorityRegistry: registry };
   }, [taxa, ancestors]);
@@ -442,8 +431,6 @@ export const DataGrid: React.FC<DataGridProps> = ({
   const getRowValue = (row: Taxon, colId: string) => {
        const tr = row as TreeRow;
        if (colId === 'descendant_count') { 
-         // ADR-002 Strategy: Show authoritative direct child count. 
-         // emphasizing virtual rows by returning blank.
          if (tr.is_virtual) return '';
          return tr.descendant_count ?? 0;
        }
@@ -876,8 +863,6 @@ export const DataGrid: React.FC<DataGridProps> = ({
                                         {tr.is_tree_header && <span className={`transform transition-transform inline-block ${tr.tree_expanded ? 'rotate-90' : ''}`}><ChevronRightIcon size={14} /></span>}
                                    </div>
                                </td>;
-                               // DO NOT render complex types directly as React children.
-                               // Use String() conversion to ensure TypeScript compatibility with ReactNode.
                                if (col.id === 'descendant_count') return <td key={col.id} className="p-2 text-xs text-center text-slate-400 font-mono">{String(val ?? '')}</td>;
                                if (col.id === 'actions') return (
                                  <td key={col.id} className="p-2 border-r border-slate-200 text-center">
@@ -897,12 +882,9 @@ export const DataGrid: React.FC<DataGridProps> = ({
                                  </td>
                                );
 
-                               // Fix: Safely handle potentially complex types for React rendering
-                               // Using explicit type narrowing to prevent TS errors with the Taxon union type
                                let displayVal: React.ReactNode = '';
                                if (typeof val === 'string') { 
                                    displayVal = val; 
-                                   // Special handling for hybrid markers that might be strings
                                    if ((col.id === 'genus_hybrid' || col.id === 'species_hybrid') && (val === 'x' || val === 'X' || val === '×')) {
                                        displayVal = '×';
                                    }
@@ -911,7 +893,6 @@ export const DataGrid: React.FC<DataGridProps> = ({
                                } else if (typeof val === 'boolean') { 
                                    displayVal = val ? 'Yes' : 'No'; 
                                } else if (val && typeof val === 'object') {
-                                   // For object types (like morphology, ecology), stringify to avoid React errors
                                    displayVal = JSON.stringify(val);
                                }
 

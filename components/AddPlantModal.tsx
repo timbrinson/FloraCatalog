@@ -11,7 +11,7 @@ import { dataService } from '../services/dataService';
 import { Taxon, ActivityItem, ActivityStatus, ActivityStep, SearchCandidate, Synonym } from '../types';
 import { assembleScientificName, normalizeTaxonParts, getNakedName, parseBotanicalName } from '../utils/formatters';
 
-const APP_VERSION = 'v2.35.9';
+const APP_VERSION = 'v2.36.0';
 
 interface CandidateGroup {
     primary: SearchCandidate;
